@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/shared/StatusBadge'
+import { PageContainer, PageHeader } from '@/components/shared/ui-kit'
 import { REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import { ArrowLeft, FileText, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
@@ -39,37 +40,23 @@ export default function RequestDetailClient({ request, user, role }: RequestDeta
       user={user}
       role={role}
     >
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link
-          href="/mintah"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft size="14" />
-          Back to Dashboard
-        </Link>
+      <PageContainer className="space-y-6">
+        <PageHeader
+          backHref="/mintah"
+          backLabel="Back to Dashboard"
+          title="Request Info"
+          subtitle="Review details submitted by requester"
+          actions={<StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />}
+        />
 
-        <div className="mb-6 flex items-center justify-between gap-4 animate-slide-up">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-              Request Info
-            </h1>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Review details submitted by requester
-            </p>
-          </div>
-          <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
-        </div>
-
-        <div className="animate-slide-up" style={{ animationDelay: '0.05s' }}>
-          <RichRequisitionView 
-            description={request.description} 
-            fallbackPurpose={request.purpose} 
-            fallbackDate={request.created_at} 
-          />
-        </div>
+        <RichRequisitionView
+          description={request.description}
+          fallbackPurpose={request.purpose}
+          fallbackDate={request.created_at}
+        />
 
         {request.status === 'new' || request.status === 'reviewing' ? (
-          <div className="mt-6 flex flex-wrap gap-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="flex flex-wrap gap-3">
             <Button
               onClick={handleConvertToPO}
               disabled={isConverting}
@@ -94,16 +81,14 @@ export default function RequestDetailClient({ request, user, role }: RequestDeta
             </Link>
           </div>
         ) : (
-          <div className="mt-6">
-            <Link href="/mintah">
-              <Button variant="outline" size="lg" className="gap-1.5">
-                <ArrowLeft size="16" />
-                Back to Dashboard
-              </Button>
-            </Link>
-          </div>
+          <Link href="/mintah">
+            <Button variant="outline" size="lg" className="gap-1.5">
+              <ArrowLeft size="16" />
+              Back to Dashboard
+            </Button>
+          </Link>
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   )
 }

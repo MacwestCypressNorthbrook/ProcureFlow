@@ -1,7 +1,8 @@
 import { getUserFromSession, createClient } from '@/lib/supabase/server'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import POCard from '@/components/shared/POCard'
-import { Card, CardContent } from '@/components/ui/card'
+import POTable from '@/components/shared/POTable'
+import { PageContainer, EmptyState } from '@/components/shared/ui-kit'
+import { CheckCircle } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
 
 export default async function FinanceCompletedPage() {
@@ -25,26 +26,13 @@ export default async function FinanceCompletedPage() {
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'finance'}
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <PageContainer>
         {pos.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pos.map((po) => (
-              <POCard
-                key={po.id}
-                po={po}
-                href={`/finance/${po.id}`}
-                showActions={false}
-              />
-            ))}
-          </div>
+          <POTable pos={pos} hrefBase="/finance" />
         ) : (
-          <Card className="glass-card border-border/40">
-            <CardContent className="p-12 text-center text-muted-foreground font-semibold">
-              No completed payments yet.
-            </CardContent>
-          </Card>
+          <EmptyState icon={<CheckCircle size={20} />} title="No completed payments" description="Processed payments will appear here." />
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   )
 }

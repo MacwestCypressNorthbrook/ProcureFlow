@@ -1,11 +1,11 @@
 import { getUserFromSession, createClient } from '@/lib/supabase/server'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import RequestCard from '@/components/shared/RequestCard'
-import POCard from '@/components/shared/POCard'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import RequestTable from '@/components/shared/RequestTable'
+import POTable from '@/components/shared/POTable'
+import { PageContainer, SectionHeader, StatStrip, EmptyState } from '@/components/shared/ui-kit'
 import { FileText, ShoppingBag, AlertTriangle, CheckCircle, Eye } from 'lucide-react'
 import Link from 'next/link'
+import type { PurchaseOrder } from '@/lib/types'
 
 export default async function MintahPage() {
   const user = await getUserFromSession()
@@ -17,30 +17,14 @@ export default async function MintahPage() {
 
   try {
     const [incomingRes, reviewingRes, poRes] = await Promise.all([
-      supabase
-        .from('requests')
-        .select('*')
-        .eq('status', 'new')
-        .order('created_at', { ascending: false })
-        .limit(6),
-      supabase
-        .from('requests')
-        .select('*')
-        .eq('status', 'reviewing')
-        .order('created_at', { ascending: false })
-        .limit(6),
-      supabase
-        .from('purchase_orders')
-        .select('*')
-        .eq('created_by', user?.id ?? '')
-        .order('created_at', { ascending: false }),
+      supabase.from('requests').select('*').eq('status', 'new').order('created_at', { ascending: false }).limit(8),
+      supabase.from('requests').select('*').eq('status', 'reviewing').order('created_at', { ascending: false }).limit(8),
+      supabase.from('purchase_orders').select('*').eq('created_by', user?.id ?? '').order('created_at', { ascending: false }),
     ])
     incomingRequests = (incomingRes.data as Record<string, unknown>[]) ?? []
     reviewingRequests = (reviewingRes.data as Record<string, unknown>[]) ?? []
     myPOs = (poRes.data as Record<string, unknown>[]) ?? []
-  } catch {
-    // DB may be unavailable
-  }
+  } catch {}
 
   const stats = {
     newRequests: incomingRequests.length,
@@ -50,8 +34,8 @@ export default async function MintahPage() {
     completed: myPOs.filter((po) => po.status === 'completed').length,
   }
 
-  const allIncoming = [...incomingRequests, ...reviewingRequests].slice(0, 6)
-  const recentPOs = myPOs.slice(0, 6)
+  const allIncoming = [...incomingRequests, ...reviewingRequests].slice(0, 8)
+  const recentPOs = myPOs.slice(0, 8)
 
   return (
     <DashboardLayout
@@ -60,150 +44,43 @@ export default async function MintahPage() {
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'mintah'}
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8 stagger animate-slide-up">
-          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                  <FileText size="22" className="text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold tracking-tight">{stats.newRequests}</p>
-                  <p className="text-xs text-muted-foreground font-semibold">New Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-                  <Eye size="22" className="text-amber-600 dark:text-amber-400" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold tracking-tight">{stats.underReview}</p>
-                  <p className="text-xs text-muted-foreground font-semibold">Under Review</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-                  <ShoppingBag size="22" className="text-indigo-600 dark:text-indigo-400" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold tracking-tight">{stats.myPOs}</p>
-                  <p className="text-xs text-muted-foreground font-semibold">My POs</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                  <AlertTriangle size="22" className="text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold tracking-tight">{stats.pendingSam}</p>
-                  <p className="text-xs text-muted-foreground font-semibold">Awaiting Sam</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                  <CheckCircle size="22" className="text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-3xl font-bold tracking-tight">{stats.completed}</p>
-                  <p className="text-xs text-muted-foreground font-semibold">Completed</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      <PageContainer className="space-y-8">
+        <StatStrip
+          stats={[
+            { label: 'New Requests', value: stats.newRequests, icon: <FileText size={18} />, accent: 'blue', href: '/mintah/requests' },
+            { label: 'Under Review', value: stats.underReview, icon: <Eye size={18} />, accent: 'amber', href: '/mintah/reviewing' },
+            { label: 'My POs', value: stats.myPOs, icon: <ShoppingBag size={18} />, accent: 'indigo', href: '/mintah/pos' },
+            { label: 'Awaiting Sam', value: stats.pendingSam, icon: <AlertTriangle size={18} />, accent: 'amber', href: '/mintah/pos/pending' },
+            { label: 'Completed', value: stats.completed, icon: <CheckCircle size={18} />, accent: 'emerald', href: '/mintah/pos/completed' },
+          ]}
+        />
 
-        {/* Recent Incoming Requests */}
-        <section className="mb-10 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold tracking-tight text-foreground">Recent Requests</h2>
-              {allIncoming.length > 0 && (
-                <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10 font-bold">
-                  {allIncoming.length}
-                </Badge>
-              )}
-            </div>
-            <Link
-              href="/mintah/requests"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              View All
-            </Link>
-          </div>
+        <section>
+          <SectionHeader
+            title="Recent Requests"
+            count={allIncoming.length}
+            action={<Link href="/mintah/requests" className="text-xs font-medium text-primary hover:underline">View all</Link>}
+          />
           {allIncoming.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allIncoming.map((req) => (
-                <RequestCard
-                  key={req.id as string}
-                  request={req as unknown as Parameters<typeof RequestCard>[0]['request']}
-                  href={`/mintah/requests/${req.id}`}
-                />
-              ))}
-            </div>
+            <RequestTable requests={allIncoming as never} hrefBase="/mintah/requests" />
           ) : (
-            <Card className="glass-card border-border/40">
-              <CardContent className="p-10 text-center text-muted-foreground font-semibold">
-                No incoming requests to review.
-              </CardContent>
-            </Card>
+            <EmptyState icon={<FileText size={20} />} title="No incoming requests" description="New requisitions to review will appear here." />
           )}
         </section>
 
-        {/* Recent POs */}
-        <section className="animate-slide-up" style={{ animationDelay: '0.15s' }}>
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold tracking-tight text-foreground">My Purchase Orders</h2>
-              {recentPOs.length > 0 && (
-                <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10 font-bold">
-                  {recentPOs.length}
-                </Badge>
-              )}
-            </div>
-            <Link
-              href="/mintah/pos"
-              className="text-xs font-semibold text-primary hover:underline"
-            >
-              View All
-            </Link>
-          </div>
+        <section>
+          <SectionHeader
+            title="My Purchase Orders"
+            count={recentPOs.length}
+            action={<Link href="/mintah/pos" className="text-xs font-medium text-primary hover:underline">View all</Link>}
+          />
           {recentPOs.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentPOs.map((po) => (
-                <POCard
-                  key={po.id as string}
-                  po={po as unknown as Parameters<typeof POCard>[0]['po']}
-                  href={`/mintah/po/${po.id}`}
-                />
-              ))}
-            </div>
+            <POTable pos={recentPOs as unknown as PurchaseOrder[]} hrefBase="/mintah/po" showRejection />
           ) : (
-            <Card className="glass-card border-border/40">
-              <CardContent className="p-10 text-center text-muted-foreground font-semibold">
-                No POs created yet. Convert a request to get started.
-              </CardContent>
-            </Card>
+            <EmptyState icon={<ShoppingBag size={20} />} title="No purchase orders yet" description="Convert a request to create your first PO." />
           )}
         </section>
-      </div>
+      </PageContainer>
     </DashboardLayout>
   )
 }

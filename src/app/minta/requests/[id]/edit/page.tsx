@@ -1,7 +1,7 @@
 import { getUserFromSession, createClient } from '@/lib/supabase/server'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { Card, CardContent } from '@/components/ui/card'
-import { ArrowLeft, Lock } from 'lucide-react'
+import { PageContainer, PageHeader, EmptyState } from '@/components/shared/ui-kit'
+import { Lock, FileText } from 'lucide-react'
 import Link from 'next/link'
 import EditRequestForm from './EditRequestForm'
 
@@ -30,16 +30,13 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
         user={user ? { name: user.name, email: user.email } : null}
         role={user?.role ?? 'minta'}
       >
-        <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-          <Card className="glass-card border-border/40">
-            <CardContent className="p-10 text-center">
-              <p className="text-muted-foreground font-semibold">Request not found.</p>
-              <Link href="/minta/requests" className="inline-flex items-center gap-1 text-primary text-sm font-semibold hover:underline mt-3">
-                ← Back to requests
-              </Link>
-            </CardContent>
-          </Card>
-        </div>
+        <PageContainer>
+          <EmptyState
+            icon={<FileText size={20} />}
+            title="Request not found"
+            action={<Link href="/minta/requests" className="text-sm font-medium text-primary hover:underline">Back to requests</Link>}
+          />
+        </PageContainer>
       </DashboardLayout>
     )
   }
@@ -68,27 +65,16 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'minta'}
     >
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-        <Link href={`/minta/requests/${id}`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors mb-6">
-          <ArrowLeft size="14" />
-          Back to request
-        </Link>
+      <PageContainer className="space-y-6">
+        <PageHeader backHref={`/minta/requests/${id}`} backLabel="Back to request" title="Edit Request" subtitle={request.purpose as string} />
 
         {!canEdit ? (
-          <Card className="glass-card border-border/40">
-            <CardContent className="p-10 text-center">
-              <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-amber-500/10 mb-4">
-                <Lock size="24" className="text-amber-600 dark:text-amber-400" />
-              </div>
-              <p className="text-foreground font-semibold mb-1">This request cannot be edited</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Requests with status <strong>&quot;{status}&quot;</strong> are read-only. Only requests with status &quot;new&quot; or &quot;reviewing&quot; can be modified.
-              </p>
-              <Link href={`/minta/requests/${id}`} className="inline-flex items-center gap-1 text-primary text-sm font-semibold hover:underline">
-                ← View request details
-              </Link>
-            </CardContent>
-          </Card>
+          <EmptyState
+            icon={<Lock size={20} />}
+            title="This request cannot be edited"
+            description={`Requests with status "${status}" are read-only. Only "new" or "reviewing" requests can be modified.`}
+            action={<Link href={`/minta/requests/${id}`} className="text-sm font-medium text-primary hover:underline">View request details</Link>}
+          />
         ) : (
           <EditRequestForm
             requestId={id}
@@ -102,7 +88,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
             }}
           />
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   )
 }

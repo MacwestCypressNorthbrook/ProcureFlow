@@ -1,10 +1,8 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { formatDate } from '@/lib/utils'
-import { Document, User, Calendar, Briefcase, Tag, Archive } from '@/lib/icons'
+import { User, Calendar, Briefcase, Tag, Archive } from '@/lib/icons'
 
 interface RichRequisitionViewProps {
   description: string | null
@@ -43,238 +41,188 @@ export interface RichRequisitionData {
   generalNotes?: string
 }
 
-export default function RichRequisitionView({ description, fallbackPurpose, fallbackDate }: RichRequisitionViewProps) {
-  // Parse description as rich data if possible
-  let richData: RichRequisitionData | null = null
-  if (description) {
-    try {
-      if (description.trim().startsWith('{')) {
-        const parsed = JSON.parse(description)
-        if (parsed && parsed.type === 'rich_requisition') {
-          richData = parsed as RichRequisitionData
-        }
-      }
-    } catch (e) {
-      // Not JSON, fallback to standard description
-      console.log('Failed to parse description as JSON, using standard view:', e)
-    }
-  }
+/** Pull a rich requisition payload out of a description, tolerating a
+ *  human-readable prefix such as "[PO#: PO-2026-0472] {…json…}". */
+export function extractRequisition(description?: string | null): {
+  data: RichRequisitionData | null
+  poNumber: string | null
+} {
+  if (!description) return { data: null, poNumber: null }
+  const poMatch = description.match(/\[PO#:\s*([^\]]+)\]/i)
+  const poNumber = poMatch ? poMatch[1].trim() : null
 
-  // Fallback: Standard text description (styled borderless)
+  const start = description.indexOf('{')
+  const end = description.lastIndexOf('}')
+  if (start === -1 || end <= start) return { data: null, poNumber }
+  try {
+    const parsed = JSON.parse(description.slice(start, end + 1))
+    if (parsed && parsed.type === 'rich_requisition') {
+      return { data: parsed as RichRequisitionData, poNumber }
+    }
+  } catch {
+    /* not a rich requisition */
+  }
+  return { data: null, poNumber }
+}
+
+export function isRichRequisition(description?: string | null): boolean {
+  return extractRequisition(description).data !== null
+}
+
+export default function RichRequisitionView({ description, fallbackDate }: RichRequisitionViewProps) {
+  const { data: richData, poNumber } = extractRequisition(description)
+
+  // Fallback: plain text description
   if (!richData) {
     return (
-      <div className="space-y-4">
-        {description ? (
-          <div className="rounded-2xl bg-card/45 backdrop-blur-xl p-6 shadow-sm">
-            <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-              <Archive size="14" />
-              Description
-            </h4>
-            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
-              {description}
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-card/25 backdrop-blur-xl p-8 text-center text-muted-foreground text-sm font-medium">
-            No description provided.
-          </div>
-        )}
+      <div className="surface overflow-hidden rounded-xl">
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <Archive size="15" className="text-muted-foreground" />
+          <h2 className="text-sm font-semibold text-foreground">Description</h2>
+        </div>
+        <div className="p-4">
+          {description ? (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{description}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground">No description provided.</p>
+          )}
+        </div>
       </div>
     )
   }
 
-  // Format currency in GHS
-  const formatGHS = (value: number) => {
-    return new Intl.NumberFormat('en-GH', {
-      style: 'currency',
-      currency: 'GHS',
-    }).format(value)
-  }
+  const formatGHS = (value: number) =>
+    new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(value)
 
-  // Calculate grand total
   const grandTotal = richData.items.reduce((sum, item) => sum + (item.amount || 0), 0)
+  const meta = [
+    ['Doc No.', richData.header.docNo],
+    ['Version', richData.header.version],
+    ['Page', richData.header.page],
+  ] as const
 
   return (
-    <div className="space-y-6">
-      {/* Printable / Visual Requisition Sheet (Borderless Floating Glass Design) */}
-      <div className="rounded-3xl bg-card/40 backdrop-blur-xl text-card-foreground shadow-[0_30px_80px_rgba(0,0,0,0.04)] dark:shadow-[0_30px_80px_rgba(0,0,0,0.25)] overflow-hidden relative">
-        {/* Subtle decorative watermark */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[120px] font-black text-muted/3 opacity-[0.02] select-none pointer-events-none tracking-widest uppercase">
-          {richData.header.companyLogo || 'MACWEST'}
-        </div>
-
-        {/* Header Block */}
-        <div className="p-8 md:p-10 border-b border-border/10 bg-muted/10 relative">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/85 text-primary-foreground flex items-center justify-center font-bold text-lg shadow-md shadow-primary/10">
-                {richData.header.companyLogo ? richData.header.companyLogo.substring(0, 2).toUpperCase() : 'MW'}
-              </div>
-              <div>
-                <h3 className="text-sm font-black tracking-wider text-foreground uppercase">
-                  {richData.header.companyLogo || 'MACWEST'}
-                </h3>
-                <h2 className="text-xl font-bold tracking-tight text-primary">
-                  {richData.header.docTitle || 'REQUISITION FORM'}
-                </h2>
-              </div>
-            </div>
-
-            {/* Header Metadata block */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs bg-card/30 backdrop-blur p-4 rounded-xl max-w-xs w-full">
-              <span className="text-muted-foreground font-black uppercase tracking-wider text-[9px]">Doc No:</span>
-              <span className="font-bold text-right text-foreground">{richData.header.docNo}</span>
-              
-              <span className="text-muted-foreground font-black uppercase tracking-wider text-[9px]">Version:</span>
-              <span className="font-bold text-right text-foreground">{richData.header.version}</span>
-              
-              <span className="text-muted-foreground font-black uppercase tracking-wider text-[9px]">Page:</span>
-              <span className="font-bold text-right text-foreground">{richData.header.page}</span>
-            </div>
+    <div className="surface overflow-hidden rounded-xl">
+      {/* Header */}
+      <div className="flex flex-col gap-4 border-b border-border px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+            {richData.header.companyLogo ? richData.header.companyLogo.substring(0, 2).toUpperCase() : 'MW'}
           </div>
-        </div>
-
-        {/* Request Details Block */}
-        <div className="p-8 md:p-10 border-b border-border/10">
-          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6">
-            <div className="flex items-start gap-2.5">
-              <User size="16" className="text-muted-foreground mt-0.5" />
-              <div>
-                <span className="text-[10px] font-black text-muted-foreground block uppercase tracking-wider">Request Name</span>
-                <span className="text-sm font-bold text-foreground">{richData.details.name || 'Bernard Wiafe'}</span>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <Briefcase size="16" className="text-muted-foreground mt-0.5" />
-              <div>
-                <span className="text-[10px] font-black text-muted-foreground block uppercase tracking-wider">Department</span>
-                <span className="text-sm font-bold text-foreground">{richData.details.department || 'Operations'}</span>
-              </div>
-            </div>
-
-            <div className="flex items-start gap-2.5">
-              <Calendar size="16" className="text-muted-foreground mt-0.5" />
-              <div>
-                <span className="text-[10px] font-black text-muted-foreground block uppercase tracking-wider">Date</span>
-                <span className="text-sm font-bold text-foreground font-mono">
-                  {richData.details.date ? richData.details.date : (fallbackDate ? formatDate(fallbackDate) : '')}
+          <div>
+            <div className="flex items-center gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {richData.header.companyLogo || 'MACWEST'}
+              </p>
+              {poNumber && (
+                <span className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-primary">
+                  {poNumber}
                 </span>
-              </div>
+              )}
             </div>
-
-            {richData.details.project && (
-              <div className="flex items-start gap-2.5 sm:col-span-2 md:col-span-3">
-                <Tag size="16" className="text-muted-foreground mt-0.5" />
-                <div>
-                  <span className="text-[10px] font-black text-muted-foreground block uppercase tracking-wider">Project / Analytics</span>
-                  <span className="text-sm font-bold text-foreground">{richData.details.project}</span>
-                </div>
-              </div>
-            )}
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+              {richData.header.docTitle || 'Requisition Form'}
+            </h2>
           </div>
         </div>
+        <div className="grid grid-cols-3 gap-4 sm:flex sm:gap-6">
+          {meta.map(([label, value]) => (
+            <div key={label} className="text-left sm:text-right">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+              <p className="text-xs font-semibold tabular-nums text-foreground">{value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {/* Table items (Borderless Design) */}
-        <div className="p-8 md:p-10 overflow-x-auto">
-          <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-wider mb-4">Requisition Items</h4>
-          <Table className="border-0">
+      {/* Details */}
+      <div className="grid gap-4 border-b border-border px-6 py-5 sm:grid-cols-2 lg:grid-cols-3">
+        <Detail icon={<User size="15" />} label="Request Name" value={richData.details.name || '—'} />
+        <Detail icon={<Briefcase size="15" />} label="Department" value={richData.details.department || '—'} />
+        <Detail icon={<Calendar size="15" />} label="Date" value={richData.details.date || (fallbackDate ? formatDate(fallbackDate) : '—')} />
+        {richData.details.project && (
+          <Detail icon={<Tag size="15" />} label="Project / Analytics" value={richData.details.project} className="sm:col-span-2 lg:col-span-3" />
+        )}
+      </div>
+
+      {/* Items */}
+      <div className="px-6 py-5">
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Requisition Items</p>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <Table>
             <TableHeader>
-              <TableRow className="border-0 hover:bg-transparent">
-                <TableHead className="w-12 text-center font-bold border-none text-[10px] uppercase tracking-wider">No.</TableHead>
-                <TableHead className="font-bold border-none text-[10px] uppercase tracking-wider">Item Description</TableHead>
-                <TableHead className="w-20 text-center font-bold border-none text-[10px] uppercase tracking-wider">Qty</TableHead>
-                <TableHead className="w-32 text-right font-bold border-none text-[10px] uppercase tracking-wider">Unit Price</TableHead>
-                <TableHead className="w-36 text-right font-bold border-none text-[10px] uppercase tracking-wider">Amount</TableHead>
-                <TableHead className="font-bold border-none text-[10px] uppercase tracking-wider">Remarks</TableHead>
+              <TableRow className="border-border hover:bg-transparent">
+                <TableHead className="h-9 w-10 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">#</TableHead>
+                <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item Description</TableHead>
+                <TableHead className="h-9 w-16 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</TableHead>
+                <TableHead className="h-9 w-28 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unit Price</TableHead>
+                <TableHead className="h-9 w-32 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</TableHead>
+                <TableHead className="hidden h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Remarks</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {richData.items.map((item, index) => (
-                <TableRow key={index} className="hover:bg-muted/10 border-0 border-b border-border/10">
-                  <TableCell className="text-center font-bold text-muted-foreground/60 border-none text-xs">{index + 1}</TableCell>
-                  <TableCell className="font-medium max-w-xs break-words border-none text-sm">{item.description}</TableCell>
-                  <TableCell className="text-center border-none text-xs font-semibold">{item.quantity || '—'}</TableCell>
-                  <TableCell className="text-right border-none text-xs font-mono font-semibold">
-                    {item.unitPrice ? formatGHS(item.unitPrice) : '—'}
-                  </TableCell>
-                  <TableCell className="text-right font-black border-none text-xs font-mono">
-                    {item.amount ? formatGHS(item.amount) : '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs border-none">{item.remarks || '—'}</TableCell>
+                <TableRow key={index} className="border-border hover:bg-muted/30">
+                  <TableCell className="px-3 py-2.5 text-center text-xs text-muted-foreground">{index + 1}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-sm font-medium text-foreground">{item.description}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-center text-xs tabular-nums">{item.quantity || '—'}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-right text-xs tabular-nums">{item.unitPrice ? formatGHS(item.unitPrice) : '—'}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums">{item.amount ? formatGHS(item.amount) : '—'}</TableCell>
+                  <TableCell className="hidden px-3 py-2.5 text-xs text-muted-foreground md:table-cell">{item.remarks || '—'}</TableCell>
                 </TableRow>
               ))}
-              <TableRow className="hover:bg-transparent border-none">
-                <TableCell colSpan={4} className="text-right uppercase tracking-widest text-[9px] font-black text-muted-foreground pt-6 border-none">
-                  Total (GHS)
-                </TableCell>
-                <TableCell className="text-right text-primary text-base font-black font-mono pt-6 border-none">
-                  {formatGHS(grandTotal)}
-                </TableCell>
-                <TableCell className="border-none" />
+              <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
+                <TableCell colSpan={4} className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total (GHS)</TableCell>
+                <TableCell className="px-3 py-3 text-right text-sm font-semibold tabular-nums text-primary">{formatGHS(grandTotal)}</TableCell>
+                <TableCell className="hidden md:table-cell" />
               </TableRow>
             </TableBody>
           </Table>
         </div>
+      </div>
 
-        {/* General notes if any */}
-        {richData.generalNotes && (
-          <div className="px-8 md:px-10 pb-8">
-            <div className="rounded-2xl bg-muted/10 p-5">
-              <span className="text-[10px] font-black text-muted-foreground block uppercase tracking-wider mb-2">
-                General Notes / Explanation
-              </span>
-              <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed font-medium">
-                {richData.generalNotes}
-              </p>
-            </div>
-          </div>
-        )}
+      {/* Notes */}
+      {richData.generalNotes && (
+        <div className="border-t border-border px-6 py-5">
+          <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">General Notes</p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{richData.generalNotes}</p>
+        </div>
+      )}
 
-        {/* Signatures and approvals */}
-        <div className="p-8 md:p-10 bg-muted/5 border-t border-border/10">
-          <h4 className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-6">Sign-offs & Approvals</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            
-            {/* Req by */}
-            <div className="space-y-2.5 text-center">
-              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">Requested By</span>
-              <div className="h-8 flex items-center justify-center text-xs font-bold border-b border-border/30 border-dashed px-2 pb-1 text-foreground/80 font-mono">
-                {richData.signatures.requestedBy || '....'}
-              </div>
-              <span className="text-[9px] text-muted-foreground block font-semibold uppercase tracking-wider">Employee / Initiator</span>
-            </div>
-
-            {/* Head of Dept */}
-            <div className="space-y-2.5 text-center">
-              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">Head of Dept.</span>
-              <div className="h-8 flex items-center justify-center text-xs font-bold border-b border-border/30 border-dashed px-2 pb-1 text-foreground/80 font-mono">
-                {richData.signatures.headOfDept || '____________________'}
-              </div>
-              <span className="text-[9px] text-muted-foreground block font-semibold uppercase tracking-wider">Departmental Head</span>
-            </div>
-
-            {/* Approved By */}
-            <div className="space-y-2.5 text-center">
-              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">Approved By</span>
-              <div className="h-8 flex items-center justify-center text-xs font-bold border-b border-border/30 border-dashed px-2 pb-1 text-foreground/80 font-mono">
-                {richData.signatures.approvedBy || '____________________'}
-              </div>
-              <span className="text-[9px] text-muted-foreground block font-semibold uppercase tracking-wider">Executive Approval</span>
-            </div>
-
-            {/* Paid By */}
-            <div className="space-y-2.5 text-center">
-              <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest block">Paid By</span>
-              <div className="h-8 flex items-center justify-center text-xs font-bold border-b border-border/30 border-dashed px-2 pb-1 text-foreground/80 font-mono">
-                {richData.signatures.paidBy || '____________________'}
-              </div>
-              <span className="text-[9px] text-muted-foreground block font-semibold uppercase tracking-wider">Finance Disbursement</span>
-            </div>
-            
-          </div>
+      {/* Signatures */}
+      <div className="border-t border-border bg-muted/20 px-6 py-5">
+        <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Sign-offs &amp; Approvals</p>
+        <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+          <Signature label="Requested By" value={richData.signatures.requestedBy} caption="Employee / Initiator" />
+          <Signature label="Head of Dept." value={richData.signatures.headOfDept} caption="Departmental Head" />
+          <Signature label="Approved By" value={richData.signatures.approvedBy} caption="Executive Approval" />
+          <Signature label="Paid By" value={richData.signatures.paidBy} caption="Finance Disbursement" />
         </div>
       </div>
+    </div>
+  )
+}
+
+function Detail({ icon, label, value, className }: { icon: React.ReactNode; label: string; value: string; className?: string }) {
+  return (
+    <div className={`flex items-start gap-2.5 ${className ?? ''}`}>
+      <span className="mt-0.5 text-muted-foreground">{icon}</span>
+      <div>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        <p className="text-sm font-medium text-foreground">{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function Signature({ label, value, caption }: { label: string; value: string; caption: string }) {
+  return (
+    <div className="text-center">
+      <p className="mb-2 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+      <div className="flex h-8 items-center justify-center border-b border-dashed border-border pb-1 text-xs font-medium text-foreground/80">
+        {value || '—'}
+      </div>
+      <p className="mt-1.5 text-[9px] font-medium uppercase tracking-wider text-muted-foreground">{caption}</p>
     </div>
   )
 }

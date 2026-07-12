@@ -1,6 +1,7 @@
 import { createClient, getUserFromSession } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import EnhancedPODetailClient from '@/components/shared/EnhancedPODetailClient'
+import { resolveAttachments } from '@/lib/resolve-file-url'
 import type { PurchaseOrder, PoAuditTrail, PoAttachment } from '@/lib/types'
 
 interface RawComment {
@@ -47,11 +48,13 @@ export default async function SamDetailPage({ params }: { params: Promise<{ id: 
     .eq('po_id', id)
     .order('created_at', { ascending: true })
 
-  const { data: poAttachments } = await supabase
+  const { data: poAttachmentsRaw } = await supabase
     .from('po_attachments')
     .select('id, po_id, file_name, file_url, uploaded_by, created_at')
     .eq('po_id', id)
     .order('created_at', { ascending: true })
+
+  const poAttachments = await resolveAttachments((poAttachmentsRaw as PoAttachment[]) ?? [])
 
   return (
     <EnhancedPODetailClient
@@ -59,7 +62,7 @@ export default async function SamDetailPage({ params }: { params: Promise<{ id: 
       originalRequest={originalRequest}
       auditTrail={(auditTrail as PoAuditTrail[]) ?? []}
       comments={(comments as unknown as RawComment[]) ?? []}
-      poAttachments={(poAttachments as unknown as PoAttachment[]) ?? []}
+      poAttachments={poAttachments}
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'sam'}
     />

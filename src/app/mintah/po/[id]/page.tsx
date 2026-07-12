@@ -1,6 +1,7 @@
 import { createClient, getUserFromSession } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import MintahPODetailClient from '@/components/shared/MintahPODetailClient'
+import { resolveAttachments } from '@/lib/resolve-file-url'
 
 export default async function MintahPODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -56,7 +57,7 @@ export default async function MintahPODetailPage({ params }: { params: Promise<{
       .select('id, po_id, file_name, file_url, uploaded_by, created_at')
       .eq('po_id', id)
       .order('created_at', { ascending: true })
-    poAttachments = attachments ?? []
+    poAttachments = await resolveAttachments(attachments ?? [])
   } catch {
     // table may not exist yet
   }

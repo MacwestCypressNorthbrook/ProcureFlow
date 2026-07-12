@@ -1,6 +1,7 @@
 import { createClient, getUserFromSession } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import MintahRequestDetailClient from '@/components/shared/MintahRequestDetailClient'
+import { resolveAttachments } from '@/lib/resolve-file-url'
 
 export default async function MintahRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -24,10 +25,12 @@ export default async function MintahRequestDetailPage({ params }: { params: Prom
     notFound()
   }
 
+  const resolvedAttachments = await resolveAttachments((attachments as any) ?? [])
+
   return (
     <MintahRequestDetailClient
       request={request}
-      attachments={(attachments as any) ?? []}
+      attachments={resolvedAttachments}
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'mintah'}
     />

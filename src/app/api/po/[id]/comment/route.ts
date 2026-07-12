@@ -67,7 +67,7 @@ export async function POST(
       author_id: guard.user.id,
       content: body.content.trim(),
     })
-    .select()
+    .select('id, po_id, author_id, content, created_at, author:users!po_comments_author_id_fkey(id, name, email)')
     .single()
 
   if (error) {

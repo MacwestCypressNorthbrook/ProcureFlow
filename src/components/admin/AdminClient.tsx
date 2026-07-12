@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   ArrowRight,
   TrendingUp,
+  History,
 } from 'lucide-react'
 
 const ghs = (n: number | null) =>
@@ -49,13 +50,14 @@ const roleBadgeColor: Record<string, string> = {
   finance: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
 }
 
-type Section = 'overview' | 'users' | 'requests' | 'pos' | 'settings'
+type Section = 'overview' | 'users' | 'requests' | 'pos' | 'audit' | 'settings'
 
 const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutGrid size="18" /> },
   { id: 'users', label: 'Users', icon: <PeopleIcon size="18" /> },
   { id: 'requests', label: 'Requests', icon: <ClipboardCheck size="18" /> },
   { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size="18" /> },
+  { id: 'audit', label: 'Audit Trail', icon: <History size="18" /> },
   { id: 'settings', label: 'Settings', icon: <Settings size="18" /> },
 ]
 
@@ -76,12 +78,14 @@ export default function AdminClient({
   users: initialUsers,
   requests,
   pos,
+  auditTrail,
 }: {
   user: { name?: string; email: string } | null
   role: string | null
   users: User[]
   requests: Request[]
   pos: PurchaseOrder[]
+  auditTrail: any[]
 }) {
   const router = useRouter()
   const [section, setSection] = useState<Section>('overview')
@@ -160,6 +164,7 @@ export default function AdminClient({
     users: { title: 'Users Directory', sub: 'Manage people and assign system roles' },
     requests: { title: 'Requisitions Raised', sub: 'Every request raised across the organization' },
     pos: { title: 'Purchase Orders', sub: 'Purchase orders from creation through payment' },
+    audit: { title: 'Audit Trail', sub: 'Track all actions across the procurement pipeline' },
     settings: { title: 'Administration Settings', sub: 'Preferences and system information' },
   }
 
@@ -387,6 +392,75 @@ export default function AdminClient({
                 ])}
                 empty="No purchase orders yet."
               />
+            </div>
+          </div>
+        )}
+
+        {section === 'audit' && (
+          <div className="space-y-6 animate-slide-up">
+            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
+              <div className="px-6 py-4 border-b border-border bg-muted/10">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Showing the latest {auditTrail.length} actions across all purchase orders
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Action</th>
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Purchase Order</th>
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Performed By</th>
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Notes</th>
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Time</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {auditTrail.map((entry: any) => {
+                      const actionLabels: Record<string, string> = {
+                        created: 'PO Created',
+                        approved_by_sam: 'Approved by Sam',
+                        rejected_by_sam: 'Rejected by Sam',
+                        sent_back_by_sam: 'Sent Back by Sam',
+                        payment_completed: 'Payment Completed',
+                        comment_added: 'Comment Added',
+                      }
+                      const actionColors: Record<string, string> = {
+                        created: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+                        approved_by_sam: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                        rejected_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
+                        sent_back_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
+                        payment_completed: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+                        comment_added: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+                      }
+                      return (
+                        <tr key={entry.id} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
+                          <td className="px-6 py-3.5">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${actionColors[entry.action] ?? 'bg-muted text-muted-foreground'}`}>
+                              {actionLabels[entry.action] ?? entry.action}
+                            </span>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <span className="font-semibold text-foreground">{entry.po?.purpose ?? '—'}</span>
+                          </td>
+                          <td className="px-6 py-3.5">
+                            <span className="text-muted-foreground font-medium">{entry.performer?.name ?? '—'}</span>
+                          </td>
+                          <td className="px-6 py-3.5 max-w-[200px] truncate text-muted-foreground">{entry.notes ?? '—'}</td>
+                          <td className="px-6 py-3.5 text-muted-foreground font-medium">{shortDate(entry.created_at)}</td>
+                        </tr>
+                      )
+                    })}
+                    {auditTrail.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
+                          No audit trail entries yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}

@@ -233,7 +233,7 @@ export default function DashboardLayout({
   const userInitials = user?.name ? user.name.slice(0, 2).toUpperCase() : user?.email.slice(0, 2).toUpperCase() || 'PF'
 
   const sections = customNav
-    ? [{ label: 'Navigation', items: customNav.map(n => ({ href: n.href || '#', label: n.label, icon: n.icon })) }]
+    ? [{ label: 'Navigation', items: customNav.map(n => ({ href: n.href || '#', label: n.label, icon: n.icon, onClick: (n as any).onClick })) }]
     : (roleNavSections[resolvedRole] || [])
 
   const sidebarContent = (onNavigate?: () => void) => (
@@ -280,6 +280,18 @@ export default function DashboardLayout({
                 const activeClass = isActive
                   ? 'bg-foreground text-background shadow-[0_4px_12px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_12px_rgba(255,255,255,0.05)]'
                   : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
+
+                if ((item as any).onClick) {
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => { (item as any).onClick(); onNavigate?.() }}
+                      className={`${baseClass} ${activeClass}`}
+                    >
+                      {content}
+                    </button>
+                  )
+                }
 
                 return (
                   <Link
@@ -335,7 +347,7 @@ export default function DashboardLayout({
   )
 
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[256px_1fr]">
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[272px_1fr]">
       {/* Desktop Sidebar */}
       <aside className="sticky top-0 hidden h-screen border-r border-border bg-card lg:block z-20">
         {sidebarContent()}

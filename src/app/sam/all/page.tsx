@@ -1,8 +1,8 @@
 import { getUserFromSession, createClient } from '@/lib/supabase/server'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import POCard from '@/components/shared/POCard'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import POTable from '@/components/shared/POTable'
+import { PageContainer, SectionHeader, EmptyState } from '@/components/shared/ui-kit'
+import { Archive } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
 
 export default async function SamAllPage() {
@@ -25,31 +25,14 @@ export default async function SamAllPage() {
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'sam'}
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3 mb-5">
-          <h2 className="text-lg font-bold tracking-tight text-foreground">All POs</h2>
-          <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10 font-bold">
-            {pos.length}
-          </Badge>
-        </div>
+      <PageContainer>
+        <SectionHeader title="All Purchase Orders" count={pos.length} />
         {pos.length > 0 ? (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {pos.map((po) => (
-              <POCard
-                key={po.id}
-                po={po}
-                href={`/sam/${po.id}`}
-              />
-            ))}
-          </div>
+          <POTable pos={pos} hrefBase="/sam" showRejection />
         ) : (
-          <Card className="glass-card border-border/40">
-            <CardContent className="p-12 text-center text-muted-foreground font-semibold">
-              No purchase orders found.
-            </CardContent>
-          </Card>
+          <EmptyState icon={<Archive size={20} />} title="No purchase orders" description="Purchase orders will appear here." />
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   )
 }
