@@ -233,7 +233,7 @@ export default function DashboardLayout({
   const userInitials = user?.name ? user.name.slice(0, 2).toUpperCase() : user?.email.slice(0, 2).toUpperCase() || 'PF'
 
   const sections = customNav
-    ? [{ label: 'Navigation', items: customNav.map(n => ({ href: n.href || '#', label: n.label, icon: n.icon, onClick: (n as any).onClick })) }]
+    ? [{ label: 'Navigation', items: customNav.map(n => ({ href: n.href || '#', label: n.label, icon: n.icon, onClick: (n as any).onClick, active: (n as any).active })) }]
     : (roleNavSections[resolvedRole] || [])
 
   const sidebarContent = (onNavigate?: () => void) => (
@@ -260,7 +260,7 @@ export default function DashboardLayout({
             </p>
             <div className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/'))
+                const isActive = (item as any).active ?? (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/')))
                 const badgeCount = navBadges?.[item.href]
                 const content = (
                   <>

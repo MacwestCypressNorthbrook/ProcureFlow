@@ -7,7 +7,9 @@ import type { User, Request, PurchaseOrder } from '@/lib/types'
 import { ROLE_LABELS, PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import ThemeToggle from '@/components/layout/ThemeToggle'
 import DashboardLayout from '@/components/layout/DashboardLayout'
-import { Card, CardContent } from '@/components/ui/card'
+import StatusBadge from '@/components/shared/StatusBadge'
+import { PageContainer, Panel, SectionHeader, StatStrip, EmptyState } from '@/components/shared/ui-kit'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   LayoutGrid,
   Users as PeopleIcon,
@@ -41,34 +43,65 @@ const roleDot: Record<string, string> = {
   finance: 'bg-emerald-500',
 }
 
-const roleBadgeColor: Record<string, string> = {
-  superuser: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
-  admin: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
-  minta: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  mintah: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-  sam: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  finance: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-}
-
 type Section = 'overview' | 'users' | 'requests' | 'pos' | 'audit' | 'settings'
 
 const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <LayoutGrid size="18" /> },
-  { id: 'users', label: 'Users', icon: <PeopleIcon size="18" /> },
-  { id: 'requests', label: 'Requests', icon: <ClipboardCheck size="18" /> },
-  { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size="18" /> },
-  { id: 'audit', label: 'Audit Trail', icon: <History size="18" /> },
-  { id: 'settings', label: 'Settings', icon: <Settings size="18" /> },
+  { id: 'overview', label: 'Overview', icon: <LayoutGrid size={18} /> },
+  { id: 'users', label: 'Users', icon: <PeopleIcon size={18} /> },
+  { id: 'requests', label: 'Requests', icon: <ClipboardCheck size={18} /> },
+  { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> },
+  { id: 'audit', label: 'Audit Trail', icon: <History size={18} /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
 ]
 
-function StatusPill({ status, kind }: { status: string; kind: 'po' | 'request' }) {
-  const cfg = (kind === 'po' ? PO_STATUS_CONFIG : REQUEST_STATUS_CONFIG)[status]
-  if (!cfg) return <span className="text-xs text-muted-foreground">{status}</span>
+interface Col {
+  label: string
+  align?: 'left' | 'right'
+  hideBelow?: 'sm' | 'md' | 'lg'
+}
+
+function DataTable({ cols, rows, empty }: { cols: Col[]; rows: React.ReactNode[][]; empty: string }) {
+  const hide = (c: Col) =>
+    c.hideBelow === 'sm' ? 'hidden sm:table-cell' : c.hideBelow === 'md' ? 'hidden md:table-cell' : c.hideBelow === 'lg' ? 'hidden lg:table-cell' : ''
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-foreground">
-      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
-    </span>
+    <div className="surface overflow-hidden rounded-xl">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-border hover:bg-transparent">
+            {cols.map((c, i) => (
+              <TableHead
+                key={i}
+                className={`h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ${c.align === 'right' ? 'text-right' : ''} ${hide(c)}`}
+              >
+                {c.label}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length > 0 ? (
+            rows.map((cells, i) => (
+              <TableRow key={i} className="border-border last:border-0">
+                {cells.map((cell, j) => (
+                  <TableCell
+                    key={j}
+                    className={`px-4 py-3 text-sm ${cols[j]?.align === 'right' ? 'text-right' : ''} ${hide(cols[j] ?? {} as Col)}`}
+                  >
+                    {cell}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow className="border-0 hover:bg-transparent">
+              <TableCell colSpan={cols.length} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                {empty}
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
   )
 }
 
@@ -117,8 +150,7 @@ export default function AdminClient({
     const q = query.trim().toLowerCase()
     return users.filter((u) => {
       const matchesRole = roleFilter === 'all' || u.role === roleFilter
-      const matchesQuery =
-        !q || (u.name ?? '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+      const matchesQuery = !q || (u.name ?? '').toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
       return matchesRole && matchesQuery
     })
   }, [users, query, roleFilter])
@@ -176,370 +208,284 @@ export default function AdminClient({
       role={role}
       customNav={customNav}
     >
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <PageContainer>
         {section === 'overview' && (
-          <div className="space-y-8 animate-slide-up">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {[
-                { label: 'Total Users', value: stats.users, icon: <PeopleIcon size="20" />, tint: 'text-violet-600 dark:text-violet-400 bg-violet-500/10' },
-                { label: 'Total Requests', value: stats.requests, icon: <ClipboardCheck size="20" />, tint: 'text-blue-600 dark:text-blue-400 bg-blue-500/10' },
-                { label: 'Purchase Orders', value: stats.pos, icon: <ShoppingBag size="20" />, tint: 'text-amber-600 dark:text-amber-400 bg-amber-500/10' },
-                { label: 'Completed Orders', value: stats.completed, icon: <CheckCircle size="20" />, tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' },
-              ].map((s) => (
-                <div key={s.label} className="group surface rounded-2xl p-5 border border-border/60 hover:shadow-md transition-all duration-200">
-                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${s.tint}`}>
-                    {s.icon}
-                  </span>
-                  <p className="mt-4 text-3xl font-bold tracking-tight text-foreground tabular">{s.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground font-medium">{s.label}</p>
-                </div>
-              ))}
-            </div>
+          <div className="space-y-8">
+            <StatStrip
+              stats={[
+                { label: 'Total Users', value: stats.users, icon: <PeopleIcon size={18} />, accent: 'purple' },
+                { label: 'Requests', value: stats.requests, icon: <ClipboardCheck size={18} />, accent: 'blue' },
+                { label: 'Purchase Orders', value: stats.pos, icon: <ShoppingBag size={18} />, accent: 'amber' },
+                { label: 'Completed', value: stats.completed, icon: <CheckCircle size={18} />, accent: 'emerald' },
+                { label: 'PO Value', value: ghs(stats.value), icon: <TrendingUp size={18} />, accent: 'indigo' },
+              ]}
+            />
 
-            {/* Distribution and PO Value */}
             <div className="grid gap-6 lg:grid-cols-5">
-              {/* Value + Pending */}
-              <div className="surface rounded-2xl p-6 border border-border/60 lg:col-span-2 flex flex-col justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total PO Value</p>
-                  <p className="mt-2 text-3xl font-bold tracking-tight text-foreground font-mono">{ghs(stats.value)}</p>
-                </div>
-                <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 text-sm">
-                  <AlertTriangle size="18" className="text-amber-500 shrink-0" />
-                  <div className="text-xs font-medium text-foreground">
-                    <span className="font-bold text-amber-600 dark:text-amber-400">{stats.pending}</span> orders await executive approval or payment.
-                  </div>
-                </div>
-              </div>
+              <Panel title="Awaiting Action" icon={<AlertTriangle size={16} className="text-amber-500" />} className="lg:col-span-2">
+                <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">{stats.pending}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  orders awaiting executive approval or payment across the pipeline.
+                </p>
+                <button
+                  onClick={() => setSection('pos')}
+                  className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Review purchase orders <ArrowRight size={13} />
+                </button>
+              </Panel>
 
-              {/* Role Distribution */}
-              <div className="surface rounded-2xl p-6 border border-border/60 lg:col-span-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Users by Role</p>
-                <ul className="space-y-4">
+              <Panel title="Users by Role" icon={<PeopleIcon size={16} />} className="lg:col-span-3">
+                <ul className="space-y-3.5">
                   {roleCounts.map(([r, count]) => (
                     <li key={r} className="flex items-center gap-3">
-                      <span className="flex w-28 items-center gap-2 text-xs font-semibold text-foreground">
+                      <span className="flex w-24 items-center gap-2 text-xs font-medium text-foreground">
                         <span className={`h-2 w-2 rounded-full ${roleDot[r] ?? 'bg-slate-400'}`} />
                         {ROLE_LABELS[r]?.split(' ')[0] ?? r}
                       </span>
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-foreground/75 transition-all duration-300"
-                          style={{ width: `${(count / Math.max(1, users.length)) * 100}%` }}
-                        />
+                        <div className="h-full rounded-full bg-foreground/70" style={{ width: `${(count / Math.max(1, users.length)) * 100}%` }} />
                       </div>
-                      <span className="w-8 text-right text-xs font-medium tabular text-muted-foreground">{count}</span>
+                      <span className="w-8 text-right text-xs font-medium tabular-nums text-muted-foreground">{count}</span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Panel>
             </div>
 
-            {/* Recent POs */}
-            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/10">
-                <h2 className="text-sm font-semibold text-foreground">Recent Purchase Orders</h2>
-                <button
-                  onClick={() => setSection('pos')}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
-                >
-                  View all
-                  <ArrowRight size="12" />
-                </button>
-              </div>
-              <Table
-                head={['Purpose', 'Amount', 'Status', 'Created']}
-                rows={pos.slice(0, 5).map((p) => [
-                  <span key="p" className="font-semibold text-foreground">{p.purpose}</span>,
-                  <span key="a" className="font-mono text-xs font-semibold text-foreground">{ghs(p.total_amount)}</span>,
-                  <StatusPill key="s" status={p.status} kind="po" />,
-                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(p.created_at)}</span>,
+            <section>
+              <SectionHeader
+                title="Recent Purchase Orders"
+                action={
+                  <button onClick={() => setSection('pos')} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                    View all <ArrowRight size={13} />
+                  </button>
+                }
+              />
+              <DataTable
+                cols={[
+                  { label: 'Purpose' },
+                  { label: 'Amount', align: 'right' },
+                  { label: 'Status' },
+                  { label: 'Created', hideBelow: 'sm' },
+                ]}
+                rows={pos.slice(0, 6).map((p) => [
+                  <span key="p" className="font-medium text-foreground">{p.purpose}</span>,
+                  <span key="a" className="font-semibold tabular-nums text-foreground">{ghs(p.total_amount)}</span>,
+                  <StatusBadge key="s" status={p.status} config={PO_STATUS_CONFIG} />,
+                  <span key="d" className="text-xs text-muted-foreground">{shortDate(p.created_at)}</span>,
                 ])}
                 empty="No purchase orders yet."
               />
-            </div>
+            </section>
           </div>
         )}
 
         {section === 'users' && (
-          <div className="space-y-6 animate-slide-up">
-            {/* Search & Filter Bar */}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
-              <div className="relative flex-1 max-w-md">
-                <Search size="16" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="relative w-full max-w-md">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search by name or email…"
-                  className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-xs font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-10 w-full rounded-lg border border-input bg-card pl-10 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
               <div className="flex items-center gap-2">
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="h-10 rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Roles</option>
                   {ASSIGNABLE.map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
                   ))}
                 </select>
-                <span className="inline-flex items-center rounded-xl bg-muted px-3.5 py-2.5 text-xs font-semibold text-muted-foreground tabular">
+                <span className="inline-flex h-10 items-center rounded-lg bg-muted px-3 text-xs font-medium tabular-nums text-muted-foreground">
                   {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
                 </span>
               </div>
             </div>
 
-            {/* Users Table */}
-            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
-                      <th className="px-6 py-3.5 uppercase tracking-wider">User</th>
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Role & Permissions</th>
-                      <th className="hidden px-6 py-3.5 uppercase tracking-wider sm:table-cell">Date Joined</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((u) => (
-                      <tr key={u.id} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
-                        <td className="px-6 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                              {(u.name ?? u.email).slice(0, 2).toUpperCase()}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-semibold text-foreground text-sm">{u.name ?? 'Unnamed'}</p>
-                              <p className="truncate text-xs text-muted-foreground font-medium">{u.email}</p>
-                            </div>
+            <div className="surface overflow-hidden rounded-xl">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border hover:bg-transparent">
+                    <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">User</TableHead>
+                    <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Role &amp; Permissions</TableHead>
+                    <TableHead className="hidden h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Joined</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((u) => (
+                    <TableRow key={u.id} className="border-border last:border-0">
+                      <TableCell className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                            {(u.name ?? u.email).slice(0, 2).toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{u.name ?? 'Unnamed'}</p>
+                            <p className="truncate text-xs text-muted-foreground">{u.email}</p>
                           </div>
-                        </td>
-                        <td className="px-6 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <select
-                              value={ASSIGNABLE.includes(u.role) ? u.role : ''}
-                              onChange={(e) => changeRole(u.id, e.target.value)}
-                              disabled={savingId === u.id}
-                              className="h-8 rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
-                            >
-                              {!ASSIGNABLE.includes(u.role) && <option value="">{u.role}</option>}
-                              {ASSIGNABLE.map((r) => (
-                                <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
-                              ))}
-                            </select>
-                            {savingId === u.id && <span className="text-[10px] text-muted-foreground animate-pulse">Saving…</span>}
-                          </div>
-                        </td>
-                        <td className="hidden px-6 py-3.5 text-muted-foreground font-medium sm:table-cell">{shortDate(u.created_at)}</td>
-                      </tr>
-                    ))}
-                    {filteredUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
-                          No users found matching your filters.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={ASSIGNABLE.includes(u.role) ? u.role : ''}
+                            onChange={(e) => changeRole(u.id, e.target.value)}
+                            disabled={savingId === u.id}
+                            className="h-8 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                          >
+                            {!ASSIGNABLE.includes(u.role) && <option value="">{u.role}</option>}
+                            {ASSIGNABLE.map((r) => (
+                              <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
+                            ))}
+                          </select>
+                          {savingId === u.id && <span className="animate-pulse text-[10px] text-muted-foreground">Saving…</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">{shortDate(u.created_at)}</TableCell>
+                    </TableRow>
+                  ))}
+                  {filteredUsers.length === 0 && (
+                    <TableRow className="border-0 hover:bg-transparent">
+                      <TableCell colSpan={3} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                        No users found matching your filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
 
-            {/* Note Panel */}
-            <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-xs text-muted-foreground leading-relaxed">
-              <CheckCircle size="18" className="mt-0.5 shrink-0 text-primary" />
+            <div className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-muted/20 p-4 text-xs leading-relaxed text-muted-foreground">
+              <CheckCircle size={16} className="mt-0.5 shrink-0 text-primary" />
               <p>
                 New users join through the{' '}
-                <Link href="/auth/signup" className="font-semibold text-primary hover:underline">signup page</Link>{' '}
-                and pick a starting role. Adjust roles inline from the dropdown — modifications will save instantly in real-time.
+                <Link href="/auth/signup" className="font-medium text-primary hover:underline">signup page</Link>{' '}
+                and pick a starting role. Adjust roles inline from the dropdown — changes save instantly.
               </p>
             </div>
           </div>
         )}
 
         {section === 'requests' && (
-          <div className="space-y-6 animate-slide-up">
-            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
-              <Table
-                head={['Purpose', 'Requester', 'Amount', 'Status', 'Created']}
-                rows={requests.map((r) => [
-                  <span key="p" className="font-semibold text-foreground">{r.purpose}</span>,
-                  <span key="r" className="text-muted-foreground text-xs font-semibold">{r.guest_name ?? '—'}</span>,
-                  <span key="a" className="font-mono text-xs text-muted-foreground">{ghs(r.estimated_unit_rate)}</span>,
-                  <StatusPill key="s" status={r.status} kind="request" />,
-                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(r.created_at)}</span>,
-                ])}
-                empty="No requests raised yet."
-              />
-            </div>
-          </div>
+          <DataTable
+            cols={[
+              { label: 'Purpose' },
+              { label: 'Requester', hideBelow: 'md' },
+              { label: 'Amount', align: 'right', hideBelow: 'sm' },
+              { label: 'Status' },
+              { label: 'Created', hideBelow: 'sm' },
+            ]}
+            rows={requests.map((r) => [
+              <span key="p" className="font-medium text-foreground">{r.purpose}</span>,
+              <span key="r" className="text-sm text-muted-foreground">{r.guest_name ?? '—'}</span>,
+              <span key="a" className="tabular-nums text-muted-foreground">{ghs(r.estimated_unit_rate)}</span>,
+              <StatusBadge key="s" status={r.status} config={REQUEST_STATUS_CONFIG} />,
+              <span key="d" className="text-xs text-muted-foreground">{shortDate(r.created_at)}</span>,
+            ])}
+            empty="No requests raised yet."
+          />
         )}
 
         {section === 'pos' && (
-          <div className="space-y-6 animate-slide-up">
-            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
-              <Table
-                head={['Purpose', 'Amount', 'Status', 'Created', 'Paid On']}
-                rows={pos.map((p) => [
-                  <span key="p" className="font-semibold text-foreground">{p.purpose}</span>,
-                  <span key="a" className="font-mono text-xs font-semibold text-foreground">{ghs(p.total_amount)}</span>,
-                  <StatusPill key="s" status={p.status} kind="po" />,
-                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(p.created_at)}</span>,
-                  <span key="pd" className="text-muted-foreground text-xs font-medium">{shortDate(p.paid_at)}</span>,
-                ])}
-                empty="No purchase orders yet."
-              />
-            </div>
-          </div>
+          <DataTable
+            cols={[
+              { label: 'Purpose' },
+              { label: 'Amount', align: 'right' },
+              { label: 'Status' },
+              { label: 'Created', hideBelow: 'sm' },
+              { label: 'Paid On', hideBelow: 'md' },
+            ]}
+            rows={pos.map((p) => [
+              <span key="p" className="font-medium text-foreground">{p.purpose}</span>,
+              <span key="a" className="font-semibold tabular-nums text-foreground">{ghs(p.total_amount)}</span>,
+              <StatusBadge key="s" status={p.status} config={PO_STATUS_CONFIG} />,
+              <span key="d" className="text-xs text-muted-foreground">{shortDate(p.created_at)}</span>,
+              <span key="pd" className="text-xs text-muted-foreground">{shortDate(p.paid_at)}</span>,
+            ])}
+            empty="No purchase orders yet."
+          />
         )}
 
         {section === 'audit' && (
-          <div className="space-y-6 animate-slide-up">
-            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
-              <div className="px-6 py-4 border-b border-border bg-muted/10">
-                <p className="text-xs text-muted-foreground font-medium">
-                  Showing the latest {auditTrail.length} actions across all purchase orders
-                </p>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Action</th>
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Purchase Order</th>
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Performed By</th>
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Notes</th>
-                      <th className="px-6 py-3.5 uppercase tracking-wider">Time</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditTrail.map((entry: any) => {
-                      const actionLabels: Record<string, string> = {
-                        created: 'PO Created',
-                        approved_by_sam: 'Approved by Sam',
-                        rejected_by_sam: 'Rejected by Sam',
-                        sent_back_by_sam: 'Sent Back by Sam',
-                        payment_completed: 'Payment Completed',
-                        comment_added: 'Comment Added',
-                      }
-                      const actionColors: Record<string, string> = {
-                        created: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
-                        approved_by_sam: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                        rejected_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
-                        sent_back_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
-                        payment_completed: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
-                        comment_added: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
-                      }
-                      return (
-                        <tr key={entry.id} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
-                          <td className="px-6 py-3.5">
-                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${actionColors[entry.action] ?? 'bg-muted text-muted-foreground'}`}>
-                              {actionLabels[entry.action] ?? entry.action}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3.5">
-                            <span className="font-semibold text-foreground">{entry.po?.purpose ?? '—'}</span>
-                          </td>
-                          <td className="px-6 py-3.5">
-                            <span className="text-muted-foreground font-medium">{entry.performer?.name ?? '—'}</span>
-                          </td>
-                          <td className="px-6 py-3.5 max-w-[200px] truncate text-muted-foreground">{entry.notes ?? '—'}</td>
-                          <td className="px-6 py-3.5 text-muted-foreground font-medium">{shortDate(entry.created_at)}</td>
-                        </tr>
-                      )
-                    })}
-                    {auditTrail.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
-                          No audit trail entries yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              Showing the latest {auditTrail.length} actions across all purchase orders.
+            </p>
+            <DataTable
+              cols={[
+                { label: 'Action' },
+                { label: 'Purchase Order', hideBelow: 'sm' },
+                { label: 'By', hideBelow: 'md' },
+                { label: 'Notes', hideBelow: 'lg' },
+                { label: 'Time', align: 'right' },
+              ]}
+              rows={auditTrail.map((entry: any) => {
+                const actionLabels: Record<string, string> = {
+                  created: 'PO Created',
+                  approved_by_sam: 'Approved by Sam',
+                  rejected_by_sam: 'Rejected by Sam',
+                  sent_back_by_sam: 'Sent Back by Sam',
+                  payment_completed: 'Payment Completed',
+                  comment_added: 'Comment Added',
+                }
+                const actionColors: Record<string, string> = {
+                  created: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+                  approved_by_sam: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                  rejected_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
+                  sent_back_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
+                  payment_completed: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+                  comment_added: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+                }
+                return [
+                  <span key="a" className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-medium ${actionColors[entry.action] ?? 'bg-muted text-muted-foreground'}`}>
+                    {actionLabels[entry.action] ?? entry.action}
+                  </span>,
+                  <span key="po" className="font-medium text-foreground">{entry.po?.purpose ?? '—'}</span>,
+                  <span key="by" className="text-sm text-muted-foreground">{entry.performer?.name ?? '—'}</span>,
+                  <span key="n" className="block max-w-[220px] truncate text-xs text-muted-foreground">{entry.notes ?? '—'}</span>,
+                  <span key="t" className="text-xs text-muted-foreground">{shortDate(entry.created_at)}</span>,
+                ]
+              })}
+              empty="No audit trail entries yet."
+            />
           </div>
         )}
 
         {section === 'settings' && (
-          <div className="max-w-2xl mx-auto space-y-5 animate-slide-up">
-            <div className="surface rounded-2xl border border-border/60 p-6 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Interface Appearance</p>
-                <p className="mt-1 text-xs text-muted-foreground font-medium">Switch between light and dark visual aesthetics.</p>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Panel title="Interface Appearance">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">Switch between light and dark themes.</p>
+                <ThemeToggle />
               </div>
-              <ThemeToggle />
-            </div>
-
-            <div className="surface rounded-2xl border border-border/60 p-6">
-              <p className="text-sm font-semibold text-foreground mb-1.5">Superuser Accounts</p>
-              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                Elevated administrative roles can be managed and modified from the **Users** section.
-                Every role change is applied instantly to the database and takes effect immediately.
+            </Panel>
+            <Panel title="Superuser Accounts">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Elevated administrative roles are managed from the <span className="font-medium text-foreground">Users</span> section.
+                Every role change is applied to the database and takes effect immediately.
               </p>
-            </div>
+            </Panel>
           </div>
         )}
-      </div>
+      </PageContainer>
 
-      {/* Toast notifications */}
       {toast && (
         <div
-          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-scale-in rounded-xl px-5 py-3 text-xs font-bold shadow-xl border ${
-            toast.ok
-              ? 'bg-foreground text-background border-foreground'
-              : 'bg-destructive text-destructive-foreground border-destructive/20'
+          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-scale-in rounded-xl border px-5 py-3 text-xs font-semibold shadow-xl ${
+            toast.ok ? 'border-foreground bg-foreground text-background' : 'border-destructive/20 bg-destructive text-destructive-foreground'
           }`}
         >
           {toast.msg}
         </div>
       )}
     </DashboardLayout>
-  )
-}
-
-function Table({
-  head,
-  rows,
-  empty,
-}: {
-  head: string[]
-  rows: React.ReactNode[][]
-  empty: string
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-xs">
-        <thead>
-          <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
-            {head.map((h) => (
-              <th key={h} className="whitespace-nowrap px-6 py-3.5 uppercase tracking-wider">
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((cells, i) => (
-            <tr key={i} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
-              {cells.map((c, j) => (
-                <td key={j} className="px-6 py-3.5 font-medium">{c}</td>
-              ))}
-            </tr>
-          ))}
-          {rows.length === 0 && (
-            <tr>
-              <td colSpan={head.length} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
-                {empty}
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
   )
 }
