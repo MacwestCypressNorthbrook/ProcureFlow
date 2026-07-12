@@ -1,10 +1,13 @@
-import { createClient, getUserFromSession } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
+import { requireRole } from '@/lib/auth-guard'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   const body = await request.json()
+  const guard = await requireRole('minta', 'admin', 'superuser')
+  if (guard.error) return guard.error
+
   const supabase = await createClient()
-  const user = await getUserFromSession()
 
   const { data, error } = await supabase
     .from('requests')
@@ -15,7 +18,7 @@ export async function POST(request: Request) {
       estimated_unit_rate: body.estimated_unit_rate,
       guest_name: body.guest_name,
       guest_email: body.guest_email,
-      created_by: user?.id ?? null,
+      created_by: guard.user.id,
       status: 'new',
     })
     .select()

@@ -3,14 +3,31 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { signUp } from '@/lib/betterauth/client'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { UserAdd } from '@/lib/icons'
+import ThemeToggle from '@/components/layout/ThemeToggle'
+import { ArrowLeft, ArrowRight, Eye, EyeOff, Shield, UserPlus } from 'lucide-react'
+
+function BrandMark({ className = '' }: { className?: string }) {
+  return (
+    <span className={`flex h-9 w-9 items-center justify-center rounded-[10px] ${className}`}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden>
+        <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+        <path d="m8 9.7 4 2.3 4-2.3M12 12v4.6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      </svg>
+    </span>
+  )
+}
+
+const trail = [
+  { who: 'Bernard Wiafe', what: 'raised RF-001', tone: 'bg-blue-400' },
+  { who: 'Mintah', what: 'converted to PO-2214', tone: 'bg-violet-400' },
+  { who: 'Sam', what: 'approved · signed off', tone: 'bg-amber-400' },
+  { who: 'Finance', what: 'paid & closed', tone: 'bg-emerald-400' },
+]
 
 export default function SignupPage() {
   const router = useRouter()
@@ -18,6 +35,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [role, setRole] = useState('minta')
+  const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -54,106 +72,161 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center mesh-gradient noise-overlay px-4 py-8">
-      <div className="w-full max-w-4xl animate-scale-in">
-        <div className="grid md:grid-cols-2 rounded-3xl overflow-hidden glass-card-elevated shadow-2xl shadow-black/10">
-          {/* Image side */}
-          <div className="relative hidden md:block">
-            <Image
-              src="/images/step-team.jpg"
-              alt="Team working together"
-              width={600}
-              height={800}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/40 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-              <h2 className="text-2xl font-bold mb-2">Join ProcureFlow</h2>
-              <p className="text-white/80 text-sm leading-relaxed">
-                Create your account and start participating in the procurement workflow.
-              </p>
+    <div className="grid min-h-screen lg:grid-cols-2">
+      {/* ── Brand panel ── */}
+      <div className="relative hidden overflow-hidden bg-foreground text-background lg:flex lg:flex-col lg:justify-between p-12">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage: 'radial-gradient(currentColor 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+          aria-hidden
+        />
+        <div className="pointer-events-none absolute -left-20 top-1/3 h-80 w-80 rounded-full bg-primary/40 blur-[120px]" aria-hidden />
+
+        <Link href="/" className="relative flex items-center gap-2.5 w-fit">
+          <BrandMark className="bg-background text-foreground" />
+          <span className="text-[17px] font-semibold tracking-[-0.02em]">ProcureFlow</span>
+        </Link>
+
+        <div className="relative max-w-md">
+          <h2 className="text-3xl font-semibold tracking-[-0.03em] leading-tight text-balance">
+            Create an account to join the loop.
+          </h2>
+          <p className="mt-4 text-background/60 leading-relaxed">
+            Requisitions, approvals and payments — every hand-off explicit, every action on record.
+          </p>
+
+          {/* audit-trail proof */}
+          <div className="mt-8 rounded-2xl border border-background/10 bg-background/[0.06] p-5 backdrop-blur-sm">
+            <div className="flex items-center gap-2 text-xs font-medium text-background/70">
+              <Shield size="14" />
+              Live audit trail · PO-2214
             </div>
+            <ul className="mt-4 space-y-3">
+              {trail.map((r, i) => (
+                <li key={i} className="flex items-center gap-3 text-sm">
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${r.tone}`} />
+                  <span className="text-background/90"><span className="font-semibold">{r.who}</span> {r.what}</span>
+                  <span className="ml-auto font-mono text-[11px] text-background/40">{`0${i + 1}:${(i * 9 + 12) % 60}`.slice(0, 5)}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          {/* Form side */}
-          <div className="p-8 sm:p-10">
-            <div className="flex flex-col items-center md:items-start mb-6">
-              <Link href="/" className="inline-flex items-center gap-2 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm shadow-md shadow-primary/20">
-                  PF
-                </div>
-              </Link>
-              <h1 className="text-2xl font-bold">Create Account</h1>
-              <p className="text-muted-foreground text-sm mt-1">Join ProcureFlow with your role</p>
+        </div>
+
+        <p className="relative text-xs text-background/40">
+          © {new Date().getFullYear()} ProcureFlow · Built for teams that move money carefully.
+        </p>
+      </div>
+
+      {/* ── Form panel ── */}
+      <div className="relative flex items-center justify-center px-5 py-10 sm:px-8">
+        <div className="absolute right-5 top-5 flex items-center gap-1">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeft size="15" /> Home
+          </Link>
+          <ThemeToggle />
+        </div>
+
+        <div className="w-full max-w-sm animate-slide-up">
+          <Link href="/" className="mb-8 flex items-center gap-2.5 lg:hidden">
+            <BrandMark className="bg-foreground text-background" />
+            <span className="text-[17px] font-semibold tracking-[-0.02em]">ProcureFlow</span>
+          </Link>
+
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create your account</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">Join ProcureFlow with your workflow role.</p>
+
+          <form onSubmit={handleSignup} className="mt-8 space-y-4">
+            {error && (
+              <div className="animate-shake rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="name" className="text-xs font-medium text-muted-foreground">Full Name</Label>
+              <Input
+                id="name"
+                placeholder="John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                className="h-11 rounded-lg"
+              />
             </div>
-            <form onSubmit={handleSignup} className="space-y-3.5">
-              {error && (
-                <div className="rounded-xl bg-destructive/10 border border-destructive/20 px-4 py-3 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <Input
-                  id="name"
-                  placeholder="John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="h-10"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-xs font-medium text-muted-foreground">Email address</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@company.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                className="h-11 rounded-lg"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">Password</Label>
+              <div className="relative">
                 <Input
                   id="password"
-                  type="password"
+                  type={showPw ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={6}
-                  className="h-10"
+                  className="h-11 rounded-lg pr-11"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <select
-                  id="role"
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="flex h-10 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                <button
+                  type="button"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? 'Hide password' : 'Show password'}
+                  className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
-                  <option value="minta">Minta (Requester)</option>
-                  <option value="mintah">Mintah (Procurement)</option>
-                  <option value="sam">Sam (Approver)</option>
-                  <option value="finance">Finance</option>
-                  <option value="superuser">Superuser (Admin)</option>
-                </select>
+                  {showPw ? <EyeOff size="17" /> : <Eye size="17" />}
+                </button>
               </div>
-              <Button type="submit" className="w-full h-10 gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow press-active" disabled={loading}>
-                <UserAdd size="16" />
-                {loading ? 'Creating account...' : 'Create Account'}
-              </Button>
-            </form>
-            <div className="mt-5 text-center text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <Link href="/auth/login" className="text-primary font-medium hover:underline">
-                Sign in
-              </Link>
             </div>
-          </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="role" className="text-xs font-medium text-muted-foreground">Workflow Role</Label>
+              <select
+                id="role"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="minta">Minta (Requester)</option>
+                <option value="mintah">Mintah (Procurement Reviewer)</option>
+                <option value="sam">Sam (Executive Approver)</option>
+                <option value="finance">Finance Disburser</option>
+                <option value="superuser">Superuser (Admin)</option>
+              </select>
+            </div>
+
+            <Button type="submit" className="h-11 w-full gap-1.5 shadow-sm mt-2" disabled={loading}>
+              {loading ? 'Creating account…' : 'Create account'}
+              {!loading && <UserPlus size="16" />}
+            </Button>
+          </form>
+
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link href="/auth/login" className="font-medium text-primary hover:underline">
+              Sign in
+            </Link>
+          </p>
         </div>
       </div>
     </div>

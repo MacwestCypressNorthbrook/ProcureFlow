@@ -1,10 +1,10 @@
 import { getUserFromSession, createClient } from '@/lib/supabase/server'
-import Header from '@/components/layout/Header'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 import RequestCard from '@/components/shared/RequestCard'
 import POCard from '@/components/shared/POCard'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Document, ShoppingCart, Warning2 } from '@/lib/icons'
+import { FileText, ShoppingBag, AlertTriangle, CheckCircle } from 'lucide-react'
 
 export default async function MintahPage() {
   const user = await getUserFromSession()
@@ -46,68 +46,63 @@ export default async function MintahPage() {
   }
 
   return (
-    <div className="min-h-screen mesh-gradient noise-overlay">
-      <Header />
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8 animate-slide-up">
-          <h1 className="text-3xl font-bold tracking-tight mb-1">
-            Mintah Dashboard
-          </h1>
-          <p className="text-muted-foreground">
-            Review requests and manage Purchase Orders
-          </p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger">
-          <Card className="glass-card-elevated border-border/40 elastic-hover flecto-reflect scroll-reveal">
+    <DashboardLayout
+      title="Mintah Dashboard"
+      subtitle="Review requisitions and manage purchase orders"
+      user={user ? { name: user.name, email: user.email } : null}
+      role={user?.role ?? 'mintah'}
+    >
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Stats Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger animate-slide-up">
+          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
             <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-blue-500/10 flex items-center justify-center">
-                  <Document size="22" color="#2563eb" />
+                  <FileText size="22" className="text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
                   <p className="text-3xl font-bold tracking-tight">{stats.newRequests}</p>
-                  <p className="text-xs text-muted-foreground font-medium">New Requests</p>
+                  <p className="text-xs text-muted-foreground font-semibold">New Requests</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card-elevated border-border/40 elastic-hover flecto-reflect scroll-reveal">
+          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
             <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
-                  <ShoppingCart size="22" color="#d97706" />
+                  <ShoppingBag size="22" className="text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                   <p className="text-3xl font-bold tracking-tight">{stats.myPOs}</p>
-                  <p className="text-xs text-muted-foreground font-medium">My POs</p>
+                  <p className="text-xs text-muted-foreground font-semibold">My POs</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card-elevated border-border/40 elastic-hover flecto-reflect scroll-reveal">
+          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
             <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                  <Warning2 size="22" color="#ea580c" />
+                  <AlertTriangle size="22" className="text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
                   <p className="text-3xl font-bold tracking-tight">{stats.pendingSam}</p>
-                  <p className="text-xs text-muted-foreground font-medium">Awaiting Sam</p>
+                  <p className="text-xs text-muted-foreground font-semibold">Awaiting Sam</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="glass-card-elevated border-border/40 elastic-hover flecto-reflect scroll-reveal">
+          <Card className="glass-card-elevated border-border/40 hover:shadow-md transition-all duration-200">
             <CardContent className="p-5">
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
-                  <ShoppingCart size="22" color="#059669" />
+                  <CheckCircle size="22" className="text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <div>
                   <p className="text-3xl font-bold tracking-tight">{stats.completed}</p>
-                  <p className="text-xs text-muted-foreground font-medium">Completed</p>
+                  <p className="text-xs text-muted-foreground font-semibold">Completed POs</p>
                 </div>
               </div>
             </CardContent>
@@ -117,9 +112,11 @@ export default async function MintahPage() {
         {/* New Requests */}
         <section className="mb-10 animate-slide-up" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center gap-3 mb-5">
-            <h2 className="text-xl font-semibold">New Requests</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">New Requests</h2>
             {requests && requests.length > 0 && (
-              <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10">{requests.length}</Badge>
+              <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10 font-bold">
+                {requests.length}
+              </Badge>
             )}
           </div>
           {requests && requests.length > 0 ? (
@@ -134,7 +131,7 @@ export default async function MintahPage() {
             </div>
           ) : (
             <Card className="glass-card border-border/40">
-              <CardContent className="p-10 text-center text-muted-foreground font-medium">
+              <CardContent className="p-10 text-center text-muted-foreground font-semibold">
                 No new requests to review.
               </CardContent>
             </Card>
@@ -144,9 +141,11 @@ export default async function MintahPage() {
         {/* My POs */}
         <section className="animate-slide-up" style={{ animationDelay: '0.15s' }}>
           <div className="flex items-center gap-3 mb-5">
-            <h2 className="text-xl font-semibold">My Purchase Orders</h2>
+            <h2 className="text-xl font-bold tracking-tight text-foreground">My Purchase Orders</h2>
             {myPOs && myPOs.length > 0 && (
-              <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10">{myPOs.length}</Badge>
+              <Badge variant="secondary" className="bg-primary/[0.06] text-primary border-primary/10 font-bold">
+                {myPOs.length}
+              </Badge>
             )}
           </div>
           {myPOs && myPOs.length > 0 ? (
@@ -161,13 +160,13 @@ export default async function MintahPage() {
             </div>
           ) : (
             <Card className="glass-card border-border/40">
-              <CardContent className="p-10 text-center text-muted-foreground font-medium">
+              <CardContent className="p-10 text-center text-muted-foreground font-semibold">
                 No POs created yet. Convert a request to get started.
               </CardContent>
             </Card>
           )}
         </section>
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

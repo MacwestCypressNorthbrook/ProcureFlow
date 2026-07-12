@@ -2,19 +2,21 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/Header'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG } from '@/lib/utils'
-import { ArrowLeft, Document, ArrowRight } from '@/lib/icons'
+import { ArrowLeft, FileText, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
 
 interface RequestDetailProps {
   request: any
+  user?: { name?: string; email: string } | null
+  role?: string | null
 }
 
-export default function RequestDetailClient({ request }: RequestDetailProps) {
+export default function RequestDetailClient({ request, user, role }: RequestDetailProps) {
   const router = useRouter()
   const [isConverting, setIsConverting] = useState(false)
 
@@ -31,26 +33,31 @@ export default function RequestDetailClient({ request }: RequestDetailProps) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/20">
-      <Header />
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <Link href="/mintah" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+    <DashboardLayout
+      title="Request Details"
+      subtitle="Review this request and convert it to a Purchase Order"
+      user={user}
+      role={role}
+    >
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <Link
+          href="/mintah"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
           <ArrowLeft size="14" />
           Back to Dashboard
         </Link>
 
-        <div className="mb-6 animate-slide-up">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight mb-1">
-                Request Details
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Review this request and convert it to a Purchase Order
-              </p>
-            </div>
-            <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
+        <div className="mb-6 flex items-center justify-between gap-4 animate-slide-up">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              Request Info
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Review details submitted by requester
+            </p>
           </div>
+          <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
         </div>
 
         <div className="animate-slide-up" style={{ animationDelay: '0.05s' }}>
@@ -62,26 +69,26 @@ export default function RequestDetailClient({ request }: RequestDetailProps) {
         </div>
 
         {request.status === 'new' || request.status === 'reviewing' ? (
-          <div className="mt-6 flex gap-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+          <div className="mt-6 flex flex-wrap gap-3 animate-slide-up" style={{ animationDelay: '0.1s' }}>
             <Button
               onClick={handleConvertToPO}
               disabled={isConverting}
               size="lg"
-              className="gap-2 shadow-lg shadow-emerald-500/20"
+              className="gap-1.5 shadow-sm"
             >
               {isConverting ? (
                 <>Processing...</>
               ) : (
                 <>
-                  <Document size="16" />
+                  <FileText size="16" />
                   Convert to PO & Send to Sam
                   <ArrowRight size="16" />
                 </>
               )}
             </Button>
             <Link href="/mintah">
-              <Button variant="outline" size="lg">
-                <ArrowLeft size="16" className="mr-1.5" />
+              <Button variant="outline" size="lg" className="gap-1.5">
+                <ArrowLeft size="16" />
                 Back
               </Button>
             </Link>
@@ -89,14 +96,14 @@ export default function RequestDetailClient({ request }: RequestDetailProps) {
         ) : (
           <div className="mt-6">
             <Link href="/mintah">
-              <Button variant="outline" size="lg" className="gap-2">
+              <Button variant="outline" size="lg" className="gap-1.5">
                 <ArrowLeft size="16" />
                 Back to Dashboard
               </Button>
             </Link>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

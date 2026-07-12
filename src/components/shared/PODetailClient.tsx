@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Header from '@/components/layout/Header'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -10,15 +10,17 @@ import { Textarea } from '@/components/ui/textarea'
 import POProgress from '@/components/shared/POProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
-import { ArrowLeft, TickCircle, CloseCircle, Document, ArrowDown } from '@/lib/icons'
+import { ArrowLeft, CheckCircle, XCircle, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
 
 interface PODetailProps {
   po: any
+  user?: { name?: string; email: string } | null
+  role?: string | null
 }
 
-export default function PODetailClient({ po }: PODetailProps) {
+export default function PODetailClient({ po, user, role }: PODetailProps) {
   const router = useRouter()
   const [rejectionReason, setRejectionReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -46,27 +48,34 @@ export default function PODetailClient({ po }: PODetailProps) {
     setIsSubmitting(false)
   }
 
+  const backHref = role === 'mintah' ? '/mintah' : '/sam'
+
   return (
-    <div className="min-h-screen bg-muted/20">
-      <Header />
-      <main className="mx-auto max-w-5xl px-4 py-8">
-        <Link href="/sam" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6 transition-colors">
+    <DashboardLayout
+      title="PO Review"
+      subtitle="Inspect the Purchase Order and make your decision"
+      user={user}
+      role={role}
+    >
+      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground mb-6 transition-colors"
+        >
           <ArrowLeft size="14" />
           Back to Dashboard
         </Link>
 
-        <div className="mb-6 animate-slide-up">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight mb-1">
-                PO Review
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Inspect the Purchase Order and make your decision
-              </p>
-            </div>
-            <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
+        <div className="mb-6 flex items-center justify-between gap-4 animate-slide-up">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              Purchase Order #{po.id.slice(0, 8)}
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Created on {formatDate(po.created_at)}
+            </p>
           </div>
+          <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
         </div>
 
         <div className="mb-6 animate-slide-up" style={{ animationDelay: '0.05s' }}>
@@ -74,88 +83,84 @@ export default function PODetailClient({ po }: PODetailProps) {
         </div>
 
         <div className="grid lg:grid-cols-2 gap-6">
-            {/* PO Details */}
-            <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-              {po.description && po.description.trim().startsWith('{') ? (
-                <RichRequisitionView 
-                  description={po.description} 
-                  fallbackPurpose={po.purpose} 
-                  fallbackDate={po.created_at} 
-                />
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Document size="16" color="currentColor" />
-                      PO Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
+          {/* PO Details */}
+          <div className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            {po.description && po.description.trim().startsWith('{') ? (
+              <RichRequisitionView 
+                description={po.description} 
+                fallbackPurpose={po.purpose} 
+                fallbackDate={po.created_at} 
+              />
+            ) : (
+              <Card className="border-border/60">
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <FileText size="16" className="text-muted-foreground" />
+                    PO Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-xs font-medium text-muted-foreground mb-1 block">Purpose</Label>
+                    <p className="text-base font-bold text-foreground">{po.purpose}</p>
+                  </div>
+
+                  {po.description && (
                     <div>
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">Purpose</Label>
-                      <p className="text-lg font-semibold">{po.purpose}</p>
+                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">Description</Label>
+                      <p className="text-xs whitespace-pre-wrap leading-relaxed text-foreground">{po.description}</p>
                     </div>
+                  )}
 
-                    {po.description && (
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Description</Label>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{po.description}</p>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Quantity</Label>
-                        <p className="text-sm font-medium">{po.quantity ?? '—'}</p>
-                      </div>
-                      <div>
-                        <Label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Rate</Label>
-                        <p className="text-sm font-medium">{formatCurrency(po.unit_rate)}</p>
-                      </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">Quantity</Label>
+                      <p className="text-xs font-bold text-foreground">{po.quantity ?? '—'}</p>
                     </div>
-
-                    <div className="rounded-lg bg-primary/5 border border-primary/10 p-4">
-                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">Total Amount</Label>
-                      <p className="text-2xl font-bold text-primary">{formatCurrency(po.total_amount)}</p>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Rate</Label>
+                      <p className="text-xs font-bold text-foreground">{formatCurrency(po.unit_rate)}</p>
                     </div>
+                  </div>
 
-                    <div className="border-t pt-4 text-xs text-muted-foreground">
-                      Created: {formatDate(po.created_at)}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                  <div className="rounded-xl bg-primary/5 border border-primary/10 p-4">
+                    <Label className="text-xs font-medium text-muted-foreground mb-1 block">Total Amount</Label>
+                    <p className="text-xl font-bold text-primary">{formatCurrency(po.total_amount)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-          {/* File Preview / Rejection */}
+          {/* File Preview & Rejection */}
           <div className="space-y-6">
-            <Card className="animate-slide-in-right" style={{ animationDelay: '0.15s' }}>
+            <Card className="border-border/60 animate-slide-in-right" style={{ animationDelay: '0.15s' }}>
               <CardHeader>
-                <CardTitle className="text-lg">Attached File</CardTitle>
+                <CardTitle className="text-sm font-semibold">Attached Document</CardTitle>
               </CardHeader>
               <CardContent>
                 {po.file_name ? (
-                  <div className="rounded-lg border bg-muted/30 p-6 text-center">
-                    <Document size="48" color="currentColor" className="mx-auto mb-3 text-muted-foreground" />
-                    <p className="text-sm font-medium mb-2">{po.file_name}</p>
-                    <Button variant="outline" size="sm" className="gap-1.5">
-                      <ArrowDown size="14" />
+                  <div className="rounded-xl border border-border bg-muted/20 p-5 text-center">
+                    <FileText size="40" className="mx-auto mb-3 text-muted-foreground" />
+                    <p className="text-xs font-semibold mb-3 truncate text-foreground">{po.file_name}</p>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8">
+                      <Download size="13" />
                       Download
                     </Button>
                   </div>
                 ) : (
-                  <div className="rounded-lg border bg-muted/30 p-6 text-center text-muted-foreground text-sm">
+                  <div className="rounded-xl border border-dashed border-border bg-muted/10 p-5 text-center text-xs text-muted-foreground font-semibold">
                     No file attached to this PO.
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Rejection Reason */}
-            {(po.status === 'pending_sam' || po.status === 'revision_required') && (
-              <Card className="animate-slide-in-right" style={{ animationDelay: '0.2s' }}>
+            {/* Rejection Reason Input */}
+            {(po.status === 'pending_sam' || po.status === 'revision_required') && role === 'sam' && (
+              <Card className="border-border/60 animate-slide-in-right" style={{ animationDelay: '0.2s' }}>
                 <CardContent className="p-4">
-                  <Label className="text-sm font-medium mb-2 block">
+                  <Label className="text-xs font-semibold mb-2 block">
                     Rejection Reason {po.status === 'revision_required' ? '(sent back to Mintah)' : '(if rejecting)'}
                   </Label>
                   <Textarea
@@ -163,21 +168,21 @@ export default function PODetailClient({ po }: PODetailProps) {
                     onChange={(e) => setRejectionReason(e.target.value)}
                     placeholder="e.g. Missing signature, needs stamp on page 2..."
                     rows={3}
-                    className="resize-none mb-3"
+                    className="resize-none text-xs"
                   />
                 </CardContent>
               </Card>
             )}
 
-            {/* Rejection history */}
+            {/* Rejection History */}
             {po.sam_rejection_reason && (
               <Card className="border-destructive/20 bg-destructive/5 animate-slide-in-right">
                 <CardContent className="p-4">
-                  <Label className="text-sm font-medium text-destructive mb-1 block flex items-center gap-1.5">
-                    <CloseCircle size="14" color="currentColor" />
-                    Rejection Reason
+                  <Label className="text-xs font-bold text-destructive mb-1.5 block flex items-center gap-1.5">
+                    <XCircle size="14" />
+                    Rejection History
                   </Label>
-                  <p className="text-sm">{po.sam_rejection_reason}</p>
+                  <p className="text-xs font-medium leading-relaxed text-destructive">{po.sam_rejection_reason}</p>
                 </CardContent>
               </Card>
             )}
@@ -185,15 +190,15 @@ export default function PODetailClient({ po }: PODetailProps) {
         </div>
 
         {/* Action Buttons */}
-        {(po.status === 'pending_sam' || po.status === 'revision_required') && (
+        {(po.status === 'pending_sam' || po.status === 'revision_required') && role === 'sam' && (
           <div className="mt-8 flex flex-wrap gap-3 animate-slide-up" style={{ animationDelay: '0.25s' }}>
             <Button
               onClick={handleApprove}
               disabled={isSubmitting}
               size="lg"
-              className="gap-2 bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/20"
+              className="gap-1.5 shadow-sm"
             >
-              <TickCircle size="16" />
+              <CheckCircle size="16" />
               Approve & Send to Finance
             </Button>
             <Button
@@ -201,20 +206,20 @@ export default function PODetailClient({ po }: PODetailProps) {
               disabled={isSubmitting || !rejectionReason.trim()}
               variant="destructive"
               size="lg"
-              className="gap-2"
+              className="gap-1.5"
             >
-              <CloseCircle size="16" />
-              Reject & Return to Mintah
+              <XCircle size="16" />
+              Reject & Return
             </Button>
             <Link href="/sam">
-              <Button variant="outline" size="lg">
-                <ArrowLeft size="16" className="mr-1.5" />
-                Back
+              <Button variant="outline" size="lg" className="gap-1.5">
+                <ArrowLeft size="16" />
+                Cancel
               </Button>
             </Link>
           </div>
         )}
-      </main>
-    </div>
+      </div>
+    </DashboardLayout>
   )
 }

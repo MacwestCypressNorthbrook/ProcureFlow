@@ -6,21 +6,20 @@ import { useRouter } from 'next/navigation'
 import type { User, Request, PurchaseOrder } from '@/lib/types'
 import { ROLE_LABELS, PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import ThemeToggle from '@/components/layout/ThemeToggle'
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
+import DashboardLayout from '@/components/layout/DashboardLayout'
+import { Card, CardContent } from '@/components/ui/card'
 import {
-  Category,
-  People,
-  ClipboardTick,
-  ShoppingCart,
-  Setting2,
-  Logout,
-  Menu,
-  SearchNormal1,
-  TickCircle,
-  Warning2,
+  LayoutGrid,
+  Users as PeopleIcon,
+  ClipboardCheck,
+  ShoppingBag,
+  Settings,
+  Search,
+  CheckCircle,
+  AlertTriangle,
   ArrowRight,
-  Card as CardIcon,
-} from '@/lib/icons'
+  TrendingUp,
+} from 'lucide-react'
 
 const ghs = (n: number | null) =>
   n == null
@@ -41,32 +40,30 @@ const roleDot: Record<string, string> = {
   finance: 'bg-emerald-500',
 }
 
+const roleBadgeColor: Record<string, string> = {
+  superuser: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
+  admin: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
+  minta: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
+  mintah: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
+  sam: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
+  finance: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
+}
+
 type Section = 'overview' | 'users' | 'requests' | 'pos' | 'settings'
 
 const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
-  { id: 'overview', label: 'Overview', icon: <Category size="18" /> },
-  { id: 'users', label: 'Users', icon: <People size="18" /> },
-  { id: 'requests', label: 'Requests', icon: <ClipboardTick size="18" /> },
-  { id: 'pos', label: 'Purchase Orders', icon: <ShoppingCart size="18" /> },
-  { id: 'settings', label: 'Settings', icon: <Setting2 size="18" /> },
+  { id: 'overview', label: 'Overview', icon: <LayoutGrid size="18" /> },
+  { id: 'users', label: 'Users', icon: <PeopleIcon size="18" /> },
+  { id: 'requests', label: 'Requests', icon: <ClipboardCheck size="18" /> },
+  { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size="18" /> },
+  { id: 'settings', label: 'Settings', icon: <Settings size="18" /> },
 ]
-
-function BrandMark() {
-  return (
-    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path d="M4 7.5 12 3l8 4.5v9L12 21l-8-4.5v-9Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-        <path d="m8 9.7 4 2.3 4-2.3M12 12v4.6" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      </svg>
-    </span>
-  )
-}
 
 function StatusPill({ status, kind }: { status: string; kind: 'po' | 'request' }) {
   const cfg = (kind === 'po' ? PO_STATUS_CONFIG : REQUEST_STATUS_CONFIG)[status]
   if (!cfg) return <span className="text-xs text-muted-foreground">{status}</span>
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-foreground">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] font-medium text-foreground">
       <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -74,17 +71,20 @@ function StatusPill({ status, kind }: { status: string; kind: 'po' | 'request' }
 }
 
 export default function AdminClient({
+  user,
+  role,
   users: initialUsers,
   requests,
   pos,
 }: {
+  user: { name?: string; email: string } | null
+  role: string | null
   users: User[]
   requests: Request[]
   pos: PurchaseOrder[]
 }) {
   const router = useRouter()
   const [section, setSection] = useState<Section>('overview')
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [users, setUsers] = useState<User[]>(initialUsers)
   const [query, setQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
@@ -119,23 +119,23 @@ export default function AdminClient({
     })
   }, [users, query, roleFilter])
 
-  const changeRole = async (id: string, role: string) => {
+  const changeRole = async (id: string, newRole: string) => {
     const prev = users.find((u) => u.id === id)?.role
-    if (prev === role) return
+    if (prev === newRole) return
     setSavingId(id)
-    setUsers((us) => us.map((u) => (u.id === id ? { ...u, role } : u)))
+    setUsers((us) => us.map((u) => (u.id === id ? { ...u, role: newRole } : u)))
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, role }),
+        body: JSON.stringify({ id, role: newRole }),
       })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Update failed' }))
         setUsers((us) => us.map((u) => (u.id === id ? { ...u, role: prev ?? u.role } : u)))
         setToast({ msg: error ?? 'Could not update role', ok: false })
       } else {
-        setToast({ msg: 'Role updated', ok: true })
+        setToast({ msg: 'Role updated successfully', ok: true })
         router.refresh()
       }
     } catch {
@@ -147,343 +147,284 @@ export default function AdminClient({
     }
   }
 
-  const NavList = ({ onNavigate }: { onNavigate?: () => void }) => (
-    <nav className="flex flex-col gap-0.5">
-      {nav.map((n) => (
-        <button
-          key={n.id}
-          onClick={() => {
-            setSection(n.id)
-            onNavigate?.()
-          }}
-          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors press-active ${
-            section === n.id
-              ? 'bg-foreground text-background'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-          }`}
-        >
-          {n.icon}
-          {n.label}
-        </button>
-      ))}
-    </nav>
-  )
-
-  const sidebarInner = (onNavigate?: () => void) => (
-    <div className="flex h-full flex-col p-4">
-      <Link href="/" className="mb-6 flex items-center gap-2.5 px-2 pt-2">
-        <BrandMark />
-        <span className="text-[15px] font-semibold tracking-tight">
-          Procure<span className="text-primary">Flow</span>
-        </span>
-        <span className="ml-auto rounded-md bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Admin
-        </span>
-      </Link>
-      <NavList onNavigate={onNavigate} />
-      <div className="mt-auto space-y-1 border-t border-border pt-4">
-        <Link
-          href="/"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <ArrowRight size="18" className="rotate-180" />
-          Back to site
-        </Link>
-        <form action="/auth/signout" method="POST">
-          <button
-            type="submit"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-          >
-            <Logout size="18" />
-            Sign out
-          </button>
-        </form>
-      </div>
-    </div>
-  )
+  const customNav = nav.map((n) => ({
+    id: n.id,
+    label: n.label,
+    icon: n.icon,
+    active: section === n.id,
+    onClick: () => setSection(n.id),
+  }))
 
   const sectionMeta: Record<Section, { title: string; sub: string }> = {
     overview: { title: 'Overview', sub: 'System health and activity at a glance' },
-    users: { title: 'Users', sub: 'Manage people and their roles' },
-    requests: { title: 'Requests', sub: 'Every requisition raised across the org' },
-    pos: { title: 'Purchase Orders', sub: 'Orders from creation through payment' },
-    settings: { title: 'Settings', sub: 'Preferences and administration' },
+    users: { title: 'Users Directory', sub: 'Manage people and assign system roles' },
+    requests: { title: 'Requisitions Raised', sub: 'Every request raised across the organization' },
+    pos: { title: 'Purchase Orders', sub: 'Purchase orders from creation through payment' },
+    settings: { title: 'Administration Settings', sub: 'Preferences and system information' },
   }
 
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[264px_1fr]">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen border-r border-border bg-card lg:block">
-        {sidebarInner()}
-      </aside>
-
-      {/* Main */}
-      <div className="flex min-h-screen flex-col">
-        {/* Top bar */}
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border glass-nav px-4 sm:px-6">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden">
-              <Menu size="20" />
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] border-r border-border bg-card p-0">
-              <SheetTitle className="sr-only">Admin navigation</SheetTitle>
-              {sidebarInner(() => setMobileOpen(false))}
-            </SheetContent>
-          </Sheet>
-
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold tracking-tight text-foreground">
-              {sectionMeta[section].title}
-            </h1>
-            <p className="hidden truncate text-xs text-muted-foreground sm:block">{sectionMeta[section].sub}</p>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
-            <span className="hidden items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-              Superuser
-            </span>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
-          {section === 'overview' && (
-            <div className="mx-auto max-w-5xl space-y-6 animate-fade-in">
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                {[
-                  { label: 'Total users', value: stats.users, icon: <People size="18" />, tint: 'text-violet-600 dark:text-violet-400 bg-violet-500/10' },
-                  { label: 'Requests', value: stats.requests, icon: <ClipboardTick size="18" />, tint: 'text-blue-600 dark:text-blue-400 bg-blue-500/10' },
-                  { label: 'Purchase orders', value: stats.pos, icon: <ShoppingCart size="18" />, tint: 'text-amber-600 dark:text-amber-400 bg-amber-500/10' },
-                  { label: 'Completed', value: stats.completed, icon: <TickCircle size="18" />, tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' },
-                ].map((s) => (
-                  <div key={s.label} className="surface rounded-xl p-5">
-                    <span className={`flex h-9 w-9 items-center justify-center rounded-lg ${s.tint}`}>{s.icon}</span>
-                    <p className="mt-4 text-3xl font-semibold tracking-tight text-foreground tabular">{s.value}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-5">
-                {/* Value + pending */}
-                <div className="surface rounded-xl p-6 lg:col-span-2">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Total PO value</p>
-                  <p className="mt-2 text-3xl font-semibold tracking-tight text-foreground font-mono">{ghs(stats.value)}</p>
-                  <div className="mt-5 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-sm">
-                    <Warning2 size="16" className="text-amber-500" />
-                    <span className="text-foreground">{stats.pending}</span>
-                    <span className="text-muted-foreground">orders awaiting action</span>
-                  </div>
+    <DashboardLayout
+      title={sectionMeta[section].title}
+      subtitle={sectionMeta[section].sub}
+      user={user}
+      role={role}
+      customNav={customNav}
+    >
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        {section === 'overview' && (
+          <div className="space-y-8 animate-slide-up">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              {[
+                { label: 'Total Users', value: stats.users, icon: <PeopleIcon size="20" />, tint: 'text-violet-600 dark:text-violet-400 bg-violet-500/10' },
+                { label: 'Total Requests', value: stats.requests, icon: <ClipboardCheck size="20" />, tint: 'text-blue-600 dark:text-blue-400 bg-blue-500/10' },
+                { label: 'Purchase Orders', value: stats.pos, icon: <ShoppingBag size="20" />, tint: 'text-amber-600 dark:text-amber-400 bg-amber-500/10' },
+                { label: 'Completed Orders', value: stats.completed, icon: <CheckCircle size="20" />, tint: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' },
+              ].map((s) => (
+                <div key={s.label} className="group surface rounded-2xl p-5 border border-border/60 hover:shadow-md transition-all duration-200">
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105 ${s.tint}`}>
+                    {s.icon}
+                  </span>
+                  <p className="mt-4 text-3xl font-bold tracking-tight text-foreground tabular">{s.value}</p>
+                  <p className="mt-1 text-xs text-muted-foreground font-medium">{s.label}</p>
                 </div>
+              ))}
+            </div>
 
-                {/* Role distribution */}
-                <div className="surface rounded-xl p-6 lg:col-span-3">
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Users by role</p>
-                  <ul className="mt-4 space-y-3">
-                    {roleCounts.map(([role, count]) => (
-                      <li key={role} className="flex items-center gap-3">
-                        <span className="flex w-28 items-center gap-2 text-sm text-foreground">
-                          <span className={`h-2 w-2 rounded-full ${roleDot[role] ?? 'bg-slate-400'}`} />
-                          {ROLE_LABELS[role]?.split(' ')[0] ?? role}
-                        </span>
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-foreground/80"
-                            style={{ width: `${(count / Math.max(1, users.length)) * 100}%` }}
-                          />
-                        </div>
-                        <span className="w-6 text-right text-sm font-medium tabular text-muted-foreground">{count}</span>
-                      </li>
-                    ))}
-                  </ul>
+            {/* Distribution and PO Value */}
+            <div className="grid gap-6 lg:grid-cols-5">
+              {/* Value + Pending */}
+              <div className="surface rounded-2xl p-6 border border-border/60 lg:col-span-2 flex flex-col justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total PO Value</p>
+                  <p className="mt-2 text-3xl font-bold tracking-tight text-foreground font-mono">{ghs(stats.value)}</p>
+                </div>
+                <div className="mt-6 flex items-center gap-2.5 rounded-xl border border-amber-500/10 bg-amber-500/5 px-4 py-3 text-sm">
+                  <AlertTriangle size="18" className="text-amber-500 shrink-0" />
+                  <div className="text-xs font-medium text-foreground">
+                    <span className="font-bold text-amber-600 dark:text-amber-400">{stats.pending}</span> orders await executive approval or payment.
+                  </div>
                 </div>
               </div>
 
-              {/* Recent POs */}
-              <div className="surface overflow-hidden rounded-xl">
-                <div className="flex items-center justify-between border-b border-border px-6 py-4">
-                  <h2 className="text-sm font-semibold text-foreground">Recent purchase orders</h2>
-                  <button onClick={() => setSection('pos')} className="text-xs font-medium text-primary hover:underline">
-                    View all
-                  </button>
-                </div>
-                <Table
-                  head={['Purpose', 'Amount', 'Status', 'Created']}
-                  rows={pos.slice(0, 5).map((p) => [
-                    <span key="p" className="font-medium text-foreground">{p.purpose}</span>,
-                    <span key="a" className="font-mono text-muted-foreground">{ghs(p.total_amount)}</span>,
-                    <StatusPill key="s" status={p.status} kind="po" />,
-                    <span key="d" className="text-muted-foreground">{shortDate(p.created_at)}</span>,
-                  ])}
-                  empty="No purchase orders yet."
-                />
+              {/* Role Distribution */}
+              <div className="surface rounded-2xl p-6 border border-border/60 lg:col-span-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">Users by Role</p>
+                <ul className="space-y-4">
+                  {roleCounts.map(([r, count]) => (
+                    <li key={r} className="flex items-center gap-3">
+                      <span className="flex w-28 items-center gap-2 text-xs font-semibold text-foreground">
+                        <span className={`h-2 w-2 rounded-full ${roleDot[r] ?? 'bg-slate-400'}`} />
+                        {ROLE_LABELS[r]?.split(' ')[0] ?? r}
+                      </span>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                        <div
+                          className="h-full rounded-full bg-foreground/75 transition-all duration-300"
+                          style={{ width: `${(count / Math.max(1, users.length)) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-8 text-right text-xs font-medium tabular text-muted-foreground">{count}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             </div>
-          )}
 
-          {section === 'users' && (
-            <div className="mx-auto max-w-5xl space-y-5 animate-fade-in">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="relative flex-1">
-                  <SearchNormal1 size="16" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search by name or email…"
-                    className="h-10 w-full rounded-lg border border-input bg-card pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  />
-                </div>
+            {/* Recent POs */}
+            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-border px-6 py-4 bg-muted/10">
+                <h2 className="text-sm font-semibold text-foreground">Recent Purchase Orders</h2>
+                <button
+                  onClick={() => setSection('pos')}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                >
+                  View all
+                  <ArrowRight size="12" />
+                </button>
+              </div>
+              <Table
+                head={['Purpose', 'Amount', 'Status', 'Created']}
+                rows={pos.slice(0, 5).map((p) => [
+                  <span key="p" className="font-semibold text-foreground">{p.purpose}</span>,
+                  <span key="a" className="font-mono text-xs font-semibold text-foreground">{ghs(p.total_amount)}</span>,
+                  <StatusPill key="s" status={p.status} kind="po" />,
+                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(p.created_at)}</span>,
+                ])}
+                empty="No purchase orders yet."
+              />
+            </div>
+          </div>
+        )}
+
+        {section === 'users' && (
+          <div className="space-y-6 animate-slide-up">
+            {/* Search & Filter Bar */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
+              <div className="relative flex-1 max-w-md">
+                <Search size="16" className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by name or email…"
+                  className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-xs font-medium text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div className="flex items-center gap-2">
                 <select
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
-                  className="h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  <option value="all">All roles</option>
+                  <option value="all">All Roles</option>
                   {ASSIGNABLE.map((r) => (
                     <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
                   ))}
                 </select>
-                <span className="shrink-0 rounded-lg bg-muted px-3 py-2 text-sm font-medium tabular text-muted-foreground">
+                <span className="inline-flex items-center rounded-xl bg-muted px-3.5 py-2.5 text-xs font-semibold text-muted-foreground tabular">
                   {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'}
                 </span>
               </div>
+            </div>
 
-              <div className="surface overflow-hidden rounded-xl">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left">
-                        <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">User</th>
-                        <th className="px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Role</th>
-                        <th className="hidden px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Joined</th>
+            {/* Users Table */}
+            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
+                      <th className="px-6 py-3.5 uppercase tracking-wider">User</th>
+                      <th className="px-6 py-3.5 uppercase tracking-wider">Role & Permissions</th>
+                      <th className="hidden px-6 py-3.5 uppercase tracking-wider sm:table-cell">Date Joined</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                              {(u.name ?? u.email).slice(0, 2).toUpperCase()}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-foreground text-sm">{u.name ?? 'Unnamed'}</p>
+                              <p className="truncate text-xs text-muted-foreground font-medium">{u.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={ASSIGNABLE.includes(u.role) ? u.role : ''}
+                              onChange={(e) => changeRole(u.id, e.target.value)}
+                              disabled={savingId === u.id}
+                              className="h-8 rounded-lg border border-border bg-card px-2.5 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+                            >
+                              {!ASSIGNABLE.includes(u.role) && <option value="">{u.role}</option>}
+                              {ASSIGNABLE.map((r) => (
+                                <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
+                              ))}
+                            </select>
+                            {savingId === u.id && <span className="text-[10px] text-muted-foreground animate-pulse">Saving…</span>}
+                          </div>
+                        </td>
+                        <td className="hidden px-6 py-3.5 text-muted-foreground font-medium sm:table-cell">{shortDate(u.created_at)}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map((u) => (
-                        <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                          <td className="px-6 py-3">
-                            <div className="flex items-center gap-3">
-                              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                                {(u.name ?? u.email).slice(0, 2).toUpperCase()}
-                              </span>
-                              <div className="min-w-0">
-                                <p className="truncate font-medium text-foreground">{u.name ?? 'Unnamed'}</p>
-                                <p className="truncate text-xs text-muted-foreground">{u.email}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3">
-                            <div className="flex items-center gap-2">
-                              <span className={`h-2 w-2 shrink-0 rounded-full ${roleDot[u.role] ?? 'bg-slate-400'}`} />
-                              <select
-                                value={ASSIGNABLE.includes(u.role) ? u.role : ''}
-                                onChange={(e) => changeRole(u.id, e.target.value)}
-                                disabled={savingId === u.id}
-                                className="h-8 rounded-md border border-input bg-card px-2 text-xs font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                              >
-                                {!ASSIGNABLE.includes(u.role) && <option value="">{u.role}</option>}
-                                {ASSIGNABLE.map((r) => (
-                                  <option key={r} value={r}>{ROLE_LABELS[r] ?? r}</option>
-                                ))}
-                              </select>
-                              {savingId === u.id && <span className="text-xs text-muted-foreground">Saving…</span>}
-                            </div>
-                          </td>
-                          <td className="hidden px-6 py-3 text-muted-foreground sm:table-cell">{shortDate(u.created_at)}</td>
-                        </tr>
-                      ))}
-                      {filteredUsers.length === 0 && (
-                        <tr>
-                          <td colSpan={3} className="px-6 py-12 text-center text-sm text-muted-foreground">
-                            No users match your filters.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-xl border border-dashed border-border bg-muted/20 p-4 text-sm text-muted-foreground">
-                <CardIcon size="18" className="mt-0.5 shrink-0" />
-                <p>
-                  New users join through the{' '}
-                  <Link href="/auth/signup" className="font-medium text-primary hover:underline">signup page</Link>{' '}
-                  and pick a starting role. Adjust anyone&apos;s role inline above — changes save instantly.
-                </p>
+                    ))}
+                    {filteredUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
+                          No users found matching your filters.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-          )}
 
-          {section === 'requests' && (
-            <div className="mx-auto max-w-5xl animate-fade-in">
-              <div className="surface overflow-hidden rounded-xl">
-                <Table
-                  head={['Purpose', 'Requester', 'Amount', 'Status', 'Created']}
-                  rows={requests.map((r) => [
-                    <span key="p" className="font-medium text-foreground">{r.purpose}</span>,
-                    <span key="r" className="text-muted-foreground">{r.guest_name ?? '—'}</span>,
-                    <span key="a" className="font-mono text-muted-foreground">{ghs(r.estimated_unit_rate)}</span>,
-                    <StatusPill key="s" status={r.status} kind="request" />,
-                    <span key="d" className="text-muted-foreground">{shortDate(r.created_at)}</span>,
-                  ])}
-                  empty="No requests raised yet."
-                />
-              </div>
+            {/* Note Panel */}
+            <div className="flex items-start gap-3 rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-xs text-muted-foreground leading-relaxed">
+              <CheckCircle size="18" className="mt-0.5 shrink-0 text-primary" />
+              <p>
+                New users join through the{' '}
+                <Link href="/auth/signup" className="font-semibold text-primary hover:underline">signup page</Link>{' '}
+                and pick a starting role. Adjust roles inline from the dropdown — modifications will save instantly in real-time.
+              </p>
             </div>
-          )}
+          </div>
+        )}
 
-          {section === 'pos' && (
-            <div className="mx-auto max-w-5xl animate-fade-in">
-              <div className="surface overflow-hidden rounded-xl">
-                <Table
-                  head={['Purpose', 'Amount', 'Status', 'Created', 'Paid']}
-                  rows={pos.map((p) => [
-                    <span key="p" className="font-medium text-foreground">{p.purpose}</span>,
-                    <span key="a" className="font-mono text-muted-foreground">{ghs(p.total_amount)}</span>,
-                    <StatusPill key="s" status={p.status} kind="po" />,
-                    <span key="d" className="text-muted-foreground">{shortDate(p.created_at)}</span>,
-                    <span key="pd" className="text-muted-foreground">{shortDate(p.paid_at)}</span>,
-                  ])}
-                  empty="No purchase orders yet."
-                />
-              </div>
+        {section === 'requests' && (
+          <div className="space-y-6 animate-slide-up">
+            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
+              <Table
+                head={['Purpose', 'Requester', 'Amount', 'Status', 'Created']}
+                rows={requests.map((r) => [
+                  <span key="p" className="font-semibold text-foreground">{r.purpose}</span>,
+                  <span key="r" className="text-muted-foreground text-xs font-semibold">{r.guest_name ?? '—'}</span>,
+                  <span key="a" className="font-mono text-xs text-muted-foreground">{ghs(r.estimated_unit_rate)}</span>,
+                  <StatusPill key="s" status={r.status} kind="request" />,
+                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(r.created_at)}</span>,
+                ])}
+                empty="No requests raised yet."
+              />
             </div>
-          )}
+          </div>
+        )}
 
-          {section === 'settings' && (
-            <div className="mx-auto max-w-2xl space-y-4 animate-fade-in">
-              <div className="surface flex items-center justify-between rounded-xl p-6">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Appearance</p>
-                  <p className="mt-1 text-sm text-muted-foreground">Switch between light and dark themes.</p>
-                </div>
-                <ThemeToggle />
-              </div>
-              <div className="surface rounded-xl p-6">
-                <p className="text-sm font-semibold text-foreground">Superuser accounts</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  Elevated roles can be assigned from the Users section. The very first superuser is provisioned
-                  directly in Supabase. Every role change here is applied immediately and reflected across the app.
-                </p>
-              </div>
+        {section === 'pos' && (
+          <div className="space-y-6 animate-slide-up">
+            <div className="surface rounded-2xl border border-border/60 overflow-hidden">
+              <Table
+                head={['Purpose', 'Amount', 'Status', 'Created', 'Paid On']}
+                rows={pos.map((p) => [
+                  <span key="p" className="font-semibold text-foreground">{p.purpose}</span>,
+                  <span key="a" className="font-mono text-xs font-semibold text-foreground">{ghs(p.total_amount)}</span>,
+                  <StatusPill key="s" status={p.status} kind="po" />,
+                  <span key="d" className="text-muted-foreground text-xs font-medium">{shortDate(p.created_at)}</span>,
+                  <span key="pd" className="text-muted-foreground text-xs font-medium">{shortDate(p.paid_at)}</span>,
+                ])}
+                empty="No purchase orders yet."
+              />
             </div>
-          )}
-        </main>
+          </div>
+        )}
+
+        {section === 'settings' && (
+          <div className="max-w-2xl mx-auto space-y-5 animate-slide-up">
+            <div className="surface rounded-2xl border border-border/60 p-6 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Interface Appearance</p>
+                <p className="mt-1 text-xs text-muted-foreground font-medium">Switch between light and dark visual aesthetics.</p>
+              </div>
+              <ThemeToggle />
+            </div>
+
+            <div className="surface rounded-2xl border border-border/60 p-6">
+              <p className="text-sm font-semibold text-foreground mb-1.5">Superuser Accounts</p>
+              <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                Elevated administrative roles can be managed and modified from the **Users** section.
+                Every role change is applied instantly to the database and takes effect immediately.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Toast */}
+      {/* Toast notifications */}
       {toast && (
         <div
-          className={`fixed bottom-5 left-1/2 z-50 -translate-x-1/2 animate-slide-up rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ${
-            toast.ok ? 'bg-foreground text-background' : 'bg-destructive text-destructive-foreground'
+          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-scale-in rounded-xl px-5 py-3 text-xs font-bold shadow-xl border ${
+            toast.ok
+              ? 'bg-foreground text-background border-foreground'
+              : 'bg-destructive text-destructive-foreground border-destructive/20'
           }`}
         >
           {toast.msg}
         </div>
       )}
-    </div>
+    </DashboardLayout>
   )
 }
 
@@ -498,11 +439,11 @@ function Table({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm">
+      <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-border text-left">
+          <tr className="border-b border-border bg-muted/15 text-muted-foreground font-semibold">
             {head.map((h) => (
-              <th key={h} className="whitespace-nowrap px-6 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th key={h} className="whitespace-nowrap px-6 py-3.5 uppercase tracking-wider">
                 {h}
               </th>
             ))}
@@ -510,15 +451,15 @@ function Table({
         </thead>
         <tbody>
           {rows.map((cells, i) => (
-            <tr key={i} className="border-b border-border last:border-0 hover:bg-muted/30">
+            <tr key={i} className="border-b border-border/60 last:border-0 hover:bg-muted/15 transition-colors">
               {cells.map((c, j) => (
-                <td key={j} className="px-6 py-3.5">{c}</td>
+                <td key={j} className="px-6 py-3.5 font-medium">{c}</td>
               ))}
             </tr>
           ))}
           {rows.length === 0 && (
             <tr>
-              <td colSpan={head.length} className="px-6 py-12 text-center text-sm text-muted-foreground">
+              <td colSpan={head.length} className="px-6 py-12 text-center text-sm text-muted-foreground font-medium">
                 {empty}
               </td>
             </tr>
