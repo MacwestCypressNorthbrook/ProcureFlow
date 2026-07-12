@@ -52,3 +52,12 @@ export interface PoAuditTrail {
   notes: string | null
   created_at: string
 }
+
+export interface PoAttachment {
+  id: string
+  po_id: string
+  file_name: string
+  file_url: string
+  uploaded_by: string | null
+  created_at: string
+}

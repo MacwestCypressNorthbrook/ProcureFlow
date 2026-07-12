@@ -1,25 +1,33 @@
 import { createClient, getUserFromSession } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import RequestDetailClient from '@/components/shared/RequestDetailClient'
+import MintahRequestDetailClient from '@/components/shared/MintahRequestDetailClient'
 
-export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function MintahRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
   const user = await getUserFromSession()
 
-  const { data: request, error } = await supabase
-    .from('requests')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const [{ data: request, error }, { data: attachments }] = await Promise.all([
+    supabase
+      .from('requests')
+      .select('*')
+      .eq('id', id)
+      .single(),
+    supabase
+      .from('request_attachments')
+      .select('id, request_id, file_name, file_url, uploaded_by, created_at')
+      .eq('request_id', id)
+      .order('created_at', { ascending: false }),
+  ])
 
   if (error || !request) {
     notFound()
   }
 
   return (
-    <RequestDetailClient
+    <MintahRequestDetailClient
       request={request}
+      attachments={(attachments as any) ?? []}
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'mintah'}
     />
