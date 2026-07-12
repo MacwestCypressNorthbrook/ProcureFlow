@@ -1,26 +1,354 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
+/* ============================================================
+   ProcureFlow — Light Fintech design system
+   Refined, restrained, trustworthy. Stripe / Ramp / Mercury.
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Surfaces */
+  --background: oklch(0.986 0.002 250);
+  --foreground: oklch(0.23 0.02 266);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.23 0.02 266);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.23 0.02 266);
+
+  /* Brand — refined indigo/blurple, used sparingly */
+  --primary: oklch(0.53 0.2 277);
+  --primary-foreground: oklch(0.99 0 0);
+
+  /* Neutrals */
+  --secondary: oklch(0.968 0.003 258);
+  --secondary-foreground: oklch(0.28 0.02 266);
+  --muted: oklch(0.968 0.003 258);
+  --muted-foreground: oklch(0.53 0.02 264);
+  --accent: oklch(0.965 0.006 275);
+  --accent-foreground: oklch(0.3 0.05 277);
+
+  /* Semantic */
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.62 0.15 155);
+  --warning: oklch(0.72 0.16 70);
+
+  /* Lines & inputs */
+  --border: oklch(0.92 0.004 264);
+  --input: oklch(0.9 0.005 264);
+  --ring: oklch(0.53 0.2 277);
+
+  --radius: 0.625rem;
+
+  /* Elevation — soft, layered fintech shadows */
+  --shadow-xs: 0 1px 2px oklch(0.2 0.03 266 / 0.05);
+  --shadow-sm: 0 1px 2px oklch(0.2 0.03 266 / 0.05), 0 1px 3px oklch(0.2 0.03 266 / 0.06);
+  --shadow-md: 0 2px 4px oklch(0.2 0.03 266 / 0.04), 0 6px 16px oklch(0.2 0.03 266 / 0.07);
+  --shadow-lg: 0 4px 8px oklch(0.2 0.03 266 / 0.04), 0 16px 32px oklch(0.2 0.03 266 / 0.09);
+  --shadow-xl: 0 8px 16px oklch(0.2 0.03 266 / 0.05), 0 28px 56px oklch(0.2 0.03 266 / 0.12);
+
+  /* Motion */
+  --spring-stiff: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.dark {
+  --background: oklch(0.17 0.012 264);
+  --foreground: oklch(0.95 0.005 260);
+  --card: oklch(0.205 0.014 264);
+  --card-foreground: oklch(0.95 0.005 260);
+  --popover: oklch(0.205 0.014 264);
+  --popover-foreground: oklch(0.95 0.005 260);
+
+  --primary: oklch(0.68 0.18 279);
+  --primary-foreground: oklch(0.16 0.02 264);
+
+  --secondary: oklch(0.25 0.014 264);
+  --secondary-foreground: oklch(0.95 0.005 260);
+  --muted: oklch(0.25 0.014 264);
+  --muted-foreground: oklch(0.68 0.015 262);
+  --accent: oklch(0.28 0.03 277);
+  --accent-foreground: oklch(0.92 0.02 277);
+
+  --destructive: oklch(0.64 0.2 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --success: oklch(0.7 0.15 158);
+  --warning: oklch(0.78 0.15 72);
+
+  --border: oklch(0.28 0.012 264);
+  --input: oklch(0.32 0.012 264);
+  --ring: oklch(0.68 0.18 279);
+
+  --shadow-xs: 0 1px 2px oklch(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.3), 0 1px 3px oklch(0 0 0 / 0.35);
+  --shadow-md: 0 2px 4px oklch(0 0 0 / 0.3), 0 6px 16px oklch(0 0 0 / 0.4);
+  --shadow-lg: 0 4px 8px oklch(0 0 0 / 0.35), 0 16px 32px oklch(0 0 0 / 0.5);
+  --shadow-xl: 0 8px 16px oklch(0 0 0 / 0.4), 0 28px 56px oklch(0 0 0 / 0.6);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), "SF Mono", "Fira Code", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Tabular figures for money / metrics */
+.tabular,
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+svg path[stroke-width] {
+  stroke: currentColor;
+}
+
+::selection {
+  background: color-mix(in oklch, var(--primary) 22%, transparent);
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklch, var(--foreground) 18%, transparent);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklch, var(--foreground) 32%, transparent);
+  background-clip: content-box;
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
+  .text-pretty { text-wrap: pretty; }
+
+  .animate-fade-in { animation: fadeIn 400ms var(--ease-out-expo) both; }
+  .animate-slide-up { animation: slideUp 500ms var(--ease-out-expo) both; }
+  .animate-slide-in-right { animation: slideInRight 400ms var(--ease-out-expo) both; }
+  .animate-scale-in { animation: scaleIn 400ms var(--spring-smooth) both; }
+  .animate-float { animation: float 7s var(--ease-in-out) infinite; }
+  .animate-float-slow { animation: float 10s var(--ease-in-out) infinite; }
+  .animate-pulse-soft { animation: pulseSoft 3s ease infinite; }
+  .animate-shake { animation: shake 400ms var(--ease-in-out) both; }
+  .animate-shimmer { animation: shimmer 2.2s linear infinite; }
+
+  .scroll-reveal {
+    animation: scrollReveal linear both;
+    animation-timeline: view();
+    animation-range: entry 0% cover 22%;
+  }
+
+  .stagger > * {
+    opacity: 0;
+    animation: slideUp 500ms var(--ease-out-expo) forwards;
+  }
+  .stagger > *:nth-child(1) { animation-delay: 40ms; }
+  .stagger > *:nth-child(2) { animation-delay: 100ms; }
+  .stagger > *:nth-child(3) { animation-delay: 160ms; }
+  .stagger > *:nth-child(4) { animation-delay: 220ms; }
+  .stagger > *:nth-child(5) { animation-delay: 280ms; }
+  .stagger > *:nth-child(6) { animation-delay: 340ms; }
+  .stagger > *:nth-child(7) { animation-delay: 400ms; }
+  .stagger > *:nth-child(8) { animation-delay: 460ms; }
+}
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: scale(1); } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes pulseSoft { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes scrollReveal { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ============================================================
+   Surfaces & utilities
+   ============================================================ */
+
+@layer utilities {
+  /* Clean solid card — the fintech default */
+  .surface {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: transform 240ms var(--spring-smooth), box-shadow 240ms var(--spring-smooth), border-color 240ms var(--spring-smooth);
+  }
+  .surface-elevated {
+    background: var(--card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    transition: transform 240ms var(--spring-smooth), box-shadow 240ms var(--spring-smooth), border-color 240ms var(--spring-smooth);
+  }
+
+  /* Backward-compatible aliases (upgraded look for not-yet-redesigned pages) */
+  .glass-card {
+    background: color-mix(in oklch, var(--card) 82%, transparent);
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+    transition: transform 240ms var(--spring-smooth), box-shadow 240ms var(--spring-smooth), border-color 240ms var(--spring-smooth);
+  }
+  .glass-card-elevated {
+    background: color-mix(in oklch, var(--card) 88%, transparent);
+    backdrop-filter: blur(20px) saturate(170%);
+    -webkit-backdrop-filter: blur(20px) saturate(170%);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+    transition: transform 240ms var(--spring-smooth), box-shadow 240ms var(--spring-smooth), border-color 240ms var(--spring-smooth);
+  }
+
+  /* Frosted nav bar */
+  .glass-nav {
+    background: color-mix(in oklch, var(--background) 72%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .hover-lift, .elastic-hover { will-change: transform; }
+    .hover-lift:hover, .elastic-hover:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-lg);
+      border-color: color-mix(in oklch, var(--primary) 22%, var(--border));
+    }
+  }
+
+  .press-active { transition: transform 120ms var(--spring-smooth); }
+  .press-active:active { transform: scale(0.97); }
+
+  /* Text gradient — subtle, single-hue for fintech restraint */
+  .text-gradient {
+    background: linear-gradient(135deg, var(--foreground) 30%, var(--primary) 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Faint dotted grid backdrop */
+  .grid-bg {
+    background-image: radial-gradient(color-mix(in oklch, var(--foreground) 8%, transparent) 1px, transparent 1px);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 78%);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 78%);
+  }
+
+  /* Soft brand glow blob */
+  .brand-glow {
+    background: radial-gradient(circle, color-mix(in oklch, var(--primary) 28%, transparent) 0%, transparent 68%);
+    filter: blur(8px);
+    pointer-events: none;
+  }
+
+  /* Subtle page washes (aliased for legacy pages) */
+  .hero-gradient,
+  .mesh-gradient {
+    background:
+      radial-gradient(ellipse 60% 50% at 15% -5%, color-mix(in oklch, var(--primary) 10%, transparent) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 40% at 92% 0%, color-mix(in oklch, var(--primary) 6%, transparent) 0%, transparent 55%),
+      var(--background);
+  }
+
+  .gradient-border { position: relative; }
+  .gradient-border::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+  }
+
+  /* Legacy no-ops kept so old markup stays clean until redesigned */
+  .noise-overlay { position: relative; }
+  .flecto-reflect { position: relative; }
+  .orb-1, .orb-2, .orb-3 {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  }
+
+  .divider-fade {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  .animate-fade-in, .animate-slide-up, .animate-slide-in-right,
+  .animate-scale-in, .animate-float, .animate-float-slow,
+  .animate-pulse-soft, .animate-shimmer, .stagger > *, .scroll-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
 }
