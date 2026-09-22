@@ -1,15 +1,8 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import StatusBadge from '@/components/shared/StatusBadge'
+import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { extractRequisition } from '@/components/shared/RichRequisitionView'
 import { REQUEST_STATUS_CONFIG, formatDate } from '@/lib/utils'
 import { ChevronRight, FileText } from 'lucide-react'
@@ -22,6 +15,7 @@ interface RequestRow {
   guest_email?: string | null
   estimated_quantity?: number | null
   estimated_unit_rate?: number | null
+  total_amount?: number | null
   status: string
   created_at: string
   [key: string]: unknown
@@ -38,90 +32,144 @@ function itemSummary(description?: string | null): string | null {
   return description
 }
 
+/** Prefer the stored total; fall back to qty × rate for rows predating it. */
+function estimatedTotal(req: RequestRow): number | null {
+  if (req.total_amount != null) return req.total_amount
+  if (req.estimated_quantity != null && req.estimated_unit_rate != null) {
+    return req.estimated_quantity * req.estimated_unit_rate
+  }
+  return null
+}
+
+const ghs = (n: number | null) =>
+  n == null ? '—' : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
+
 export default function RequestTable({
   requests,
   hrefBase,
+  compact = false,
+  storageKey = 'requests',
 }: {
   requests: RequestRow[]
   hrefBase: string
+  storageKey?: string
+  /** Dashboard preview: plain table, no toolbar or pagination. */
+  compact?: boolean
 }) {
   const router = useRouter()
 
+  const columns: DataColumn<RequestRow>[] = [
+    {
+      id: 'purpose',
+      label: 'Request',
+      sortable: true,
+      sortValue: (r) => r.purpose,
+      cell: (r) => {
+        const summary = itemSummary(r.description)
+        return (
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <FileText size={15} />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">{r.purpose}</p>
+              {summary && <p className="truncate text-xs text-muted-foreground">{summary}</p>}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'requester',
+      label: 'Requester',
+      hideBelow: 'lg',
+      sortable: true,
+      sortValue: (r) => r.guest_name ?? '',
+      cell: (r) => (
+        <>
+          <p className="truncate text-sm text-foreground">{r.guest_name || '—'}</p>
+          {r.guest_email && <p className="truncate text-xs text-muted-foreground">{r.guest_email}</p>}
+        </>
+      ),
+    },
+    {
+      id: 'total',
+      label: 'Est. Total',
+      align: 'right',
+      hideBelow: 'md',
+      sortable: true,
+      sortValue: estimatedTotal,
+      cell: (r) => <span className="tabular-nums text-foreground">{ghs(estimatedTotal(r))}</span>,
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      sortable: true,
+      sortValue: (r) => r.status,
+      cell: (r) => <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />,
+    },
+    {
+      id: 'created_at',
+      label: 'Submitted',
+      hideBelow: 'sm',
+      sortable: true,
+      sortValue: (r) => r.created_at,
+      cell: (r) => <span className="text-xs text-muted-foreground">{formatDate(r.created_at)}</span>,
+    },
+    {
+      id: 'chevron',
+      label: '',
+      align: 'right',
+      headClassName: 'w-10',
+      cell: () => (
+        <ChevronRight size={16} className="inline text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+      ),
+    },
+  ]
+
+  const statuses = Array.from(new Set(requests.map((r) => r.status))).sort()
+  const facets: DataFacet<RequestRow>[] = [
+    {
+      id: 'status',
+      label: 'Status',
+      options: statuses.map((s) => ({ value: s, label: REQUEST_STATUS_CONFIG[s]?.label ?? s })),
+      matches: (r, value) => r.status === value,
+    },
+  ]
+
   return (
-    <div className="surface overflow-hidden rounded-xl">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent border-border">
-            <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Request
-            </TableHead>
-            <TableHead className="hidden h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">
-              Requester
-            </TableHead>
-            <TableHead className="hidden h-9 px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">
-              Est. Total
-            </TableHead>
-            <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Status
-            </TableHead>
-            <TableHead className="hidden h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">
-              Submitted
-            </TableHead>
-            <TableHead className="h-9 w-10 px-4" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {requests.map((req) => {
-            const summary = itemSummary(req.description)
-            const estTotal =
-              req.estimated_quantity && req.estimated_unit_rate
-                ? req.estimated_quantity * req.estimated_unit_rate
-                : null
-            return (
-              <TableRow
-                key={req.id}
-                onClick={() => router.push(`${hrefBase}/${req.id}`)}
-                className="group cursor-pointer border-border last:border-0"
-              >
-                <TableCell className="max-w-0 px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                      <FileText size={15} />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{req.purpose}</p>
-                      {summary && (
-                        <p className="truncate text-xs text-muted-foreground">{summary}</p>
-                      )}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="hidden px-4 py-3 lg:table-cell">
-                  <p className="truncate text-sm text-foreground">{req.guest_name || '—'}</p>
-                  {req.guest_email && (
-                    <p className="truncate text-xs text-muted-foreground">{req.guest_email}</p>
-                  )}
-                </TableCell>
-                <TableCell className="hidden px-4 py-3 text-right text-sm tabular-nums text-foreground md:table-cell">
-                  {estTotal !== null ? `$${estTotal.toLocaleString()}` : '—'}
-                </TableCell>
-                <TableCell className="px-4 py-3">
-                  <StatusBadge status={req.status} config={REQUEST_STATUS_CONFIG} />
-                </TableCell>
-                <TableCell className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">
-                  {formatDate(req.created_at)}
-                </TableCell>
-                <TableCell className="px-4 py-3 text-right">
-                  <ChevronRight
-                    size={16}
-                    className="text-muted-foreground/50 transition-colors group-hover:text-foreground"
-                  />
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-    </div>
+    <DataView
+      rows={requests}
+      getRowId={(r) => r.id}
+      columns={columns}
+      facets={facets}
+      searchPlaceholder="Search requests…"
+      searchText={(r) => [r.purpose, r.guest_name, r.guest_email, itemSummary(r.description)]}
+      defaultSort={{ id: 'created_at', dir: 'desc' }}
+      storageKey={storageKey}
+      compact={compact}
+      onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}
+      emptyTitle="No requests yet"
+      emptyMessage="Requisitions will appear here once they are raised."
+      renderCard={(r) => {
+        const summary = itemSummary(r.description)
+        return (
+          <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
+            <div className="flex items-start justify-between gap-3">
+              <p className="line-clamp-2 text-sm font-semibold text-foreground">{r.purpose}</p>
+              <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
+            </div>
+            {summary && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{summary}</p>}
+            <div className="mt-auto pt-4">
+              <p className="text-lg font-semibold tabular-nums text-foreground">{ghs(estimatedTotal(r))}</p>
+              <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{r.guest_name || '—'}</span>
+                <span className="shrink-0">{formatDate(r.created_at)}</span>
+              </div>
+            </div>
+          </article>
+        )
+      }}
+    />
   )
 }

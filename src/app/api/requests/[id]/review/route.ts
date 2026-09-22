@@ -1,44 +1,42 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth-guard'
+import { queryOne, execute } from '@/lib/db'
+import { requireCapability } from '@/lib/auth-guard'
+import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
+import type { Request as DbRequest } from '@/lib/types'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const guard = await requireRole('mintah', 'admin', 'superuser')
+  const guard = await requireCapability('request:review')
   if (guard.error) return guard.error
 
-  const supabase = await createClient()
+  const existing = await queryOne<DbRequest>(
+    `SELECT id, purpose, created_by, status FROM public.requests WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
-  const { data: existing, error: fetchError } = await supabase
-    .from('requests')
-    .select('id, status')
-    .eq('id', id)
-    .single()
-
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   }
 
-  if (existing.status !== 'new') {
-    return NextResponse.json(
-      { error: 'Can only mark requests with status "new" as reviewing' },
-      { status: 400 }
-    )
-  }
+  await execute(
+    `UPDATE public.requests
+     SET status = 'under_review', updated_at = now()
+     WHERE id = $1`,
+    [id]
+  )
 
-  const { error } = await supabase
-    .from('requests')
-    .update({
-      status: 'reviewing',
-      updated_at: new Date().toISOString(),
+  if (existing.created_by) {
+    await createNotification({
+      userId: existing.created_by,
+      title: 'Requisition Under Review',
+      message: `Your requisition "${existing.purpose}" is currently being reviewed.`,
+      type: 'info',
+      target: { type: 'request', id },
+      sendEmailAlert: true,
     })
-    .eq('id', id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
   return NextResponse.json({ success: true })

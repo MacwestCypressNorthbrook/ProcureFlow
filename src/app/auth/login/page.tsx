@@ -3,7 +3,8 @@
 import { useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { signIn } from '@/lib/betterauth/client'
+import { authClient } from '@/lib/auth/client'
+import { dashboardPathForRole } from '@/lib/roles'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,15 +29,6 @@ const trail = [
   { who: 'Finance', what: 'paid & closed', tone: 'bg-emerald-400' },
 ]
 
-const ROLE_REDIRECTS: Record<string, string> = {
-  minta: '/minta',
-  mintah: '/mintah',
-  sam: '/sam',
-  finance: '/finance',
-  admin: '/admin',
-  superuser: '/admin',
-}
-
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -52,17 +44,31 @@ function LoginForm() {
     setLoading(true)
     setError('')
 
+    let dest = redirect
+
     try {
-      const result = await signIn(email, password, redirect ?? undefined)
-      const userRole = result.user?.role ?? 'minta'
-      const dest = redirect || ROLE_REDIRECTS[userRole] || '/minta'
-      router.push(dest)
-      router.refresh()
+      // The client rejects on failure and may also return an `error` payload.
+      const result = await authClient.signIn.email({ email, password })
+      if (result?.error) throw result.error
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Sign in failed'
-      setError(message)
+      setError(err instanceof Error ? err.message : 'Sign in failed')
       setLoading(false)
+      return
     }
+
+    // Role lives in public.users, not in the auth record — resolve it server-side.
+    if (!dest) {
+      try {
+        const res = await fetch('/api/auth/profile')
+        const profile = res.ok ? await res.json() : null
+        dest = dashboardPathForRole(profile?.role)
+      } catch {
+        dest = '/minta'
+      }
+    }
+
+    router.push(dest)
+    router.refresh()
   }
 
   return (

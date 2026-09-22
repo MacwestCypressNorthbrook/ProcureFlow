@@ -1,0 +1,97 @@
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
+
+const BUCKET_NAME = process.env.STORAGE_BUCKET_NAME || 'supporting_documents'
+const REGION = process.env.AWS_REGION || 'us-east-2'
+const ENDPOINT = process.env.AWS_ENDPOINT_URL_S3 || process.env.NEON_STORAGE_ENDPOINT
+
+let s3ClientInstance: S3Client | null = null
+
+export function getS3Client(): S3Client {
+  if (!s3ClientInstance) {
+    const accessKeyId = process.env.AWS_ACCESS_KEY_ID
+    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY
+
+    s3ClientInstance = new S3Client({
+      region: REGION,
+      endpoint: ENDPOINT || undefined,
+      forcePathStyle: true, // Recommended for S3-compatible endpoints
+      credentials:
+        accessKeyId && secretAccessKey
+          ? {
+              accessKeyId,
+              secretAccessKey,
+            }
+          : undefined,
+    })
+  }
+  return s3ClientInstance
+}
+
+/**
+ * Upload a file buffer to Neon Object Storage bucket (supporting_documents).
+ */
+export async function uploadFile(
+  buffer: Buffer | Uint8Array,
+  key: string,
+  contentType: string = 'application/octet-stream'
+): Promise<string> {
+  const client = getS3Client()
+  const command = new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+    Body: buffer,
+    ContentType: contentType,
+  })
+
+  await client.send(command)
+  return key
+}
+
+/**
+ * Generate a pre-signed temporary URL for viewing/downloading a file.
+ */
+export async function getSignedDownloadUrl(
+  key: string,
+  expiresInSeconds: number = 3600
+): Promise<string> {
+  if (!key) return ''
+  // If it's already a full HTTP(S) URL or data URL, return as-is
+  if (
+    key.startsWith('http://') ||
+    key.startsWith('https://') ||
+    key.startsWith('data:') ||
+    key.startsWith('blob:')
+  ) {
+    return key
+  }
+
+  try {
+    const client = getS3Client()
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+    return await getSignedUrl(client, command, { expiresIn: expiresInSeconds })
+  } catch (err) {
+    console.error(`Failed to generate signed URL for key "${key}":`, err)
+    return key
+  }
+}
+
+/**
+ * Delete a file from the bucket.
+ */
+export async function deleteFile(key: string): Promise<void> {
+  const client = getS3Client()
+  const command = new DeleteObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: key,
+  })
+  await client.send(command)
+}

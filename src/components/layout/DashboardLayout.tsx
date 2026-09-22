@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import ThemeToggle from '@/components/layout/ThemeToggle'
+import NotificationBell from '@/components/layout/NotificationBell'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
-import { ROLE_LABELS } from '@/lib/utils'
+import { normalizeRole, roleLabel, roleDefinition } from '@/lib/roles'
 import {
   Menu,
   LayoutDashboard,
@@ -21,16 +21,10 @@ import {
   Clock,
   CheckCircle,
   ShoppingBag,
-  AlertTriangle,
-  Send,
-  History,
-  MessageSquare,
-  Users,
-  TrendingUp,
-  Archive,
   Eye,
   Banknote,
   Receipt,
+  Scale,
 } from 'lucide-react'
 
 interface NavItem {
@@ -41,6 +35,15 @@ interface NavItem {
   active?: boolean
   onClick?: () => void
   badge?: number
+}
+
+/** What the sidebar actually renders — either a link or an in-page section switch. */
+type SidebarItem = {
+  label: string
+  icon: React.ReactNode
+  href?: string
+  active?: boolean
+  onClick?: () => void
 }
 
 interface DashboardLayoutProps {
@@ -54,12 +57,10 @@ interface DashboardLayoutProps {
 }
 
 const roleNavSections: Record<string, { label: string; items: { href: string; label: string; icon: React.ReactNode }[] }[]> = {
-  minta: [
+  engineer: [
     {
       label: 'Overview',
-      items: [
-        { href: '/minta', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      ],
+      items: [{ href: '/minta', label: 'Dashboard', icon: <LayoutDashboard size={18} /> }],
     },
     {
       label: 'Requests',
@@ -70,128 +71,90 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
       ],
     },
   ],
-  mintah: [
+  project_lead: [
     {
       label: 'Overview',
-      items: [
-        { href: '/mintah', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      ],
+      items: [{ href: '/sam', label: 'Dashboard', icon: <LayoutDashboard size={18} /> }],
     },
     {
-      label: 'Requests',
+      label: 'Review',
       items: [
-        { href: '/mintah/requests', label: 'Incoming Requests', icon: <Inbox size={18} /> },
-        { href: '/mintah/reviewing', label: 'Under Review', icon: <Eye size={18} /> },
+        { href: '/sam/requests', label: 'Awaiting Review', icon: <ClipboardCheck size={18} /> },
+        { href: '/sam/all', label: 'All Orders', icon: <ShoppingBag size={18} /> },
+      ],
+    },
+  ],
+  supply_chain: [
+    {
+      label: 'Overview',
+      items: [{ href: '/mintah', label: 'Dashboard', icon: <LayoutDashboard size={18} /> }],
+    },
+    {
+      label: 'Review',
+      items: [
+        { href: '/mintah/queue', label: 'Awaiting Review', icon: <Eye size={18} /> },
+        { href: '/mintah/requests', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
     {
       label: 'Purchase Orders',
-      items: [
-        { href: '/mintah/pos', label: 'My POs', icon: <ShoppingBag size={18} /> },
-        { href: '/mintah/pos/pending', label: 'Awaiting Sam', icon: <Send size={18} /> },
-        { href: '/mintah/pos/revision', label: 'Revisions Needed', icon: <AlertTriangle size={18} /> },
-        { href: '/mintah/pos/completed', label: 'Completed', icon: <CheckCircle size={18} /> },
-      ],
+      items: [{ href: '/mintah/pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> }],
     },
   ],
-  sam: [
+  cost_control: [
     {
       label: 'Overview',
-      items: [
-        { href: '/sam', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      ],
-    },
-    {
-      label: 'Approvals',
-      items: [
-        { href: '/sam/pending', label: 'Pending Approval', icon: <ClipboardCheck size={18} /> },
-        { href: '/sam/revision', label: 'Needs Revision', icon: <AlertTriangle size={18} /> },
-        { href: '/sam/approved', label: 'Approved', icon: <CheckCircle size={18} /> },
-      ],
-    },
-    {
-      label: 'History',
-      items: [
-        { href: '/sam/all', label: 'All POs', icon: <Archive size={18} /> },
-      ],
+      items: [{ href: '/cost-control', label: 'Awaiting Review', icon: <Scale size={18} /> }],
     },
   ],
   finance: [
     {
       label: 'Overview',
-      items: [
-        { href: '/finance', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-      ],
+      items: [{ href: '/finance', label: 'Dashboard', icon: <LayoutDashboard size={18} /> }],
     },
     {
       label: 'Payments',
       items: [
-        { href: '/finance/pending', label: 'Pending Payment', icon: <Banknote size={18} /> },
+        { href: '/finance/queue', label: 'Awaiting Payment', icon: <Banknote size={18} /> },
         { href: '/finance/completed', label: 'Completed', icon: <CheckCircle size={18} /> },
       ],
     },
     {
       label: 'History',
-      items: [
-        { href: '/finance/all', label: 'All POs', icon: <Receipt size={18} /> },
-      ],
+      items: [{ href: '/finance/all', label: 'All POs', icon: <Receipt size={18} /> }],
     },
   ],
-  superuser: [
+  administrator: [
     {
-      label: 'Overview',
-      items: [
-        { href: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> },
-      ],
+      label: 'Workflow',
+      items: [{ href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> }],
     },
     {
-      label: 'All Dashboards',
-      items: [
-        { href: '/mintah', label: 'Mintah View', icon: <ShoppingBag size={18} /> },
-        { href: '/sam', label: 'Sam View', icon: <ClipboardCheck size={18} /> },
-        { href: '/finance', label: 'Finance View', icon: <CreditCard size={18} /> },
-      ],
+      label: 'Administration',
+      items: [{ href: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> }],
     },
     {
-      label: 'Management',
+      label: 'Dashboards',
       items: [
-        { href: '/admin/users', label: 'User Management', icon: <Users size={18} /> },
-      ],
-    },
-  ],
-  admin: [
-    {
-      label: 'Overview',
-      items: [
-        { href: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> },
-      ],
-    },
-    {
-      label: 'Management',
-      items: [
-        { href: '/admin/users', label: 'User Management', icon: <Users size={18} /> },
+        { href: '/sam/requests', label: 'Project Lead', icon: <ClipboardCheck size={18} /> },
+        { href: '/mintah/queue', label: 'Supply Chain', icon: <Eye size={18} /> },
+        { href: '/cost-control', label: 'Cost Control', icon: <Scale size={18} /> },
+        { href: '/finance', label: 'Finance', icon: <CreditCard size={18} /> },
       ],
     },
   ],
 }
 
-function Inbox(props: React.SVGProps<SVGSVGElement> & { size?: number }) {
-  return (
-    <svg width={props.size || 24} height={props.size || 24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
-      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
-    </svg>
-  )
-}
+// Legacy role values still stored on older rows.
+roleNavSections.minta = roleNavSections.engineer
+roleNavSections.mintah = roleNavSections.supply_chain
+roleNavSections.sam = roleNavSections.project_lead
+roleNavSections.lead = roleNavSections.project_lead
+roleNavSections.super_user = roleNavSections.administrator
+roleNavSections.superuser = roleNavSections.administrator
+roleNavSections.admin = roleNavSections.administrator
+roleNavSections.adminstrator = roleNavSections.administrator
 
-const roleBadgeColor: Record<string, string> = {
-  superuser: 'bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20',
-  admin: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
-  minta: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  mintah: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20',
-  sam: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20',
-  finance: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20',
-}
 
 export default function DashboardLayout({
   children,
@@ -204,37 +167,32 @@ export default function DashboardLayout({
 }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [user, setUser] = useState<{ name?: string; email: string } | null>(serverUser || null)
-  const [role, setRole] = useState<string | null>(serverRole || null)
-  const supabase = createClient()
+  // The server resolves both of these from the session on every request, so
+  // they are authoritative props — mirroring them into state only cost a render.
+  const role = serverRole ?? null
+  const user = serverUser ?? null
 
-  useEffect(() => {
-    if (serverUser && serverRole) return
+  // Normalizing first means a legacy value such as `sam` or `mintah` still
+  // gets its proper sidebar instead of silently falling back to the engineer's.
+  const resolvedRole = normalizeRole(role) ?? 'engineer'
+  /** Custom nav items keep their `onClick` / `active` flags — they drive in-page sections. */
+  const baseSections = customNav
+    ? [{ label: 'Navigation', items: customNav as SidebarItem[] }]
+    : roleNavSections[resolvedRole] || roleNavSections.engineer
 
-    async function fetchUser() {
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      if (authUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('name, email, role')
-          .eq('id', authUser.id)
-          .single()
+  // Every role gets its own account settings — a signed-in user should never
+  // have to guess where their profile and password live.
+  const sections: { label: string; items: SidebarItem[] }[] = [
+    ...baseSections,
+    {
+      label: 'Account',
+      items: [{ href: '/settings', label: 'Settings', icon: <Settings size={18} /> }],
+    },
+  ]
 
-        if (profile) {
-          setUser({ name: profile.name, email: profile.email })
-          setRole(profile.role)
-        }
-      }
-    }
-    fetchUser()
-  }, [supabase, serverUser, serverRole])
-
-  const resolvedRole = role || 'minta'
-  const userInitials = user?.name ? user.name.slice(0, 2).toUpperCase() : user?.email.slice(0, 2).toUpperCase() || 'PF'
-
-  const sections = customNav
-    ? [{ label: 'Navigation', items: customNav.map(n => ({ href: n.href || '#', label: n.label, icon: n.icon, onClick: (n as any).onClick, active: (n as any).active })) }]
-    : (roleNavSections[resolvedRole] || [])
+  const userInitials = (user?.name || user?.email || 'U')
+    .slice(0, 2)
+    .toUpperCase()
 
   const sidebarContent = (onNavigate?: () => void) => (
     <div className="flex h-full flex-col bg-card/50 dark:bg-card/30 backdrop-blur-md">
@@ -246,7 +204,7 @@ export default function DashboardLayout({
         <div className="flex flex-col">
           <span className="text-sm font-semibold tracking-tight text-foreground">ProcureFlow</span>
           <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-            {ROLE_LABELS[resolvedRole] || resolvedRole}
+            {roleLabel(resolvedRole)}
           </span>
         </div>
       </div>
@@ -260,8 +218,11 @@ export default function DashboardLayout({
             </p>
             <div className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive = (item as any).active ?? (pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href + '/')))
-                const badgeCount = navBadges?.[item.href]
+                const href = item.href
+                const isActive =
+                  item.active ??
+                  (href ? pathname === href || (href !== '/' && pathname.startsWith(href + '/')) : false)
+                const badgeCount = href ? navBadges?.[href] : undefined
                 const content = (
                   <>
                     <span className={`transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`}>
@@ -281,11 +242,12 @@ export default function DashboardLayout({
                   ? 'bg-foreground text-background shadow-[0_4px_12px_rgba(0,0,0,0.08)] dark:shadow-[0_4px_12px_rgba(255,255,255,0.05)]'
                   : 'text-muted-foreground hover:bg-muted/80 hover:text-foreground'
 
-                if ((item as any).onClick) {
+                if (item.onClick) {
+                  const handleClick = item.onClick
                   return (
                     <button
                       key={item.label}
-                      onClick={() => { (item as any).onClick(); onNavigate?.() }}
+                      onClick={() => { handleClick(); onNavigate?.() }}
                       className={`${baseClass} ${activeClass}`}
                     >
                       {content}
@@ -293,10 +255,12 @@ export default function DashboardLayout({
                   )
                 }
 
+                if (!href) return null
+
                 return (
                   <Link
-                    key={item.href}
-                    href={item.href}
+                    key={href}
+                    href={href}
                     onClick={onNavigate}
                     className={`${baseClass} ${activeClass}`}
                   >
@@ -376,11 +340,14 @@ export default function DashboardLayout({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* In-app Notification Bell */}
+            <NotificationBell />
+
             {role && (
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${roleBadgeColor[role] || 'bg-muted border-border'}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${roleDefinition(role)?.accent ?? 'bg-muted text-muted-foreground'}`}>
                 <span className="h-1 w-1 rounded-full bg-current" />
-                {ROLE_LABELS[role] || role}
+                {roleLabel(role)}
               </span>
             )}
           </div>

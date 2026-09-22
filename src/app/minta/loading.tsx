@@ -1,5 +1,5 @@
-import { ListPageSkeleton } from '@/components/shared/skeletons'
+import { DashboardSkeleton } from '@/components/shared/skeletons'
 
 export default function Loading() {
-  return <ListPageSkeleton role="minta" title="My Dashboard" />
+  return <DashboardSkeleton role="minta" title="My Dashboard" stats={5} />
 }

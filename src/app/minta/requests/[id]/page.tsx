@@ -1,4 +1,6 @@
-import { getUserFromSession, createClient } from '@/lib/supabase/server'
+import { requirePageRole } from '@/lib/auth-guard'
+import { query, queryOne } from '@/lib/db'
+import { getRequestItems } from '@/lib/requests'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DocumentList from '@/components/shared/DocumentList'
@@ -6,35 +8,44 @@ import RichRequisitionView from '@/components/shared/RichRequisitionView'
 import { PageContainer, PageHeader, Panel, Field, EmptyState } from '@/components/shared/ui-kit'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveAttachments } from '@/lib/resolve-file-url'
-import { FileText, Paperclip, Clock } from 'lucide-react'
+import { FileText, Paperclip, Clock, Package } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
 
+export const dynamic = 'force-dynamic'
+
 export default async function RequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getUserFromSession()
-  const supabase = await createClient()
+  const user = await requirePageRole('engineer')
 
   let requestData: Record<string, unknown> | null = null
   let attachments: Record<string, unknown>[] = []
+  let items: Awaited<ReturnType<typeof getRequestItems>> = []
 
   try {
-    const { data } = await supabase.from('requests').select('*').eq('id', id).single()
-    requestData = data
+    requestData = await queryOne<Record<string, unknown>>(
+      `SELECT r.*, u.name AS requester_name, u.email AS requester_email
+         FROM public.requests r
+         LEFT JOIN public.users u ON u.id = r.created_by
+        WHERE r.id = $1
+        LIMIT 1`,
+      [id]
+    )
     if (requestData) {
-      const { data: attData } = await supabase
-        .from('request_attachments')
-        .select('*')
-        .eq('request_id', id)
-        .order('created_at', { ascending: true })
-      const resolved = await resolveAttachments((attData as Record<string, unknown>[]) ?? [])
-      attachments = resolved
+      const attData = await query<Record<string, unknown>>(
+        `SELECT * FROM public.request_attachments WHERE request_id = $1 ORDER BY created_at ASC`,
+        [id]
+      )
+      attachments = await resolveAttachments(attData)
+      items = await getRequestItems(id)
     }
-  } catch {}
+  } catch (err) {
+    console.error('Failed to load request detail from Neon:', err)
+  }
 
   if (!requestData) {
     return (
-      <DashboardLayout title="Request Details" user={user ? { name: user.name, email: user.email } : null} role={user?.role ?? 'minta'}>
+      <DashboardLayout title="Request Details" user={user ? { name: user.name, email: user.email } : null} role={user?.role ?? 'engineer'}>
         <PageContainer>
           <EmptyState
             icon={<FileText size={20} />}
@@ -47,8 +58,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   }
 
   const status = String(requestData.status || '')
-  const canEdit = status === 'new' || status === 'reviewing'
-  const canDelete = status === 'new'
+  const canEdit = status === 'new' || status === 'pending' || status === 'reviewing' || status === 'under_review'
+  const canDelete = status === 'new' || status === 'pending'
   const isOwner = requestData.created_by === user?.id
 
   const docs = attachments
@@ -62,7 +73,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   const timeline = [
     { label: 'Created', date: String(requestData.created_at || ''), done: true },
-    { label: 'Under Review', date: status === 'reviewing' || status === 'converted' ? String(requestData.updated_at || '') : null, done: status === 'reviewing' || status === 'converted' },
+    { label: 'Under Review', date: status === 'reviewing' || status === 'under_review' || status === 'converted' ? String(requestData.updated_at || '') : null, done: status === 'reviewing' || status === 'under_review' || status === 'converted' },
     { label: 'Converted to PO', date: status === 'converted' ? String(requestData.updated_at || '') : null, done: status === 'converted' },
   ]
   if (status === 'rejected') timeline.push({ label: 'Rejected', date: String(requestData.updated_at || ''), done: true })
@@ -72,7 +83,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       title="Request Details"
       subtitle={String(requestData.purpose || '')}
       user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'minta'}
+      role={user?.role ?? 'engineer'}
     >
       <PageContainer className="space-y-6">
         <PageHeader
@@ -97,6 +108,59 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               fallbackDate={String(requestData.created_at || '')}
             />
 
+            <Panel title={`Materials${items.length ? ` (${items.length})` : ''}`} icon={<Package size={16} />}>
+              {items.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No material lines on this request.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
+                        <th className="py-2 pr-3 font-medium">Description</th>
+                        <th className="py-2 px-3 text-right font-medium">Qty</th>
+                        <th className="py-2 px-3 text-right font-medium">Unit price</th>
+                        <th className="py-2 pl-3 text-right font-medium">Line total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item) => (
+                        <tr key={item.id} className="border-b border-border/50 last:border-0">
+                          <td className="py-2.5 pr-3">
+                            <p className="font-medium text-foreground">{item.description}</p>
+                            {item.supplier_name && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{item.supplier_name}</p>
+                            )}
+                            {item.remarks && (
+                              <p className="mt-0.5 text-xs text-muted-foreground">{item.remarks}</p>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-foreground">
+                            {Number(item.quantity)}{item.unit ? ` ${item.unit}` : ''}
+                          </td>
+                          <td className="py-2.5 px-3 text-right tabular-nums text-foreground">
+                            {formatCurrency(Number(item.unit_price))}
+                          </td>
+                          <td className="py-2.5 pl-3 text-right font-semibold tabular-nums text-foreground">
+                            {formatCurrency(Number(item.line_total))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-border">
+                        <td colSpan={3} className="py-2.5 pr-3 text-right text-xs font-medium text-muted-foreground">
+                          Total
+                        </td>
+                        <td className="py-2.5 pl-3 text-right font-semibold tabular-nums text-foreground">
+                          {formatCurrency(Number(requestData.total_amount) || 0)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </Panel>
+
             <Panel title={`Attachments${docs.length ? ` (${docs.length})` : ''}`} icon={<Paperclip size={16} />}>
               <DocumentList docs={docs} emptyLabel="No attachments on this request." />
             </Panel>
@@ -106,9 +170,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           <div className="space-y-6">
             <Panel title="Details">
               <div className="space-y-3">
-                <Field label="Requester"><p className="text-sm font-semibold text-foreground">{String(requestData.guest_name || '—')}</p></Field>
-                {typeof requestData.guest_email === 'string' && requestData.guest_email && (
-                  <Field label="Email"><p className="text-sm font-semibold text-foreground">{String(requestData.guest_email)}</p></Field>
+                <Field label="Requester"><p className="text-sm font-semibold text-foreground">{String(requestData.requester_name || requestData.guest_name || '—')}</p></Field>
+                {Boolean(requestData.requester_email || requestData.guest_email) && (
+                  <Field label="Email"><p className="text-sm font-semibold text-foreground">{String(requestData.requester_email || requestData.guest_email)}</p></Field>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Est. Cost"><p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(Number(requestData.estimated_unit_rate) || 0)}</p></Field>

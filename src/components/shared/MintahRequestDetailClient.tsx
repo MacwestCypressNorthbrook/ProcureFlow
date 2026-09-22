@@ -12,6 +12,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
 import { REQUEST_STATUS_CONFIG, formatDate } from '@/lib/utils'
 import { Eye, Paperclip, Upload, Send, Link2 } from 'lucide-react'
+import { can } from '@/lib/roles'
 
 interface Attachment {
   id: string
@@ -76,6 +77,9 @@ export default function MintahRequestDetailClient({
     setAttaching(false)
   }
 
+  // Only Supply Chain converts a requisition into a purchase order.
+  const canConvert = can(role, 'request:convert')
+
   const handleAttachPO = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!poNumber.trim() || !poDoc) return
@@ -94,6 +98,8 @@ export default function MintahRequestDetailClient({
       method: 'POST',
       body: formData,
     })
+    // Reachable only when `canConvert`, i.e. Supply Chain or an elevated role,
+    // both of which can open this list.
     if (res.ok) router.push('/mintah/pos')
     setSubmittingPo(false)
   }
@@ -157,7 +163,7 @@ export default function MintahRequestDetailClient({
               </Panel>
             )}
 
-            {request.status === 'reviewing' && (
+            {request.status === 'reviewing' && canConvert && (
               <Panel title="Attach PO Document" icon={<Link2 size={16} className="text-primary" />}>
                 <p className="mb-3 text-xs text-muted-foreground">
                   Upload the PO document (PDF) to create a PO record and submit it for Sam&apos;s approval.

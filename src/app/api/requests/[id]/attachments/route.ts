@@ -1,36 +1,41 @@
-import { createClient } from '@/lib/supabase/server'
+import { query, queryOne } from '@/lib/db'
+import { uploadFile } from '@/lib/storage'
 import { requireRole } from '@/lib/auth-guard'
 import { NextResponse } from 'next/server'
+import type { RequestAttachment } from '@/lib/types'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const guard = await requireRole('minta', 'admin', 'superuser', 'sam', 'finance')
+  const guard = await requireRole(
+    'engineer',
+    'project_lead',
+    'cost_control',
+    'supply_chain',
+    'finance',
+    'super_user',
+    'administrator'
+  )
   if (guard.error) return guard.error
 
-  const supabase = await createClient()
-
-  const { data: existing } = await supabase
-    .from('requests')
-    .select('id')
-    .eq('id', id)
-    .single()
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM public.requests WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
   if (!existing) {
     return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   }
 
-  const { data, error } = await supabase
-    .from('request_attachments')
-    .select('id, request_id, file_name, file_url, uploaded_by, created_at')
-    .eq('request_id', id)
-    .order('created_at', { ascending: false })
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
+  const data = await query<RequestAttachment>(
+    `SELECT id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at
+     FROM public.request_attachments
+     WHERE request_id = $1
+     ORDER BY created_at DESC`,
+    [id]
+  )
 
   return NextResponse.json({ data })
 }
@@ -40,13 +45,31 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const guard = await requireRole('minta', 'admin', 'superuser')
+  const guard = await requireRole(
+    'engineer',
+    'project_lead',
+    'cost_control',
+    'supply_chain',
+    'super_user',
+    'administrator'
+  )
   if (guard.error) return guard.error
 
   const contentType = request.headers.get('content-type') || ''
 
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM public.requests WHERE id = $1 LIMIT 1`,
+    [id]
+  )
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Request not found' }, { status: 404 })
+  }
+
   let fileName: string
   let fileUrl: string
+  let fileSize: number | null = null
+  let fileMime: string | null = null
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await request.formData()
@@ -55,88 +78,43 @@ export async function POST(
       return NextResponse.json({ error: 'A file is required' }, { status: 400 })
     }
 
-    const supabase = await createClient()
-
-    const { data: existing } = await supabase
-      .from('requests')
-      .select('id')
-      .eq('id', id)
-      .single()
-
-    if (!existing) {
-      return NextResponse.json({ error: 'Request not found' }, { status: 404 })
-    }
-
     fileName = file.name
-    const storagePath = `request-docs/${id}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    fileSize = file.size
+    fileMime = file.type || 'application/octet-stream'
+    const storageKey = `request-docs/${id}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
 
-    const fileBuffer = await file.arrayBuffer()
-    const { error: uploadError } = await supabase.storage
-      .from('po-files')
-      .upload(storagePath, fileBuffer, {
-        contentType: file.type || 'application/pdf',
-        upsert: false,
-      })
-
-    if (uploadError) {
-      return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 400 })
+    try {
+      const arrayBuffer = await file.arrayBuffer()
+      const buffer = Buffer.from(arrayBuffer)
+      await uploadFile(buffer, storageKey, fileMime)
+      fileUrl = storageKey
+    } catch (uploadErr) {
+      console.error('Neon storage upload failed:', uploadErr)
+      return NextResponse.json(
+        { error: 'Failed to upload file to Neon Object Storage' },
+        { status: 500 }
+      )
     }
+  } else {
+    // Fallback JSON payload
+    const body = await request.json()
+    fileName = body.file_name
+    fileUrl = body.file_url
 
-    fileUrl = storagePath
-
-    const { data, error } = await supabase
-      .from('request_attachments')
-      .insert({
-        request_id: id,
-        file_name: fileName,
-        file_url: fileUrl,
-        uploaded_by: guard.user.id,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 })
+    if (!fileName || !fileUrl) {
+      return NextResponse.json(
+        { error: 'file_name and file_url are required' },
+        { status: 400 }
+      )
     }
-
-    return NextResponse.json({ data }, { status: 201 })
   }
 
-  // Fallback: JSON body (for backwards compat with data URLs)
-  const body = await request.json()
-  fileName = body.file_name
-  fileUrl = body.file_url
+  const inserted = await queryOne<RequestAttachment>(
+    `INSERT INTO public.request_attachments (request_id, file_name, file_url, file_size, file_type, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at`,
+    [id, fileName, fileUrl, fileSize, fileMime, guard.user.id]
+  )
 
-  if (!fileName || !fileUrl) {
-    return NextResponse.json({ error: 'file_name and file_url are required' }, { status: 400 })
-  }
-
-  const supabase = await createClient()
-
-  const { data: existing } = await supabase
-    .from('requests')
-    .select('id')
-    .eq('id', id)
-    .single()
-
-  if (!existing) {
-    return NextResponse.json({ error: 'Request not found' }, { status: 404 })
-  }
-
-  const { data, error } = await supabase
-    .from('request_attachments')
-    .insert({
-      request_id: id,
-      file_name: fileName,
-      file_url: fileUrl,
-      uploaded_by: guard.user.id,
-    })
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
-
-  return NextResponse.json({ data }, { status: 201 })
+  return NextResponse.json({ data: inserted }, { status: 201 })
 }

@@ -1,13 +1,24 @@
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
+import { redirect } from 'next/navigation'
+import { getUserFromSession } from '@/lib/auth/server'
+import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { TickCircle, ArrowRight, Document } from '@/lib/icons'
+import { dashboardPathForRole } from '@/lib/roles'
 
-export default function RequestSuccessPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function RequestSuccessPage() {
+  const user = await getUserFromSession()
+  if (!user) redirect('/auth/login?redirect=/request')
+
   return (
-    <div className="min-h-screen mesh-gradient noise-overlay">
-      <Header />
+    <DashboardLayout
+      title="Request Submitted"
+      user={{ name: user.name, email: user.email }}
+      role={user.role}
+    >
       <main className="mx-auto max-w-2xl px-4 py-12">
         <Card className="animate-scale-in glass-card-elevated border-border/40">
           <CardContent className="p-10 text-center">
@@ -25,9 +36,9 @@ export default function RequestSuccessPage() {
                   Submit Another
                 </Button>
               </Link>
-              <Link href="/">
+              <Link href={dashboardPathForRole(user.role)}>
                 <Button className="gap-2 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow">
-                  Back to Home
+                  Go to Dashboard
                   <ArrowRight size="16" />
                 </Button>
               </Link>
@@ -35,6 +46,6 @@ export default function RequestSuccessPage() {
           </CardContent>
         </Card>
       </main>
-    </div>
+    </DashboardLayout>
   )
 }

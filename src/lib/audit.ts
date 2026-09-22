@@ -1,0 +1,96 @@
+import { query } from '@/lib/db'
+
+/** One recorded action on a purchase order, resolved to the person who took it. */
+export interface PoAuditEntry {
+  id: string
+  po_id: string
+  action: string
+  notes: string | null
+  created_at: string
+  performed_by: string | null
+  actor_name: string | null
+  actor_email: string | null
+  actor_role: string | null
+}
+
+/**
+ * The audit trail for a purchase order, oldest first.
+ *
+ * `performed_by` is a bare UUID on the table, which is useless to a reviewer —
+ * the join is what makes the trail an actual record of who did what. Order is
+ * fixed here rather than at each call site so every view tells the same story.
+ */
+export async function getPoAuditTrail(poId: string): Promise<PoAuditEntry[]> {
+  return await query<PoAuditEntry>(
+    `SELECT a.id,
+            a.po_id,
+            a.action,
+            a.notes,
+            a.created_at,
+            a.performed_by,
+            u.name  AS actor_name,
+            u.email AS actor_email,
+            u.role  AS actor_role
+       FROM public.po_audit_trail a
+       LEFT JOIN public.users u ON u.id = a.performed_by
+      WHERE a.po_id = $1
+      ORDER BY a.created_at ASC, a.id ASC`,
+    [poId]
+  )
+}
+
+/**
+ * Human labels for the actions the PO routes actually write:
+ * 'created', 'approved', 'rejected', 'sent_back', 'paid'.
+ * The *_by_sam / payment_completed keys are legacy spellings kept so older
+ * rows still render a proper label rather than raw snake_case.
+ */
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  created: 'Purchase order created',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  sent_back: 'Sent back for revision',
+  paid: 'Payment completed',
+  // legacy
+  approved_by_sam: 'Approved',
+  rejected_by_sam: 'Rejected',
+  sent_back_by_sam: 'Sent back for revision',
+  payment_completed: 'Payment completed',
+  po_attached: 'PO document attached',
+  comment_added: 'Comment added',
+}
+
+export type AuditTone = 'positive' | 'negative' | 'neutral'
+
+const POSITIVE_ACTIONS = new Set(['approved', 'paid', 'approved_by_sam', 'payment_completed'])
+const NEGATIVE_ACTIONS = new Set(['rejected', 'sent_back', 'rejected_by_sam', 'sent_back_by_sam'])
+
+export function auditTone(action: string): AuditTone {
+  if (POSITIVE_ACTIONS.has(action)) return 'positive'
+  if (NEGATIVE_ACTIONS.has(action)) return 'negative'
+  return 'neutral'
+}
+
+/** "3 hours ago" — the at-a-glance read; the exact timestamp sits beside it. */
+export function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const seconds = Math.round((Date.now() - then) / 1000)
+  if (seconds < 60) return 'just now'
+
+  const units: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+    ['year', 31536000],
+    ['month', 2592000],
+    ['week', 604800],
+    ['day', 86400],
+    ['hour', 3600],
+    ['minute', 60],
+  ]
+  const rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
+  for (const [unit, secondsInUnit] of units) {
+    if (Math.abs(seconds) >= secondsInUnit) {
+      return rtf.format(-Math.round(seconds / secondsInUnit), unit)
+    }
+  }
+  return 'just now'
+}

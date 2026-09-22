@@ -1,30 +1,74 @@
-import { createClient, getUserFromSession } from '@/lib/supabase/server'
-import AdminClient from '@/components/admin/AdminClient'
-import type { User, Request, PurchaseOrder } from '@/lib/types'
+import { requirePageRole } from '@/lib/auth-guard'
+import { query } from '@/lib/db'
+import AdminClient, { type AuditEntry } from '@/components/admin/AdminClient'
+import type { SupplierRow } from '@/components/admin/SuppliersPanel'
+import type {
+  Request,
+  PurchaseOrder,
+  ProjectWithMemberCount,
+  UserWithProjects,
+} from '@/lib/types'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
-  const supabase = await createClient()
-  const user = await getUserFromSession()
+  const user = await requirePageRole('administrator', 'super_user')
 
-  const [{ data: users }, { data: requests }, { data: pos }, { data: auditTrail }] = await Promise.all([
-    supabase.from('users').select('*').order('created_at', { ascending: false }),
-    supabase.from('requests').select('*').order('created_at', { ascending: false }),
-    supabase.from('purchase_orders').select('*').order('created_at', { ascending: false }),
-    supabase
-      .from('po_audit_trail')
-      .select('*, po:purchase_orders!po_audit_trail_po_id_fkey(id, purpose, status), performer:users!po_audit_trail_performed_by_fkey(id, name, email)')
-      .order('created_at', { ascending: false })
-      .limit(100),
+  const [users, projects, suppliers, requests, pos, auditTrail] = await Promise.all([
+    query<UserWithProjects>(
+      `SELECT u.*,
+              COALESCE(
+                json_agg(
+                  json_build_object('id', p.id, 'name', p.name, 'code', p.code)
+                  ORDER BY p.name
+                ) FILTER (WHERE p.id IS NOT NULL),
+                '[]'
+              ) AS projects
+         FROM public.users u
+         LEFT JOIN public.project_members pm ON pm.user_id = u.id
+         LEFT JOIN public.projects p ON p.id = pm.project_id
+        GROUP BY u.id
+        ORDER BY u.created_at DESC
+        LIMIT 500`
+    ),
+    query<ProjectWithMemberCount>(
+      `SELECT p.*, COUNT(pm.user_id)::int AS member_count
+         FROM public.projects p
+         LEFT JOIN public.project_members pm ON pm.project_id = p.id
+        GROUP BY p.id
+        ORDER BY p.status = 'archived', p.name ASC`
+    ),
+    query<SupplierRow>(
+      `SELECT s.*, COUNT(ri.id)::int AS usage_count
+         FROM public.suppliers s
+         LEFT JOIN public.request_items ri ON ri.supplier_id = s.id
+        GROUP BY s.id
+        ORDER BY s.is_active DESC, s.name ASC`
+    ),
+    query<Request>(`SELECT * FROM public.requests ORDER BY created_at DESC LIMIT 200`),
+    query<PurchaseOrder>(`SELECT * FROM public.purchase_orders ORDER BY created_at DESC LIMIT 200`),
+    query<AuditEntry>(
+      `SELECT a.*,
+              json_build_object('id', po.id, 'purpose', po.purpose, 'status', po.status) as po,
+              json_build_object('id', u.id, 'name', u.name, 'email', u.email) as performer
+       FROM public.po_audit_trail a
+       LEFT JOIN public.purchase_orders po ON po.id = a.po_id
+       LEFT JOIN public.users u ON u.id = a.performed_by
+       ORDER BY a.created_at DESC
+       LIMIT 100`
+    ),
   ])
 
   return (
     <AdminClient
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'admin'}
-      users={(users ?? []) as User[]}
-      requests={(requests ?? []) as Request[]}
-      pos={(pos ?? []) as PurchaseOrder[]}
-      auditTrail={(auditTrail ?? []) as any[]}
+      user={{ name: user.name, email: user.email }}
+      role={user.role}
+      users={users}
+      projects={projects}
+      suppliers={suppliers}
+      requests={requests}
+      pos={pos}
+      auditTrail={auditTrail}
     />
   )
 }

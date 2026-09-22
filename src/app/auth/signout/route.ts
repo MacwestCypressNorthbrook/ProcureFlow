@@ -1,8 +1,11 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
+import { auth } from '@/lib/auth/server'
 
-export async function POST() {
-  const response = NextResponse.redirect(new URL('/auth/login', 'http://localhost:3000'))
-  response.cookies.set('betterauth_session', '', { maxAge: 0, path: '/' })
-  response.cookies.set('pf_session', '', { maxAge: 0, path: '/' })
-  return response
+export async function POST(request: NextRequest) {
+  try {
+    await auth.signOut()
+  } catch {
+    // Already signed out, or the auth service is unreachable — clear locally anyway.
+  }
+  return NextResponse.redirect(new URL('/auth/login', request.url), { status: 303 })
 }

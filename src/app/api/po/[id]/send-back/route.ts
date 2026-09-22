@@ -1,6 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth-guard'
+import { queryOne, execute } from '@/lib/db'
+import { requireCapability } from '@/lib/auth-guard'
+import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
+import type { PurchaseOrder } from '@/lib/types'
 
 export async function POST(
   request: Request,
@@ -8,59 +10,72 @@ export async function POST(
 ) {
   const { id } = await params
   const body = await request.json()
-  const guard = await requireRole('sam', 'admin', 'superuser')
+  const guard = await requireCapability('po:approve')
   if (guard.error) return guard.error
 
   if (!body.reason || !body.reason.trim()) {
     return NextResponse.json({ error: 'reason is required' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const reason = body.reason.trim()
 
-  const { data: existing, error: fetchError } = await supabase
-    .from('purchase_orders')
-    .select('id, status, request_id')
-    .eq('id', id)
-    .single()
+  const existing = await queryOne<PurchaseOrder>(
+    `SELECT id, status, request_id, purpose, created_by
+     FROM public.purchase_orders
+     WHERE id = $1
+     LIMIT 1`,
+    [id]
+  )
 
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
   }
 
-  if (existing.status !== 'pending_sam') {
-    return NextResponse.json(
-      { error: 'Can only send back POs with status "pending_sam"' },
-      { status: 400 }
+  await execute(
+    `UPDATE public.purchase_orders
+     SET status = 'sent_back',
+         rejection_reason = $1,
+         sam_rejection_reason = $1,
+         updated_at = now()
+     WHERE id = $2`,
+    [reason, id]
+  )
+
+  await execute(
+    `INSERT INTO public.po_audit_trail (po_id, action, performed_by, notes)
+     VALUES ($1, $2, $3, $4)`,
+    [id, 'sent_back', guard.user.id, reason]
+  )
+
+  if (existing.request_id) {
+    await execute(
+      `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
+       VALUES ($1, $2, 'cost_control', 'sent_back', $3, $4)`,
+      [existing.request_id, id, guard.user.id, reason]
     )
   }
 
-  const { error } = await supabase
-    .from('purchase_orders')
-    .update({
-      status: 'revision_required',
-      sam_rejection_reason: body.reason.trim(),
-    })
-    .eq('id', id)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
+  if (existing.request_id) {
+    await execute(
+      `UPDATE public.requests
+       SET status = 'sent_back',
+           sent_back_to = 'admin',
+           return_to_stage = 'cost_control',
+           updated_at = now()
+       WHERE id = $1`,
+      [existing.request_id]
+    )
   }
 
-  await supabase.from('po_audit_trail').insert({
-    po_id: id,
-    action: 'sent_back_by_sam',
-    performed_by: guard.user.id,
-    notes: body.reason.trim(),
-  })
-
-  if (existing.request_id) {
-    await supabase
-      .from('requests')
-      .update({
-        status: 'reviewing',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.request_id)
+  if (existing.created_by) {
+    await createNotification({
+      userId: existing.created_by,
+      title: 'PO Sent Back for Revision',
+      message: `Purchase Order "${existing.purpose}" was sent back: ${reason}`,
+      type: 'warning',
+      target: { type: 'po', id },
+      sendEmailAlert: true,
+    })
   }
 
   return NextResponse.json({ success: true })

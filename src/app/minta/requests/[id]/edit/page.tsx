@@ -1,26 +1,26 @@
-import { getUserFromSession, createClient } from '@/lib/supabase/server'
+import { requirePageRole } from '@/lib/auth-guard'
+import { queryOne } from '@/lib/db'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { PageContainer, PageHeader, EmptyState } from '@/components/shared/ui-kit'
 import { Lock, FileText } from 'lucide-react'
 import Link from 'next/link'
 import EditRequestForm from './EditRequestForm'
 
+export const dynamic = 'force-dynamic'
+
 export default async function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await getUserFromSession()
-  const supabase = await createClient()
+  const user = await requirePageRole('engineer')
 
   let request: Record<string, unknown> | null = null
 
   try {
-    const { data } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('id', id)
-      .single()
-    request = data as Record<string, unknown> | null
-  } catch {
-    // DB may be unavailable
+    request = await queryOne<Record<string, unknown>>(
+      `SELECT * FROM public.requests WHERE id = $1 LIMIT 1`,
+      [id]
+    )
+  } catch (err) {
+    console.error('Failed to load request for editing from Neon:', err)
   }
 
   if (!request) {

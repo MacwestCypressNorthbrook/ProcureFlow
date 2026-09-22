@@ -1,37 +1,37 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth-guard'
+import { query, queryOne } from '@/lib/db'
+import { requireCapability } from '@/lib/auth-guard'
+import { isElevated } from '@/lib/roles'
 import { NextResponse } from 'next/server'
+import type { PurchaseOrder } from '@/lib/types'
+import { getPoAuditTrail } from '@/lib/audit'
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const guard = await requireRole('minta', 'admin', 'superuser', 'sam', 'finance')
+  const guard = await requireCapability('po:view')
   if (guard.error) return guard.error
 
-  const supabase = await createClient()
+  const po = await queryOne<PurchaseOrder & Record<string, unknown>>(
+    `SELECT po.*,
+            json_build_object('id', u1.id, 'name', u1.name, 'email', u1.email, 'role', u1.role) as requestor,
+            json_build_object('id', u2.id, 'name', u2.name, 'email', u2.email, 'role', u2.role) as approver,
+            json_build_object('id', u3.id, 'name', u3.name, 'email', u3.email, 'role', u3.role) as payer
+     FROM public.purchase_orders po
+     LEFT JOIN public.users u1 ON u1.id = po.created_by
+     LEFT JOIN public.users u2 ON u2.id = COALESCE(po.approved_by, po.sam_approved_by)
+     LEFT JOIN public.users u3 ON u3.id = po.paid_by
+     WHERE po.id = $1
+     LIMIT 1`,
+    [id]
+  )
 
-  const { data: po, error: poError } = await supabase
-    .from('purchase_orders')
-    .select(`
-      *,
-      requestor:users!purchase_orders_created_by_fkey(id, name, email, role),
-      approver:users!purchase_orders_sam_approved_by_fkey(id, name, email, role),
-      payer:users!purchase_orders_paid_by_fkey(id, name, email, role)
-    `)
-    .eq('id', id)
-    .single()
-
-  if (poError || !po) {
+  if (!po) {
     return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
   }
 
-  const { data: auditTrail } = await supabase
-    .from('po_audit_trail')
-    .select('*')
-    .eq('po_id', id)
-    .order('created_at', { ascending: true })
+  const auditTrail = await getPoAuditTrail(id)
 
   return NextResponse.json({ data: { ...po, audit_trail: auditTrail ?? [] } })
 }
@@ -42,55 +42,52 @@ export async function PUT(
 ) {
   const { id } = await params
   const body = await request.json()
-  const guard = await requireRole('minta', 'admin', 'superuser')
+  const guard = await requireCapability('po:view')
   if (guard.error) return guard.error
 
-  const supabase = await createClient()
+  const existing = await queryOne<PurchaseOrder>(
+    `SELECT id, created_by, status FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
-  const { data: existing, error: fetchError } = await supabase
-    .from('purchase_orders')
-    .select('id, created_by, status')
-    .eq('id', id)
-    .single()
-
-  if (fetchError || !existing) {
+  if (!existing) {
     return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
   }
 
-  if (existing.created_by !== guard.user.id) {
+  if (!isElevated(guard.user.role) && existing.created_by !== guard.user.id) {
     return NextResponse.json({ error: 'Only the creator can update this PO' }, { status: 403 })
   }
 
-  if (!['pending_sam', 'revision_required'].includes(existing.status)) {
-    return NextResponse.json(
-      { error: 'Can only update POs with status "pending_sam" or "revision_required"' },
-      { status: 400 }
-    )
-  }
+  const quantity = body.quantity !== undefined ? Number(body.quantity) : null
+  const unitRate = body.unit_rate !== undefined ? Number(body.unit_rate) : null
+  const totalAmount = quantity && unitRate ? quantity * unitRate : (body.total_amount ? Number(body.total_amount) : null)
 
-  const updateFields: Record<string, unknown> = {}
-  if (body.purpose !== undefined) updateFields.purpose = body.purpose
-  if (body.description !== undefined) updateFields.description = body.description
-  if (body.quantity !== undefined) updateFields.quantity = body.quantity
-  if (body.unit_rate !== undefined) updateFields.unit_rate = body.unit_rate
-  if (body.total_amount !== undefined) updateFields.total_amount = body.total_amount
-  if (body.file_path !== undefined) updateFields.file_path = body.file_path
-  if (body.file_name !== undefined) updateFields.file_name = body.file_name
+  const updated = await queryOne<PurchaseOrder>(
+    `UPDATE public.purchase_orders
+     SET purpose = COALESCE($1, purpose),
+         description = COALESCE($2, description),
+         vendor_name = COALESCE($3, vendor_name),
+         quantity = COALESCE($4, quantity),
+         unit_rate = COALESCE($5, unit_rate),
+         total_amount = COALESCE($6, total_amount),
+         file_path = COALESCE($7, file_path),
+         file_name = COALESCE($8, file_name),
+         status = CASE WHEN status = 'sent_back' OR status = 'rejected' THEN 'pending_cost_control' ELSE status END,
+         updated_at = now()
+     WHERE id = $9
+     RETURNING *`,
+    [
+      body.purpose,
+      body.description,
+      body.vendor_name,
+      quantity,
+      unitRate,
+      totalAmount,
+      body.file_path,
+      body.file_name,
+      id,
+    ]
+  )
 
-  if (existing.status === 'revision_required') {
-    updateFields.status = 'pending_sam'
-  }
-
-  const { data, error } = await supabase
-    .from('purchase_orders')
-    .update(updateFields)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
-
-  return NextResponse.json({ data })
+  return NextResponse.json({ data: updated })
 }

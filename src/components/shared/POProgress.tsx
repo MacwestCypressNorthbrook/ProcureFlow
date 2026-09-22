@@ -8,15 +8,15 @@ interface POProgressProps {
 }
 
 const steps = [
-  { key: 'pending_sam', label: 'Awaiting Sam', step: 1 },
-  { key: 'pending_payment', label: 'Awaiting Payment', step: 2 },
-  { key: 'completed', label: 'Completed', step: 3 },
+  { key: 'pending_cost_control', label: 'Awaiting Approval', step: 1 },
+  { key: 'pending_finance', label: 'Awaiting Payment', step: 2 },
+  { key: 'paid', label: 'Paid', step: 3 },
 ]
 
-const revisionStep = { key: 'revision_required', label: 'Revision Required' }
+const revisionStep = { key: 'sent_back', label: 'Sent Back' }
 
 export default function POProgress({ status, className }: POProgressProps) {
-  const isRevision = status === 'revision_required'
+  const isRevision = status === 'sent_back'
   const isCancelled = status === 'cancelled'
   const currentStep = steps.findIndex((s) => s.key === status)
   const activeIndex = isRevision ? -1 : currentStep

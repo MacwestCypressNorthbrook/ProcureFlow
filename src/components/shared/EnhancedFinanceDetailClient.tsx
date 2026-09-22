@@ -12,7 +12,9 @@ import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { CreditCard, FileText, CheckCircle, XCircle, MessageSquare, History, Clock, CheckSquare } from 'lucide-react'
 import RichRequisitionView, { isRichRequisition } from '@/components/shared/RichRequisitionView'
-import type { PurchaseOrder, PoAuditTrail, PoAttachment } from '@/lib/types'
+import type { PurchaseOrder, PoAttachment } from '@/lib/types'
+import type { PoAuditEntry } from '@/lib/audit'
+import AuditTrail from '@/components/shared/AuditTrail'
 
 interface Comment {
   id: string
@@ -25,7 +27,7 @@ interface EnhancedFinanceDetailProps {
   po: PurchaseOrder
   originalRequest?: Record<string, unknown> | null
   samUser?: { name: string | null; email: string } | null
-  auditTrail: PoAuditTrail[]
+  auditTrail: PoAuditEntry[]
   comments: Comment[]
   poAttachments?: PoAttachment[]
   user?: { name?: string; email: string } | null
@@ -70,35 +72,6 @@ export default function EnhancedFinanceDetailClient({
       setCommentText('')
     }
     setIsCommentSubmitting(false)
-  }
-
-  const auditActionLabel: Record<string, string> = {
-    created: 'PO Created',
-    approved_by_sam: 'Approved by Sam',
-    rejected_by_sam: 'Revision Requested',
-    sent_back_by_sam: 'Sent Back for Revision',
-    payment_completed: 'Payment Completed',
-    comment_added: 'Comment Added',
-  }
-
-  const getActionIcon = (action: string) => {
-    switch (action) {
-      case 'approved_by_sam': return <CheckCircle size={13} />
-      case 'rejected_by_sam':
-      case 'sent_back_by_sam': return <XCircle size={13} />
-      case 'payment_completed': return <CheckSquare size={13} />
-      default: return <Clock size={13} />
-    }
-  }
-
-  const getActionColor = (action: string): string => {
-    switch (action) {
-      case 'approved_by_sam': return 'bg-emerald-500 text-white'
-      case 'payment_completed': return 'bg-blue-500 text-white'
-      case 'rejected_by_sam':
-      case 'sent_back_by_sam': return 'bg-red-500 text-white'
-      default: return 'bg-muted text-muted-foreground'
-    }
   }
 
   return (
@@ -195,25 +168,7 @@ export default function EnhancedFinanceDetailClient({
             </Panel>
 
             <Panel title="Payment Timeline" icon={<History size={16} />}>
-              {auditTrail.length > 0 ? (
-                <div className="space-y-0">
-                  {auditTrail.map((entry, i) => (
-                    <div key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
-                      {i < auditTrail.length - 1 && <div className="absolute left-[11px] top-5 bottom-0 w-px bg-border" />}
-                      <div className={`mt-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full ring-2 ring-card ${getActionColor(entry.action)}`}>
-                        {getActionIcon(entry.action)}
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-xs font-semibold text-foreground">{auditActionLabel[entry.action] || entry.action}</p>
-                        {entry.notes && <p className="mt-0.5 text-[11px] text-muted-foreground">{entry.notes}</p>}
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(entry.created_at)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No activity yet.</p>
-              )}
+              <AuditTrail entries={auditTrail} />
             </Panel>
 
             {po.status === 'completed' && po.paid_at && (
@@ -224,7 +179,7 @@ export default function EnhancedFinanceDetailClient({
               </div>
             )}
 
-            {po.status === 'pending_payment' && (
+            {po.status === 'pending_finance' && (
               <div className="rounded-xl border border-primary/30 bg-primary/[0.04] p-5">
                 {!showConfirmPay ? (
                   <div className="text-center">

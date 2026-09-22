@@ -23,6 +23,66 @@ export function StatStripSkeleton({ count = 4 }: { count?: number }) {
   )
 }
 
+export function StatGridSkeleton({ count = 4 }: { count?: number }) {
+  const cols =
+    count >= 5
+      ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5'
+      : count === 4
+        ? 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'
+        : 'grid-cols-1 sm:grid-cols-3'
+
+  return (
+    <div className={cn('grid gap-3 sm:gap-4', cols)}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="surface rounded-2xl p-5">
+          <div className="flex items-start justify-between">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-4 w-4 rounded" />
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <Skeleton className="h-7 w-24" />
+            <Skeleton className="h-4 w-12 rounded-md" />
+          </div>
+          <Skeleton className="mt-3 h-3 w-32" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Dashboard landing skeleton — hero band, KPI cards, first table. */
+export function DashboardSkeleton({
+  role,
+  title,
+  stats = 4,
+}: {
+  role?: string | null
+  title?: string
+  stats?: number
+}) {
+  return (
+    <DashboardLayout title={title ?? 'Loading…'} role={role}>
+      <PageContainer className="space-y-6">
+        <div className="surface rounded-2xl px-5 py-6 sm:px-7 sm:py-7">
+          <Skeleton className="h-2.5 w-20" />
+          <Skeleton className="mt-3 h-7 w-64" />
+          <Skeleton className="mt-3 h-3.5 w-full max-w-md" />
+          <div className="mt-4 flex gap-2">
+            <Skeleton className="h-6 w-24 rounded-full" />
+            <Skeleton className="h-6 w-28 rounded-full" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
+        </div>
+        <StatGridSkeleton count={stats} />
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-40" />
+          <TableSkeleton />
+        </div>
+      </PageContainer>
+    </DashboardLayout>
+  )
+}
+
 export function TableSkeleton({ rows = 7 }: { rows?: number }) {
   return (
     <div className="surface overflow-hidden rounded-xl">
@@ -69,7 +129,7 @@ export function ListPageSkeleton({ role, title, stats = true }: { role?: string 
   return (
     <DashboardLayout title={title ?? 'Loading…'} role={role}>
       <PageContainer className="space-y-8">
-        {stats && <StatStripSkeleton count={4} />}
+        {stats && <StatGridSkeleton count={4} />}
         <div className="space-y-3">
           <Skeleton className="h-4 w-40" />
           <TableSkeleton />

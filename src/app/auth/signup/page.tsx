@@ -3,8 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { signUp } from '@/lib/betterauth/client'
-import { createClient } from '@/lib/supabase/client'
+import { authClient } from '@/lib/auth/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -34,7 +33,6 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
-  const [role, setRole] = useState('minta')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -45,28 +43,14 @@ export default function SignupPage() {
     setError('')
 
     try {
-      const result = await signUp(email, password, name)
-      const betterAuthUser = result.user
-
-      const supabase = createClient()
-      const { error: dbError } = await supabase.from('users').upsert({
-        email,
-        name,
-        role,
-        auth_id: betterAuthUser.id,
-      })
-
-      if (dbError) {
-        setError(`Account created but profile setup failed: ${dbError.message}`)
-        setLoading(false)
-        return
-      }
+      // The client rejects on failure and may also return an `error` payload.
+      const result = await authClient.signUp.email({ email, password, name })
+      if (result?.error) throw result.error
 
       router.push('/auth/login')
       router.refresh()
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Signup failed'
-      setError(message)
+      setError(err instanceof Error ? err.message : 'Signup failed')
       setLoading(false)
     }
   }
@@ -140,7 +124,7 @@ export default function SignupPage() {
           </Link>
 
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Create your account</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">Join ProcureFlow with your workflow role.</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">Join ProcureFlow to start raising requests.</p>
 
           <form onSubmit={handleSignup} className="mt-8 space-y-4">
             {error && (
@@ -199,21 +183,10 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="role" className="text-xs font-medium text-muted-foreground">Workflow Role</Label>
-              <select
-                id="role"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="flex h-11 w-full rounded-lg border border-input bg-card px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                <option value="minta">Minta (Requester)</option>
-                <option value="mintah">Mintah (Procurement Reviewer)</option>
-                <option value="sam">Sam (Executive Approver)</option>
-                <option value="finance">Finance Disburser</option>
-                <option value="superuser">Superuser (Admin)</option>
-              </select>
-            </div>
+            <p className="rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+              New accounts start as a requester. An administrator assigns your
+              workflow role once your account is approved.
+            </p>
 
             <Button type="submit" className="h-11 w-full gap-1.5 shadow-sm mt-2" disabled={loading}>
               {loading ? 'Creating account…' : 'Create account'}

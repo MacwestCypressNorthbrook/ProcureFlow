@@ -1,8 +1,12 @@
-import { createClient, getUserFromSession } from '@/lib/supabase/server'
+import { requirePageRole } from '@/lib/auth-guard'
+import { query, queryOne } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import EnhancedFinanceDetailClient from '@/components/shared/EnhancedFinanceDetailClient'
 import { resolveAttachments } from '@/lib/resolve-file-url'
-import type { PurchaseOrder, PoAuditTrail, PoAttachment } from '@/lib/types'
+import type { PurchaseOrder, PoAttachment } from '@/lib/types'
+import { getPoAuditTrail } from '@/lib/audit'
+
+export const dynamic = 'force-dynamic'
 
 interface RawComment {
   id: string
@@ -13,66 +17,63 @@ interface RawComment {
 
 export default async function FinanceDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const user = await getUserFromSession()
+  const user = await requirePageRole('finance')
 
-  const { data: po, error } = await supabase
-    .from('purchase_orders')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const po = await queryOne<PurchaseOrder>(
+    `SELECT * FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
-  if (error || !po) {
+  if (!po) {
     notFound()
   }
 
   let originalRequest: Record<string, unknown> | null = null
   if (po.request_id) {
-    const { data: req } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('id', po.request_id)
-      .single()
-    originalRequest = req
+    originalRequest = await queryOne<Record<string, unknown>>(
+      `SELECT * FROM public.requests WHERE id = $1 LIMIT 1`,
+      [po.request_id]
+    )
   }
 
-  let samUser: { name: string | null; email: string } | null = null
-  if (po.sam_approved_by) {
-    const { data: u } = await supabase
-      .from('users')
-      .select('name, email')
-      .eq('id', po.sam_approved_by)
-      .single()
-    samUser = u
+  let approverUser: { name: string | null; email: string } | null = null
+  const approverId = po.approved_by || po.sam_approved_by
+  if (approverId) {
+    approverUser = await queryOne<{ name: string | null; email: string }>(
+      `SELECT name, email FROM public.users WHERE id = $1 LIMIT 1`,
+      [approverId]
+    )
   }
 
-  const { data: auditTrail } = await supabase
-    .from('po_audit_trail')
-    .select('*')
-    .eq('po_id', id)
-    .order('created_at', { ascending: false })
+  const auditTrail = await getPoAuditTrail(id)
 
-  const { data: comments } = await supabase
-    .from('po_comments')
-    .select('id, po_id, author_id, content, created_at, author:users!po_comments_author_id_fkey(id, name, email)')
-    .eq('po_id', id)
-    .order('created_at', { ascending: true })
+  const comments = await query<RawComment>(
+    `SELECT c.id, c.comment as content, c.created_at,
+            json_build_object('id', u.id, 'name', u.name, 'email', u.email) as author
+     FROM public.po_comments c
+     LEFT JOIN public.users u ON u.id = c.user_id
+     WHERE c.po_id = $1
+     ORDER BY c.created_at ASC`,
+    [id]
+  )
 
-  const { data: poAttachmentsRaw } = await supabase
-    .from('po_attachments')
-    .select('id, po_id, file_name, file_url, uploaded_by, created_at')
-    .eq('po_id', id)
-    .order('created_at', { ascending: true })
+  const poAttachmentsRaw = await query<PoAttachment>(
+    `SELECT id, po_id, file_name, file_url, uploaded_by, created_at
+     FROM public.po_attachments
+     WHERE po_id = $1
+     ORDER BY created_at ASC`,
+    [id]
+  )
 
-  const poAttachments = await resolveAttachments((poAttachmentsRaw as PoAttachment[]) ?? [])
+  const poAttachments = await resolveAttachments(poAttachmentsRaw)
 
   return (
     <EnhancedFinanceDetailClient
-      po={po as unknown as PurchaseOrder}
+      po={po}
       originalRequest={originalRequest}
-      samUser={samUser}
-      auditTrail={(auditTrail as PoAuditTrail[]) ?? []}
-      comments={(comments as unknown as RawComment[]) ?? []}
+      samUser={approverUser}
+      auditTrail={auditTrail}
+      comments={comments}
       poAttachments={poAttachments}
       user={user ? { name: user.name, email: user.email } : null}
       role={user?.role ?? 'finance'}

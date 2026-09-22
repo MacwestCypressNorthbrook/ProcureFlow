@@ -1,23 +1,23 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSignedDownloadUrl } from '@/lib/storage'
 
 /**
- * If the URL looks like a Supabase Storage path (not a full URL or data: URL),
- * generate a signed URL for it. Otherwise return the URL as-is.
+ * If the URL looks like an Object Storage path (not a full URL or data: URL),
+ * generate an S3 pre-signed URL for it from Neon Object Storage.
+ * Otherwise return the URL as-is.
  */
 export async function resolveFileUrl(url: string): Promise<string> {
   if (!url) return url
-  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+  if (
+    url.startsWith('http://') ||
+    url.startsWith('https://') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:')
+  ) {
     return url
   }
 
-  // Looks like a storage path (e.g. "po-docs/uuid/filename.pdf")
-  const supabase = await createClient()
-  const { data, error } = await supabase.storage
-    .from('po-files')
-    .createSignedUrl(url, 3600)
-
-  if (error || !data?.signedUrl) return url
-  return data.signedUrl
+  // Looks like a storage path (e.g. "po-docs/uuid/filename.pdf" or "request-docs/...")
+  return await getSignedDownloadUrl(url, 3600)
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -27,6 +27,7 @@ export async function resolveFileUrl(url: string): Promise<string> {
 export async function resolveAttachments(
   attachments: any[]
 ): Promise<any[]> {
+  if (!Array.isArray(attachments)) return []
   return Promise.all(
     attachments.map(async (att) => {
       if (att && typeof att.file_url === 'string') {

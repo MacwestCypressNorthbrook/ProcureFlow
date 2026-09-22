@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
-import { getProfile, PROFILE_COOKIE } from '@/lib/betterauth/client'
 import type { User } from '@/lib/types'
 import { ROLE_LABELS } from '@/lib/utils'
 import {
@@ -65,13 +64,28 @@ function Logo() {
 
 export default function Header() {
   const [profile, setProfile] = useState<{ name: string; role: string } | null>(null)
+  const [resolved, setResolved] = useState(false)
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
 
+  // The session cookie is httpOnly, so the profile (and role) is fetched
+  // from the server rather than read out of document.cookie.
   useEffect(() => {
-    const p = getProfile()
-    if (p) setProfile({ name: p.name, role: p.role })
+    let cancelled = false
+    fetch('/api/auth/profile')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((p) => {
+        if (cancelled) return
+        if (p) setProfile({ name: p.name, role: p.role })
+        setResolved(true)
+      })
+      .catch(() => {
+        if (!cancelled) setResolved(true)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -139,13 +153,15 @@ export default function Header() {
                 </Button>
               </form>
             </>
-          ) : (
+          ) : resolved ? (
             <Link href="/auth/login">
               <Button size="sm" className="h-9 gap-1.5 px-4 shadow-sm">
                 Sign In
                 <ArrowRight size="15" />
               </Button>
             </Link>
+          ) : (
+            <div className="h-9 w-24 animate-pulse rounded-lg bg-muted" aria-hidden />
           )}
         </div>
 
@@ -201,13 +217,15 @@ export default function Header() {
                       Sign Out
                     </button>
                   </form>
-                ) : (
+                ) : resolved ? (
                   <Link href="/auth/login" onClick={() => setOpen(false)}>
                     <Button className="w-full gap-1.5">
                       <UserIcon size="16" />
                       Sign In
                     </Button>
                   </Link>
+                ) : (
+                  <div className="h-10 w-full animate-pulse rounded-lg bg-muted" aria-hidden />
                 )}
               </div>
             </SheetContent>

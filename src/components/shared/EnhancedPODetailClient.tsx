@@ -12,7 +12,10 @@ import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { CheckCircle, XCircle, FileText, MessageSquare, History, Clock, Send } from 'lucide-react'
 import RichRequisitionView, { isRichRequisition } from '@/components/shared/RichRequisitionView'
-import type { PurchaseOrder, PoAuditTrail, PoAttachment } from '@/lib/types'
+import type { PurchaseOrder, PoAttachment } from '@/lib/types'
+import type { PoAuditEntry } from '@/lib/audit'
+import AuditTrail from '@/components/shared/AuditTrail'
+import { can, dashboardPathForRole, normalizeRole } from '@/lib/roles'
 
 interface Comment {
   id: string
@@ -24,7 +27,7 @@ interface Comment {
 interface EnhancedPODetailProps {
   po: PurchaseOrder
   originalRequest?: Record<string, unknown> | null
-  auditTrail: PoAuditTrail[]
+  auditTrail: PoAuditEntry[]
   comments: Comment[]
   poAttachments?: PoAttachment[]
   user?: { name?: string; email: string } | null
@@ -74,28 +77,17 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
     setIsCommentSubmitting(false)
   }
 
-  const auditActionLabel: Record<string, string> = {
-    created: 'PO Created',
-    approved_by_sam: 'Approved by Sam',
-    rejected_by_sam: 'Revision Requested by Sam',
-    sent_back_by_sam: 'Sent Back for Revision',
-    payment_completed: 'Payment Completed',
-    comment_added: 'Comment Added',
-  }
-
-  const stepIcon = (action: string) => {
-    if (action === 'approved_by_sam' || action === 'payment_completed') return <CheckCircle size={13} />
-    if (action === 'rejected_by_sam' || action === 'sent_back_by_sam') return <XCircle size={13} />
-    return <Send size={13} />
-  }
-
-  const canAct = (po.status === 'pending_sam' || po.status === 'revision_required') && role === 'sam'
+  // The stored role is `project_lead` / `cost_control`; comparing against the
+  // legacy literal 'sam' meant the approve and reject actions never rendered
+  // for the people who are supposed to use them.
+  const canAct =
+    po.status === 'pending_cost_control' && can(role, 'po:approve')
 
   return (
     <DashboardLayout title="PO Review" subtitle="Inspect the Purchase Order and make your decision" user={user} role={role}>
       <PageContainer className="space-y-6">
         <PageHeader
-          backHref={role === 'sam' ? '/sam' : '/finance'}
+          backHref={dashboardPathForRole(role)}
           backLabel="Back to Dashboard"
           title={`PO #${po.id.slice(0, 8)}`}
           subtitle={`Created ${formatDate(po.created_at)}`}
@@ -186,7 +178,7 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
                   </Button>
                   <div>
                     <p className="mb-1.5 text-xs font-medium text-muted-foreground">
-                      Reason {po.status === 'revision_required' ? '(returns to Mintah)' : '(if rejecting)'}
+                      Reason {po.status === 'sent_back' ? '(returns to Supply Chain)' : '(if rejecting)'}
                     </p>
                     <Textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="e.g. Missing signature on page 2…" rows={3} className="resize-none text-sm" />
                   </div>
@@ -210,7 +202,7 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
               </div>
             )}
 
-            {po.sam_approved_at && role === 'finance' && (
+            {po.sam_approved_at && normalizeRole(role) === 'finance' && (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/[0.06] p-4">
                 <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                   <CheckCircle size={13} /> Approved by Sam · {formatDate(po.sam_approved_at)}
@@ -219,30 +211,7 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
             )}
 
             <Panel title="Status Timeline" icon={<History size={16} />}>
-              {auditTrail.length > 0 ? (
-                <div className="space-y-0">
-                  {auditTrail.map((entry, i) => (
-                    <div key={entry.id} className="relative flex gap-3 pb-4 last:pb-0">
-                      {i < auditTrail.length - 1 && <div className="absolute left-[11px] top-5 bottom-0 w-px bg-border" />}
-                      <div className={`mt-0.5 flex h-[22px] w-[22px] items-center justify-center rounded-full ring-2 ring-card ${
-                        entry.action === 'approved_by_sam' || entry.action === 'payment_completed' ? 'bg-emerald-500 text-white'
-                          : entry.action === 'rejected_by_sam' ? 'bg-red-500 text-white' : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {stepIcon(entry.action)}
-                      </div>
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <p className="text-xs font-semibold text-foreground">{auditActionLabel[entry.action] || entry.action}</p>
-                        {entry.notes && <p className="mt-0.5 text-[11px] text-muted-foreground">{entry.notes}</p>}
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDate(entry.created_at)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Clock size={13} /> PO Created
-                </div>
-              )}
+              <AuditTrail entries={auditTrail} />
             </Panel>
           </div>
         </div>

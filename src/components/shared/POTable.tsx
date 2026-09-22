@@ -1,102 +1,156 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import StatusBadge from '@/components/shared/StatusBadge'
+import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { ChevronRight, FileText, AlertTriangle } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
 
-interface POTableProps {
+export default function POTable({
+  pos,
+  hrefBase,
+  showRejection = false,
+  compact = false,
+  storageKey = 'purchase-orders',
+}: {
   pos: PurchaseOrder[]
   hrefBase: string
   showRejection?: boolean
-}
-
-export default function POTable({ pos, hrefBase, showRejection = false }: POTableProps) {
+  storageKey?: string
+  /** Dashboard preview: plain table, no toolbar or pagination. */
+  compact?: boolean
+}) {
   const router = useRouter()
 
+  const columns: DataColumn<PurchaseOrder>[] = [
+    {
+      id: 'purpose',
+      label: 'Purchase Order',
+      sortable: true,
+      sortValue: (p) => p.purpose,
+      cell: (p) => (
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <FileText size={15} />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">{p.purpose}</p>
+            <p className="truncate text-xs text-muted-foreground">
+              {p.po_number ?? `#${p.id.slice(0, 8)}`}
+              {p.file_name ? ` · ${p.file_name}` : ''}
+            </p>
+            {showRejection && p.sam_rejection_reason && (
+              <p className="mt-1 flex items-center gap-1 truncate text-xs font-medium text-destructive">
+                <AlertTriangle size={11} className="shrink-0" />
+                {p.sam_rejection_reason}
+              </p>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'amount',
+      label: 'Amount',
+      align: 'right',
+      sortable: true,
+      sortValue: (p) => p.total_amount,
+      cell: (p) => (
+        <span className="font-semibold tabular-nums text-foreground">{formatCurrency(p.total_amount)}</span>
+      ),
+    },
+    {
+      id: 'breakdown',
+      label: 'Qty × Rate',
+      align: 'right',
+      hideBelow: 'md',
+      cell: (p) => (
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {p.quantity && p.unit_rate ? `${p.quantity} × ${formatCurrency(p.unit_rate)}` : '—'}
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      sortable: true,
+      sortValue: (p) => p.status,
+      cell: (p) => <StatusBadge status={p.status} config={PO_STATUS_CONFIG} />,
+    },
+    {
+      id: 'created_at',
+      label: 'Created',
+      hideBelow: 'sm',
+      sortable: true,
+      sortValue: (p) => p.created_at,
+      cell: (p) => <span className="text-xs text-muted-foreground">{formatDate(p.created_at)}</span>,
+    },
+    {
+      id: 'chevron',
+      label: '',
+      align: 'right',
+      headClassName: 'w-10',
+      cell: () => (
+        <ChevronRight size={16} className="inline text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+      ),
+    },
+  ]
+
+  const statuses = Array.from(new Set(pos.map((p) => p.status))).sort()
+  const facets: DataFacet<PurchaseOrder>[] = [
+    {
+      id: 'status',
+      label: 'Status',
+      options: statuses.map((s) => ({ value: s, label: PO_STATUS_CONFIG[s]?.label ?? s })),
+      matches: (p, value) => p.status === value,
+    },
+  ]
+
   return (
-    <div className="surface overflow-hidden rounded-xl">
-      <Table>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent border-border">
-            <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Purchase Order
-            </TableHead>
-            <TableHead className="h-9 px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Amount
-            </TableHead>
-            <TableHead className="hidden h-9 px-4 text-right text-[11px] font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">
-              Qty × Rate
-            </TableHead>
-            <TableHead className="h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Status
-            </TableHead>
-            <TableHead className="hidden h-9 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">
-              Created
-            </TableHead>
-            <TableHead className="h-9 w-10 px-4" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {pos.map((po) => (
-            <TableRow
-              key={po.id}
-              onClick={() => router.push(`${hrefBase}/${po.id}`)}
-              className="group cursor-pointer border-border last:border-0"
-            >
-              <TableCell className="max-w-0 px-4 py-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                    <FileText size={15} />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{po.purpose}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      #{po.id.slice(0, 8)}
-                      {po.file_name ? ` · ${po.file_name}` : ''}
-                    </p>
-                    {showRejection && po.sam_rejection_reason && (
-                      <p className="mt-1 flex items-center gap-1 truncate text-xs font-medium text-destructive">
-                        <AlertTriangle size={11} className="shrink-0" />
-                        {po.sam_rejection_reason}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-foreground">
-                {formatCurrency(po.total_amount)}
-              </TableCell>
-              <TableCell className="hidden px-4 py-3 text-right text-xs tabular-nums text-muted-foreground md:table-cell">
-                {po.quantity && po.unit_rate
-                  ? `${po.quantity} × ${formatCurrency(po.unit_rate)}`
-                  : '—'}
-              </TableCell>
-              <TableCell className="px-4 py-3">
-                <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
-              </TableCell>
-              <TableCell className="hidden px-4 py-3 text-xs text-muted-foreground sm:table-cell">
-                {formatDate(po.created_at)}
-              </TableCell>
-              <TableCell className="px-4 py-3 text-right">
-                <ChevronRight
-                  size={16}
-                  className="text-muted-foreground/50 transition-colors group-hover:text-foreground"
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <DataView
+      rows={pos}
+      getRowId={(p) => p.id}
+      columns={columns}
+      facets={facets}
+      searchPlaceholder="Search purchase orders…"
+      searchText={(p) => [p.purpose, p.po_number, p.description, p.vendor_name, p.file_name]}
+      defaultSort={{ id: 'created_at', dir: 'desc' }}
+      storageKey={storageKey}
+      compact={compact}
+      onRowClick={(p) => router.push(`${hrefBase}/${p.id}`)}
+      emptyTitle="No purchase orders yet"
+      emptyMessage="Purchase orders will appear here once requisitions are converted."
+      renderCard={(p) => (
+        <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-sm font-semibold text-foreground">{p.purpose}</p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {p.po_number ?? `#${p.id.slice(0, 8)}`}
+              </p>
+            </div>
+            <StatusBadge status={p.status} config={PO_STATUS_CONFIG} />
+          </div>
+
+          {showRejection && p.sam_rejection_reason && (
+            <p className="mt-2 flex items-start gap-1.5 text-xs font-medium text-destructive">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+              <span className="line-clamp-2">{p.sam_rejection_reason}</span>
+            </p>
+          )}
+
+          <div className="mt-auto pt-4">
+            <p className="text-lg font-semibold tabular-nums text-foreground">{formatCurrency(p.total_amount)}</p>
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="truncate">
+                {p.quantity && p.unit_rate ? `${p.quantity} × ${formatCurrency(p.unit_rate)}` : '—'}
+              </span>
+              <span className="shrink-0">{formatDate(p.created_at)}</span>
+            </div>
+          </div>
+        </article>
+      )}
+    />
   )
 }

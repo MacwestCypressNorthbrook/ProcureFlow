@@ -1,13 +1,16 @@
-import { createClient } from '@/lib/supabase/server'
-import { requireRole } from '@/lib/auth-guard'
+import { queryOne, execute } from '@/lib/db'
+import { uploadFile } from '@/lib/storage'
+import { requireCapability } from '@/lib/auth-guard'
+import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
+import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params
-  const guard = await requireRole('mintah', 'admin', 'superuser')
+  const guard = await requireCapability('request:convert')
   if (guard.error) return guard.error
 
   const contentType = request.headers.get('content-type') || ''
@@ -15,7 +18,7 @@ export async function POST(
   let poNumber: string
   let fileName: string | null = null
   let fileUrl: string | null = null
-  let fileBuffer: ArrayBuffer | null = null
+  let fileBuffer: Buffer | null = null
   let fileMimeType: string | null = null
 
   if (contentType.includes('multipart/form-data')) {
@@ -25,7 +28,8 @@ export async function POST(
     if (file && file.size > 0) {
       fileName = file.name
       fileMimeType = file.type || 'application/pdf'
-      fileBuffer = await file.arrayBuffer()
+      const arrayBuffer = await file.arrayBuffer()
+      fileBuffer = Buffer.from(arrayBuffer)
     }
   } else {
     const body = await request.json()
@@ -41,89 +45,92 @@ export async function POST(
     return NextResponse.json({ error: 'A PDF file or file_url is required' }, { status: 400 })
   }
 
-  const supabase = await createClient()
+  const req = await queryOne<DbRequest>(
+    `SELECT * FROM public.requests WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
-  const { data: req, error: reqError } = await supabase
-    .from('requests')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (reqError || !req) {
+  if (!req) {
     return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   }
 
-  if (req.status !== 'reviewing') {
-    return NextResponse.json(
-      { error: 'Request must be in "reviewing" status to attach a PO' },
-      { status: 400 }
-    )
-  }
-
-  // Upload file to Supabase Storage if we have a raw file
+  // Upload file to Neon Object Storage if raw file provided
   if (fileBuffer && fileName) {
-    const ext = fileName.split('.').pop() || 'pdf'
     const storagePath = `po-docs/${id}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('po-files')
-      .upload(storagePath, fileBuffer, {
-        contentType: fileMimeType || 'application/pdf',
-        upsert: false,
-      })
-
-    if (uploadError) {
-      return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 400 })
+    try {
+      await uploadFile(fileBuffer, storagePath, fileMimeType || 'application/pdf')
+      fileUrl = storagePath
+    } catch (uploadErr) {
+      console.error('Neon storage upload failed:', uploadErr)
+      return NextResponse.json({ error: 'Failed to upload PO file to storage' }, { status: 500 })
     }
-
-    fileUrl = storagePath
   }
 
   const descriptionWithPoNumber = `[PO#: ${poNumber}] ${req.description || ''}`.trim()
+  const estQty = req.estimated_quantity ? Number(req.estimated_quantity) : null
+  const estRate = req.estimated_unit_rate ? Number(req.estimated_unit_rate) : null
+  const totalAmount = estQty && estRate ? estQty * estRate : null
 
-  const { data: po, error: poError } = await supabase
-    .from('purchase_orders')
-    .insert({
-      request_id: req.id,
-      purpose: req.purpose,
-      description: descriptionWithPoNumber,
-      quantity: req.estimated_quantity,
-      unit_rate: req.estimated_unit_rate,
-      total_amount: req.estimated_quantity && req.estimated_unit_rate
-        ? req.estimated_quantity * req.estimated_unit_rate
-        : null,
-      file_name: fileName,
-      file_path: fileUrl,
-      created_by: guard.user.id,
-      status: 'pending_sam',
-    })
-    .select()
-    .single()
+  const po = await queryOne<PurchaseOrder>(
+    `INSERT INTO public.purchase_orders (
+       po_number, request_id, purpose, description, quantity, unit_rate, total_amount,
+       file_name, file_path, created_by, status
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+     RETURNING id, po_number, purpose, total_amount, status`,
+    [
+      poNumber,
+      req.id,
+      req.purpose,
+      descriptionWithPoNumber,
+      estQty,
+      estRate,
+      totalAmount,
+      fileName,
+      fileUrl,
+      guard.user.id,
+      // Same entry status as /convert — both mean "PO raised, awaiting review".
+      'pending_cost_control',
+    ]
+  )
 
-  if (poError) {
-    return NextResponse.json({ error: poError.message }, { status: 400 })
+  if (!po) {
+    return NextResponse.json({ error: 'Failed to create purchase order' }, { status: 500 })
   }
 
-  await supabase
-    .from('requests')
-    .update({ status: 'converted' })
-    .eq('id', id)
+  // Update request status to converted
+  await execute(
+    `UPDATE public.requests SET status = 'converted', updated_at = now() WHERE id = $1`,
+    [id]
+  )
 
+  // Record PO attachment
   if (fileName && fileUrl) {
-    await supabase.from('po_attachments').insert({
-      po_id: po.id,
-      file_name: fileName,
-      file_url: fileUrl,
-      uploaded_by: guard.user.id,
-    })
+    await execute(
+      `INSERT INTO public.po_attachments (po_id, file_name, file_url, uploaded_by)
+       VALUES ($1, $2, $3, $4)`,
+      [po.id, fileName, fileUrl, guard.user.id]
+    )
   }
 
-  await supabase.from('po_audit_trail').insert({
-    po_id: po.id,
-    action: 'created',
-    performed_by: guard.user.id,
-    notes: `PO ${poNumber} attached from external procurement system`,
-  })
+  // Record audit trail
+  await execute(
+    `INSERT INTO public.po_audit_trail (po_id, action, performed_by, notes)
+     VALUES ($1, $2, $3, $4)`,
+    [po.id, 'created', guard.user.id, `PO ${poNumber} attached and submitted for approval`]
+  )
+
+  // Send notification to request creator if available
+  if (req.created_by) {
+    await createNotification({
+      userId: req.created_by,
+      title: 'Purchase Order Created',
+      message: `Purchase order #${poNumber} has been generated for your requisition "${req.purpose}".`,
+      type: 'info',
+      link: `/minta/tracking`,
+      sendEmailAlert: true,
+    })
+  }
 
   return NextResponse.json({ success: true, po_id: po.id }, { status: 201 })
 }

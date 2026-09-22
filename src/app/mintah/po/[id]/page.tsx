@@ -1,66 +1,64 @@
-import { createClient, getUserFromSession } from '@/lib/supabase/server'
+import { requirePageRole } from '@/lib/auth-guard'
+import { query, queryOne } from '@/lib/db'
 import { notFound } from 'next/navigation'
 import MintahPODetailClient from '@/components/shared/MintahPODetailClient'
 import { resolveAttachments } from '@/lib/resolve-file-url'
+import type { PurchaseOrder, PoAttachment } from '@/lib/types'
+import { getPoAuditTrail } from '@/lib/audit'
+
+export const dynamic = 'force-dynamic'
+
+interface Comment {
+  id: string
+  po_id: string
+  author_id: string | null
+  content: string
+  created_at: string
+  author?: { id: string; name: string; email: string } | null
+}
 
 export default async function MintahPODetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
-  const user = await getUserFromSession()
+  const user = await requirePageRole('supply_chain')
 
-  const { data: po, error } = await supabase
-    .from('purchase_orders')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const po = await queryOne<PurchaseOrder>(
+    `SELECT * FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
+    [id]
+  )
 
-  if (error || !po) {
+  if (!po) {
     notFound()
   }
 
-  let originalRequest: any = null
-  let comments: any[] = []
-  let auditTrail: any[] = []
-
+  let originalRequest: Record<string, unknown> | null = null
   if (po.request_id) {
-    const { data } = await supabase
-      .from('requests')
-      .select('*')
-      .eq('id', po.request_id)
-      .single()
-    originalRequest = data
+    originalRequest = await queryOne<Record<string, unknown>>(
+      `SELECT * FROM public.requests WHERE id = $1 LIMIT 1`,
+      [po.request_id]
+    )
   }
 
-  try {
-    const [commentsRes, auditRes] = await Promise.all([
-      supabase
-        .from('po_comments')
-        .select('id, po_id, author_id, content, created_at, author:users!po_comments_author_id_fkey(id, name, email)')
-        .eq('po_id', id)
-        .order('created_at', { ascending: true }),
-      supabase
-        .from('po_audit_trail')
-        .select('id, po_id, action, performed_by, notes, created_at')
-        .eq('po_id', id)
-        .order('created_at', { ascending: false }),
-    ])
-    comments = (commentsRes.data as any[]) ?? []
-    auditTrail = (auditRes.data as any[]) ?? []
-  } catch {
-    // tables may not exist yet
-  }
+  const [comments, auditTrail, attachmentsRaw] = await Promise.all([
+    query<Comment>(
+      `SELECT c.id, c.po_id, c.user_id as author_id, c.comment as content, c.created_at,
+              json_build_object('id', u.id, 'name', u.name, 'email', u.email) as author
+       FROM public.po_comments c
+       LEFT JOIN public.users u ON u.id = c.user_id
+       WHERE c.po_id = $1
+       ORDER BY c.created_at ASC`,
+      [id]
+    ),
+    getPoAuditTrail(id),
+    query<PoAttachment>(
+      `SELECT id, po_id, file_name, file_url, uploaded_by, created_at
+       FROM public.po_attachments
+       WHERE po_id = $1
+       ORDER BY created_at ASC`,
+      [id]
+    ),
+  ])
 
-  let poAttachments: any[] = []
-  try {
-    const { data: attachments } = await supabase
-      .from('po_attachments')
-      .select('id, po_id, file_name, file_url, uploaded_by, created_at')
-      .eq('po_id', id)
-      .order('created_at', { ascending: true })
-    poAttachments = await resolveAttachments(attachments ?? [])
-  } catch {
-    // table may not exist yet
-  }
+  const poAttachments = await resolveAttachments(attachmentsRaw)
 
   return (
     <MintahPODetailClient
@@ -70,7 +68,7 @@ export default async function MintahPODetailPage({ params }: { params: Promise<{
       auditTrail={auditTrail}
       poAttachments={poAttachments}
       user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'mintah'}
+      role={user?.role ?? 'supply_chain'}
     />
   )
 }

@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { ROLES, roleLabel, roleDefinition } from '@/lib/roles'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -24,69 +25,57 @@ export function formatDate(date: string | null): string {
   })
 }
 
-export const ROLE_LABELS: Record<string, string> = {
-  superuser: 'Superuser',
-  minta: 'Minta (Requester)',
-  mintah: 'Mintah (Procurement)',
-  sam: 'Sam (Approver)',
-  finance: 'Finance',
-  admin: 'Admin',
-  lead: 'Lead',
-  employee: 'Employee',
-}
+/**
+ * Role labels and colours, derived from `lib/roles.ts`.
+ *
+ * Kept as lookup maps for existing call sites, but they are built from the
+ * canonical definitions plus their legacy aliases so nothing can drift. Prefer
+ * `roleLabel()` / `roleDefinition()` from `lib/roles` in new code.
+ */
+const LEGACY_ROLE_KEYS = [
+  'minta',
+  'mintah',
+  'sam',
+  'admin',
+  'superuser',
+  'adminstrator',
+  'lead',
+  'employee',
+]
 
-export const ROLE_COLORS: Record<string, string> = {
-  superuser: 'bg-purple-100 text-purple-800 border-purple-200',
-  minta: 'bg-blue-100 text-blue-800 border-blue-200',
-  mintah: 'bg-amber-100 text-amber-800 border-amber-200',
-  sam: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  finance: 'bg-rose-100 text-rose-800 border-rose-200',
-  admin: 'bg-slate-100 text-slate-800 border-slate-200',
-  lead: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  employee: 'bg-gray-100 text-gray-800 border-gray-200',
-}
+export const ROLE_LABELS: Record<string, string> = Object.fromEntries([
+  ...Object.values(ROLES).map((r) => [r.id, r.label]),
+  ...LEGACY_ROLE_KEYS.map((key) => [key, roleLabel(key)]),
+])
+
+export const ROLE_COLORS: Record<string, string> = Object.fromEntries([
+  ...Object.values(ROLES).map((r) => [r.id, r.accent]),
+  ...LEGACY_ROLE_KEYS.map((key) => [key, roleDefinition(key)?.accent ?? 'bg-muted text-muted-foreground']),
+])
 
 export const PO_STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  pending_sam: {
-    label: 'Awaiting Sam',
-    color: 'bg-amber-50 text-amber-700 border-amber-200',
-    dot: 'bg-amber-500',
+  draft: {
+    label: 'Draft',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400',
   },
-  pending_payment: {
+  pending_cost_control: {
+    label: 'With Cost Control',
+    color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    dot: 'bg-cyan-500',
+  },
+  pending_finance: {
     label: 'Awaiting Payment',
     color: 'bg-blue-50 text-blue-700 border-blue-200',
     dot: 'bg-blue-500',
   },
-  revision_required: {
-    label: 'Revision Required',
-    color: 'bg-red-50 text-red-700 border-red-200',
-    dot: 'bg-red-500',
+  sent_back: {
+    label: 'Sent Back',
+    color: 'bg-orange-50 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
   },
-  completed: {
-    label: 'Completed',
-    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    dot: 'bg-emerald-500',
-  },
-  cancelled: {
-    label: 'Cancelled',
-    color: 'bg-gray-50 text-gray-500 border-gray-200',
-    dot: 'bg-gray-400',
-  },
-}
-
-export const REQUEST_STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  new: {
-    label: 'New',
-    color: 'bg-blue-50 text-blue-700 border-blue-200',
-    dot: 'bg-blue-500',
-  },
-  reviewing: {
-    label: 'Reviewing',
-    color: 'bg-amber-50 text-amber-700 border-amber-200',
-    dot: 'bg-amber-500',
-  },
-  converted: {
-    label: 'Converted to PO',
+  paid: {
+    label: 'Paid',
     color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: 'bg-emerald-500',
   },
@@ -95,9 +84,62 @@ export const REQUEST_STATUS_CONFIG: Record<string, { label: string; color: strin
     color: 'bg-red-50 text-red-700 border-red-200',
     dot: 'bg-red-500',
   },
-  archived: {
-    label: 'Archived',
-    color: 'bg-gray-50 text-gray-500 border-gray-200',
-    dot: 'bg-gray-400',
+  cancelled: {
+    label: 'Cancelled',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400',
+  },
+}
+
+export const REQUEST_STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+  draft: {
+    label: 'Draft',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400',
+  },
+  pending_lead: {
+    label: 'With Project Lead',
+    color: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    dot: 'bg-indigo-500',
+  },
+  pending_supply_chain: {
+    label: 'With Supply Chain',
+    color: 'bg-amber-50 text-amber-700 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  pending_admin: {
+    label: 'Awaiting PO',
+    color: 'bg-violet-50 text-violet-700 border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  pending_cost_control: {
+    label: 'With Cost Control',
+    color: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+    dot: 'bg-cyan-500',
+  },
+  pending_finance: {
+    label: 'With Finance',
+    color: 'bg-blue-50 text-blue-700 border-blue-200',
+    dot: 'bg-blue-500',
+  },
+  sent_back: {
+    label: 'Sent Back',
+    color: 'bg-orange-50 text-orange-700 border-orange-200',
+    dot: 'bg-orange-500',
+  },
+  completed: {
+    label: 'Completed',
+    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  rejected: {
+    label: 'Rejected',
+    color: 'bg-red-50 text-red-700 border-red-200',
+    dot: 'bg-red-500',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: 'bg-slate-50 text-slate-700 border-slate-200',
+    dot: 'bg-slate-400',
   },
 }

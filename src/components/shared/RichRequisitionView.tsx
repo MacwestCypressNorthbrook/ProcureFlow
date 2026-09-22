@@ -28,8 +28,10 @@ export interface RichRequisitionData {
   items: Array<{
     description: string
     quantity: number
+    unit?: string
     unitPrice: number
     amount: number
+    supplierName?: string
     remarks: string
   }>
   signatures: {
@@ -154,9 +156,10 @@ export default function RichRequisitionView({ description, fallbackDate }: RichR
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="h-9 w-10 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">#</TableHead>
                 <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item Description</TableHead>
-                <TableHead className="h-9 w-16 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</TableHead>
+                <TableHead className="h-9 w-20 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</TableHead>
                 <TableHead className="h-9 w-28 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unit Price</TableHead>
                 <TableHead className="h-9 w-32 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</TableHead>
+                <TableHead className="hidden h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Supplier</TableHead>
                 <TableHead className="hidden h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Remarks</TableHead>
               </TableRow>
             </TableHeader>
@@ -165,15 +168,19 @@ export default function RichRequisitionView({ description, fallbackDate }: RichR
                 <TableRow key={index} className="border-border hover:bg-muted/30">
                   <TableCell className="px-3 py-2.5 text-center text-xs text-muted-foreground">{index + 1}</TableCell>
                   <TableCell className="px-3 py-2.5 text-sm font-medium text-foreground">{item.description}</TableCell>
-                  <TableCell className="px-3 py-2.5 text-center text-xs tabular-nums">{item.quantity || '—'}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-center text-xs tabular-nums">
+                    {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '—'}
+                  </TableCell>
                   <TableCell className="px-3 py-2.5 text-right text-xs tabular-nums">{item.unitPrice ? formatGHS(item.unitPrice) : '—'}</TableCell>
                   <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums">{item.amount ? formatGHS(item.amount) : '—'}</TableCell>
+                  <TableCell className="hidden px-3 py-2.5 text-xs text-muted-foreground sm:table-cell">{item.supplierName || '—'}</TableCell>
                   <TableCell className="hidden px-3 py-2.5 text-xs text-muted-foreground md:table-cell">{item.remarks || '—'}</TableCell>
                 </TableRow>
               ))}
               <TableRow className="border-border bg-muted/30 hover:bg-muted/30">
                 <TableCell colSpan={4} className="px-3 py-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total (GHS)</TableCell>
                 <TableCell className="px-3 py-3 text-right text-sm font-semibold tabular-nums text-primary">{formatGHS(grandTotal)}</TableCell>
+                <TableCell className="hidden sm:table-cell" />
                 <TableCell className="hidden md:table-cell" />
               </TableRow>
             </TableBody>

@@ -12,6 +12,8 @@ import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { FileText, Send, MessageSquare, Clock, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import type { PoAuditEntry } from '@/lib/audit'
+import AuditTrail from '@/components/shared/AuditTrail'
 
 interface Comment {
   id: string
@@ -22,20 +24,11 @@ interface Comment {
   author?: { id: string; name: string; email: string } | null
 }
 
-interface AuditEntry {
-  id: string
-  po_id: string
-  action: string
-  performed_by: string | null
-  notes: string | null
-  created_at: string
-}
-
 interface MintahPODetailProps {
   po: any
   originalRequest: any | null
   comments: Comment[]
-  auditTrail: AuditEntry[]
+  auditTrail: PoAuditEntry[]
   poAttachments?: any[]
   user?: { name?: string; email: string } | null
   role?: string | null
@@ -162,44 +155,18 @@ export default function MintahPODetailClient({
               <DocumentList docs={poAttachments} emptyLabel="No PO documents attached yet." />
             </Panel>
 
-            {(po.status === 'revision_required' || po.request_id) && (
+            {po.request_id && (
               <Panel title="Actions">
-                <div className="space-y-2">
-                  {po.status === 'revision_required' && (
-                    <Link href={`/mintah/po/${po.id}/edit`} className="block">
-                      <Button className="w-full gap-1.5" size="sm">
-                        <FileText size={14} /> Edit PO
-                      </Button>
-                    </Link>
-                  )}
-                  {po.request_id && (
-                    <Link href={`/mintah/requests/${po.request_id}`} className="block">
-                      <Button variant="outline" className="w-full gap-1.5" size="sm">
-                        <ArrowLeft size={14} /> View Original Request
-                      </Button>
-                    </Link>
-                  )}
-                </div>
+                <Link href={`/mintah/requests/${po.request_id}`} className="block">
+                  <Button variant="outline" className="w-full gap-1.5" size="sm">
+                    <ArrowLeft size={14} /> View Original Request
+                  </Button>
+                </Link>
               </Panel>
             )}
 
             <Panel title="Audit Trail" icon={<Clock size={16} />}>
-              {auditTrail.length > 0 ? (
-                <div className="space-y-3">
-                  {auditTrail.map((entry) => (
-                    <div key={entry.id} className="text-xs">
-                      <div className="mb-0.5 flex items-center gap-2">
-                        <span className="font-semibold capitalize text-foreground">{entry.action.replace(/_/g, ' ')}</span>
-                        <span className="text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">{formatDate(entry.created_at)}</span>
-                      </div>
-                      {entry.notes && <p className="leading-relaxed text-muted-foreground">{entry.notes}</p>}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground">No audit trail entries.</p>
-              )}
+              <AuditTrail entries={auditTrail} />
             </Panel>
           </div>
         </div>
