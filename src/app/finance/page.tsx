@@ -40,9 +40,9 @@ export default async function FinancePage() {
   const pendingAmount = pendingPaying.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0)
   const settledShare = totalProcessed + pendingCount > 0 ? totalProcessed / (totalProcessed + pendingCount) : 0
   const money = (n: number) =>
-    new Intl.NumberFormat('en-US', {
+    new Intl.NumberFormat('en-GH', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'GHS',
       maximumFractionDigits: 0,
     }).format(n)
   const paidMonth = monthSplit(

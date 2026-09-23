@@ -12,6 +12,8 @@ import Link from 'next/link'
 import RequestActions from './RequestActions'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
+import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
+import RemindButton from '@/components/shared/RemindButton'
 import { getReviewBundle } from '@/lib/review'
 import { currentStage } from '@/lib/workflow'
 
@@ -80,12 +82,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       created_at: typeof a.created_at === 'string' ? a.created_at : undefined,
     }))
 
-  const timeline = [
-    { label: 'Created', date: String(requestData.created_at || ''), done: true },
-    { label: 'Under Review', date: status === 'reviewing' || status === 'under_review' || status === 'converted' ? String(requestData.updated_at || '') : null, done: status === 'reviewing' || status === 'under_review' || status === 'converted' },
-    { label: 'Converted to PO', date: status === 'converted' ? String(requestData.updated_at || '') : null, done: status === 'converted' },
-  ]
-  if (status === 'rejected') timeline.push({ label: 'Rejected', date: String(requestData.updated_at || ''), done: true })
 
   return (
     <>
@@ -211,20 +207,26 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             </Panel>
 
             <Panel title="Status Timeline" icon={<Clock size={16} />}>
-              <div className="space-y-0">
-                {timeline.map((step, i) => (
-                  <div key={i} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={`h-3 w-3 shrink-0 rounded-full border-2 ${step.done ? 'border-primary bg-primary' : 'border-border bg-card'}`} />
-                      {i < timeline.length - 1 && <div className={`min-h-[22px] w-px flex-1 ${step.done ? 'bg-primary/40' : 'bg-border'}`} />}
-                    </div>
-                    <div className="pb-4">
-                      <p className={`text-xs font-semibold ${step.done ? 'text-foreground' : 'text-muted-foreground'}`}>{step.label}</p>
-                      {step.date && <p className="mt-0.5 text-[10px] text-muted-foreground">{formatDate(step.date)}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <RequisitionTimeline
+                status={status}
+                sentBackTo={(requestData.sent_back_to as string | null) ?? null}
+                sentBackAt={(requestData.sent_back_at as string | null) ?? null}
+                createdAt={String(requestData.created_at || '')}
+                history={approvalHistory}
+              />
+
+              {isOwner && (
+                <div className="mt-2 border-t border-border pt-4">
+                  <RemindButton
+                    requestId={id}
+                    status={status}
+                    sentBackTo={(requestData.sent_back_to as string | null) ?? null}
+                  />
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Sends an email and in-app alert to whoever is holding it. Once every 6 hours.
+                  </p>
+                </div>
+              )}
             </Panel>
           </div>
         </div>

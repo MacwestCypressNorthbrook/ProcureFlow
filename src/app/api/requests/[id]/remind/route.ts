@@ -3,8 +3,8 @@ import { getUserFromSession } from '@/lib/auth/server'
 import { isElevated } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
-import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
-import { currentStage, STAGES, stageSeesPurchaseOrder, type RequestStatus } from '@/lib/workflow'
+import type { Request as DbRequest } from '@/lib/types'
+import { currentStage, STAGES, type RequestStatus } from '@/lib/workflow'
 
 /** Hours a requester must wait before nudging the same request again. */
 const COOLDOWN_HOURS = 6
@@ -35,18 +35,10 @@ async function currentHolder(request: DbRequest): Promise<Holder | null> {
     return null
   }
 
-  const po = await queryOne<PurchaseOrder>(
-    `SELECT id, status FROM public.purchase_orders
-      WHERE request_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1`,
-    [request.id]
-  )
-
   return {
     roles: [...definition.roles],
     stage: definition.label,
-    link: (id) => (stageSeesPurchaseOrder(stage) && po ? definition.route(id) : definition.route(id)),
+    link: definition.route,
   }
 }
 
@@ -64,7 +56,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const { id } = await params
 
   const existing = await queryOne<DbRequest>(
-    `SELECT id, purpose, status, created_by, created_at FROM public.requests WHERE id = $1 LIMIT 1`,
+    `SELECT id, purpose, status, created_by, created_at, sent_back_to
+       FROM public.requests WHERE id = $1 LIMIT 1`,
     [id]
   )
   if (!existing) {

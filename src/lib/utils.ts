@@ -8,9 +8,9 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(amount: number | null): string {
   if (amount === null || amount === undefined) return '—'
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('en-GH', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'GHS',
   }).format(amount)
 }
 

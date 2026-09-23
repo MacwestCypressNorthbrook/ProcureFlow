@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS public.requests (
     estimated_quantity NUMERIC,
     estimated_unit_rate NUMERIC,
     total_amount NUMERIC,
-    currency TEXT DEFAULT 'USD',
+    currency TEXT DEFAULT 'GHS',
     guest_name TEXT,
     guest_email TEXT,
     created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,

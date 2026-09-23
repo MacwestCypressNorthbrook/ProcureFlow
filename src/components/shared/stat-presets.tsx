@@ -4,9 +4,9 @@ import type { PurchaseOrder } from '@/lib/types'
 
 /** Money in the same format as `formatCurrency`, without the trailing cents. */
 export const statMoney = (n: number) =>
-  new Intl.NumberFormat('en-US', {
+  new Intl.NumberFormat('en-GH', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'GHS',
     maximumFractionDigits: 0,
   }).format(n)
 
