@@ -56,12 +56,61 @@ type SidebarItem = {
 
 interface DashboardLayoutProps {
   children: React.ReactNode
-  title: string
+  /** Optional override; otherwise the header title is derived from the route. */
+  title?: string
   subtitle?: string
   role?: string | null
   user?: { name?: string; email: string } | null
   customNav?: NavItem[]
+  /**
+   * Render neutral placeholder rows instead of a role's menu.
+   *
+   * Loading skeletons must never render real navigation: guessing a role there
+   * flashes another team's sidebar at whoever is waiting for the page.
+   */
+  navSkeleton?: boolean
   navBadges?: Record<string, number>
+}
+
+/**
+ * Header titles by route.
+ *
+ * The shell lives in a layout now, so it cannot receive a title from the page
+ * it wraps. Deriving it from the pathname keeps the header meaningful without
+ * making every page re-render the chrome just to set a string. Longest match
+ * wins, so `/minta/requests` beats `/minta`.
+ */
+const ROUTE_TITLES: Record<string, { title: string; subtitle?: string }> = {
+  '/minta': { title: 'My Dashboard', subtitle: 'Track your requisitions through the chain' },
+  '/minta/requests': { title: 'My Requests', subtitle: 'Every requisition you have raised' },
+  '/minta/tracking': { title: 'Track Request Status', subtitle: 'Where each requisition sits right now' },
+  '/request': { title: 'New Request', subtitle: 'Raise a requisition for review' },
+  '/sam': { title: 'Project Lead Review', subtitle: 'First review of every requisition' },
+  '/sam/requests': { title: 'Requisitions to Review', subtitle: 'Awaiting your approval' },
+  '/sam/all': { title: 'All Purchase Orders', subtitle: 'Complete history' },
+  '/mintah': { title: 'Supply Chain', subtitle: 'Specifications, quantities and suppliers' },
+  '/mintah/queue': { title: 'Requisitions to Review', subtitle: 'Awaiting your approval' },
+  '/mintah/requests': { title: 'All Requisitions', subtitle: 'Everything raised across the sites' },
+  '/cost-control': { title: 'Cost Control Review', subtitle: 'Purchase orders against budget' },
+  '/finance': { title: 'Finance Dashboard', subtitle: 'Disbursement and settlement' },
+  '/finance/queue': { title: 'Awaiting Payment', subtitle: 'Cleared for disbursement' },
+  '/finance/completed': { title: 'Completed Payments', subtitle: 'Paid and receipted' },
+  '/finance/all': { title: 'All Purchase Orders', subtitle: 'Complete history' },
+  '/admin': { title: 'Administration', subtitle: 'Requisitions, purchase orders and reference data' },
+  '/admin/requests': { title: 'Requisitions', subtitle: 'Every request raised across the organization' },
+  '/settings': { title: 'Settings', subtitle: 'Your profile and preferences' },
+}
+
+function titleForPath(pathname: string): { title: string; subtitle?: string } {
+  let best: { title: string; subtitle?: string } | null = null
+  let bestLength = -1
+  for (const [route, meta] of Object.entries(ROUTE_TITLES)) {
+    if ((pathname === route || pathname.startsWith(route + '/')) && route.length > bestLength) {
+      best = meta
+      bestLength = route.length
+    }
+  }
+  return best ?? { title: 'ProcureFlow' }
 }
 
 const roleNavSections: Record<string, { label: string; items: { href: string; label: string; icon: React.ReactNode }[] }[]> = {
@@ -104,10 +153,6 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
         { href: '/mintah/requests', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
-    {
-      label: 'Purchase Orders',
-      items: [{ href: '/mintah/pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> }],
-    },
   ],
   cost_control: [
     {
@@ -132,24 +177,22 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
       items: [{ href: '/finance/all', label: 'All POs', icon: <Receipt size={18} /> }],
     },
   ],
+  // Procurement only. People, the audit trail, email templates and workspace
+  // preferences are Super User territory and must not appear here.
   administrator: [
     {
-      label: 'Core Workflow',
+      label: 'Purchase Orders',
       items: [
-        { href: '/admin', label: 'Admin Dashboard', icon: <LayoutDashboard size={18} /> },
-        { href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> },
+        { href: '/admin', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+        { href: '/admin?tab=requests', label: 'Requisitions', icon: <FileText size={18} /> },
         { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
-        { href: '/admin?tab=requests', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
     {
-      label: 'Management',
+      label: 'Reference Data',
       items: [
-        { href: '/admin?tab=users', label: 'Users & Roles', icon: <Users size={18} /> },
         { href: '/admin?tab=projects', label: 'Project Sites', icon: <Building2 size={18} /> },
         { href: '/admin?tab=suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
-        { href: '/admin?tab=emails', label: 'Email Templates', icon: <Mail size={18} /> },
-        { href: '/admin?tab=audit', label: 'Audit Trail', icon: <History size={18} /> },
       ],
     },
   ],
@@ -158,9 +201,8 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
       label: 'Operations',
       items: [
         { href: '/admin', label: 'Admin Overview', icon: <LayoutDashboard size={18} /> },
-        { href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> },
+        { href: '/admin?tab=requests', label: 'Requisitions', icon: <FileText size={18} /> },
         { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
-        { href: '/admin?tab=requests', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
     {
@@ -203,9 +245,13 @@ export default function DashboardLayout({
   user: serverUser,
   customNav,
   navBadges,
+  navSkeleton = false,
 }: DashboardLayoutProps) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const routeMeta = titleForPath(pathname)
+  const headerTitle = title ?? routeMeta.title
+  const headerSubtitle = subtitle ?? routeMeta.subtitle
   // The server resolves both of these from the session on every request, so
   // they are authoritative props — mirroring them into state only cost a render.
   const role = serverRole ?? null
@@ -215,18 +261,27 @@ export default function DashboardLayout({
   // gets its proper sidebar instead of silently falling back to the engineer's.
   const resolvedRole = normalizeRole(role) ?? 'engineer'
   /** Custom nav items keep their `onClick` / `active` flags — they drive in-page sections. */
-  const baseSections = customNav
-    ? [{ label: 'Navigation', items: customNav as SidebarItem[] }]
-    : roleNavSections[resolvedRole] || roleNavSections.engineer
+  const baseSections = navSkeleton
+    ? []
+    : customNav
+      ? [{ label: 'Navigation', items: customNav as SidebarItem[] }]
+      : roleNavSections[resolvedRole] || roleNavSections.engineer
 
   // Check if base navigation already includes account or settings to prevent duplicate items
   const alreadyHasSettings = baseSections.some((s) =>
-    s.items.some((item) => item.label.toLowerCase() === 'settings' || item.href === '/settings')
+    s.items.some((item) =>
+      item.label.toLowerCase().includes('settings') ||
+      item.label.toLowerCase().includes('users') ||
+      item.label.toLowerCase().includes('roles') ||
+      item.href === '/settings'
+    )
   )
 
   // Every role gets its own account settings — a signed-in user should never
   // have to guess where their profile and password live.
-  const sections: { label: string; items: SidebarItem[] }[] = [
+  const sections: { label: string; items: SidebarItem[] }[] = navSkeleton
+    ? []
+    : [
     ...baseSections,
     ...(alreadyHasSettings
       ? []
@@ -259,6 +314,23 @@ export default function DashboardLayout({
 
       {/* Nav List */}
       <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
+        {navSkeleton && (
+          <div className="space-y-6" aria-hidden>
+            {[4, 3].map((count, gi) => (
+              <div key={gi}>
+                <div className="mb-2 ml-3 h-2 w-16 animate-pulse rounded bg-muted" />
+                <div className="space-y-1.5">
+                  {Array.from({ length: count }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-xl px-3 py-2">
+                      <div className="h-[18px] w-[18px] shrink-0 animate-pulse rounded bg-muted" />
+                      <div className="h-3 flex-1 animate-pulse rounded bg-muted" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {sections.map((section, si) => (
           <div key={si}>
             <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">
@@ -328,7 +400,9 @@ export default function DashboardLayout({
             {userInitials}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-semibold text-foreground">{user?.name || 'User'}</p>
+            <p className="truncate text-xs font-semibold text-foreground">
+              {user?.name || user?.email || ''}
+            </p>
             <p className="truncate text-[10px] text-muted-foreground font-medium">{user?.email}</p>
           </div>
         </div>
@@ -381,10 +455,10 @@ export default function DashboardLayout({
 
           <div className="min-w-0 flex-1">
             <h1 className="text-sm font-semibold tracking-tight text-foreground sm:text-base truncate">
-              {title}
+              {headerTitle}
             </h1>
-            {subtitle && (
-              <p className="hidden text-xs text-muted-foreground sm:block truncate">{subtitle}</p>
+            {headerSubtitle && (
+              <p className="hidden text-xs text-muted-foreground sm:block truncate">{headerSubtitle}</p>
             )}
           </div>
 

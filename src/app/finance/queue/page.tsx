@@ -1,5 +1,4 @@
 import { requirePageRole } from '@/lib/auth-guard'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
@@ -10,16 +9,11 @@ import { CreditCard } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 export default async function FinanceQueuePage() {
-  const user = await requirePageRole('finance')
+  await requirePageRole('finance')
   const rows = await getStageQueue([statusForStage('finance')])
 
   return (
-    <DashboardLayout
-      title="Awaiting Payment"
-      subtitle="Approved purchase orders cleared for disbursement"
-      user={{ name: user.name, email: user.email }}
-      role={user.role}
-    >
+    <>
       <PageContainer className="space-y-6">
         <StatGrid
           stats={requestSummaryStats({
@@ -33,6 +27,6 @@ export default async function FinanceQueuePage() {
         />
         <QueueTable rows={rows} hrefBase="/finance/queue" storageKey="finance-queue" />
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

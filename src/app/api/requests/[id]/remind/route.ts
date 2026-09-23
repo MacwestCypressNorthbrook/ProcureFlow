@@ -4,6 +4,7 @@ import { isElevated } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
+import { currentStage, STAGES, stageSeesPurchaseOrder, type RequestStatus } from '@/lib/workflow'
 
 /** Hours a requester must wait before nudging the same request again. */
 const COOLDOWN_HOURS = 6
@@ -22,60 +23,31 @@ interface Holder {
  * nobody is waiting to act (rejected, or already paid).
  */
 async function currentHolder(request: DbRequest): Promise<Holder | null> {
-  const status = request.status
+  // Who holds the requisition is a property of its stage, not of any PO —
+  // the stage chain in lib/workflow.ts is the single source of truth.
+  const stage = currentStage(request.status as RequestStatus, request.sent_back_to ?? null)
+  if (!stage) return null
 
-  if (status === 'new' || status === 'pending') {
-    return {
-      roles: ['supply_chain', 'mintah'],
-      stage: 'procurement',
-      link: (id) => `/mintah/requests/${id}`,
-    }
-  }
+  const definition = STAGES[stage]
 
-  if (status === 'reviewing' || status === 'under_review') {
-    return {
-      roles: ['supply_chain', 'mintah'],
-      stage: 'procurement review',
-      link: (id) => `/mintah/requests/${id}`,
-    }
-  }
-
-  if (status === 'converted' || status === 'approved') {
-    // Once converted, the wait has moved onto the purchase order.
-    const po = await queryOne<PurchaseOrder>(
-      `SELECT id, status FROM public.purchase_orders
-        WHERE request_id = $1
-        ORDER BY created_at DESC
-        LIMIT 1`,
-      [request.id]
-    )
-    if (!po) return null
-
-    if (po.status === 'pending_cost_control') {
-      return {
-        roles: ['project_lead', 'sam', 'cost_control'],
-        stage: 'approval',
-        link: () => `/sam/${po.id}`,
-      }
-    }
-    if (po.status === 'pending_finance') {
-      return {
-        roles: ['finance'],
-        stage: 'payment',
-        link: () => `/finance/${po.id}`,
-      }
-    }
-    if (po.status === 'sent_back') {
-      return {
-        roles: ['supply_chain', 'mintah'],
-        stage: 'revision',
-        link: () => `/mintah/po/${po.id}`,
-      }
-    }
+  if (stage === 'requester') {
+    // Waiting on the person who raised it; nobody else can be nudged.
     return null
   }
 
-  return null
+  const po = await queryOne<PurchaseOrder>(
+    `SELECT id, status FROM public.purchase_orders
+      WHERE request_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [request.id]
+  )
+
+  return {
+    roles: [...definition.roles],
+    stage: definition.label,
+    link: (id) => (stageSeesPurchaseOrder(stage) && po ? definition.route(id) : definition.route(id)),
+  }
 }
 
 /**

@@ -1,6 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import POTable from '@/components/shared/POTable'
 import { PageContainer, SectionHeader, StatGrid, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
 import { Button } from '@/components/ui/button'
@@ -52,12 +51,7 @@ export default async function FinancePage() {
   const firstName = user?.name?.split(' ')[0]
 
   return (
-    <DashboardLayout
-      title="Finance Dashboard"
-      subtitle="Manage and disburse payments for purchase orders"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'finance'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <DashboardHero
           eyebrow="Disbursements"
@@ -158,6 +152,6 @@ export default async function FinancePage() {
           </section>
         )}
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }
