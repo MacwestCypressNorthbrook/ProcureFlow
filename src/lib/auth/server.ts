@@ -1,10 +1,41 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server'
 import { queryOne } from '@/lib/db'
 
-export const auth = createNeonAuth({
-  baseUrl: process.env.NEON_AUTH_BASE_URL!,
-  cookies: {
-    secret: process.env.NEON_AUTH_COOKIE_SECRET!,
+type NeonAuth = ReturnType<typeof createNeonAuth>
+
+let instance: NeonAuth | null = null
+
+/**
+ * Build the Neon Auth client on first use, not on import.
+ *
+ * `createNeonAuth` throws when its cookie secret is missing. Calling it at
+ * module scope meant any build environment without `NEON_AUTH_COOKIE_SECRET`
+ * — a CI or Vercel build that has not been given the variable — failed while
+ * collecting page data, long before a request was ever served. Deferring it
+ * turns that into a clear runtime error on the one request that needs auth,
+ * and lets the build succeed.
+ */
+function getAuth(): NeonAuth {
+  if (!instance) {
+    const baseUrl = process.env.NEON_AUTH_BASE_URL
+    const secret = process.env.NEON_AUTH_COOKIE_SECRET
+    if (!baseUrl || !secret) {
+      throw new Error(
+        'Neon Auth is not configured: set NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET.'
+      )
+    }
+    instance = createNeonAuth({ baseUrl, cookies: { secret } })
+  }
+  return instance
+}
+
+/**
+ * The auth client, resolved lazily. Callers keep using `auth.getSession()`;
+ * the proxy just delays construction until the first property access.
+ */
+export const auth = new Proxy({} as NeonAuth, {
+  get(_target, property, receiver) {
+    return Reflect.get(getAuth() as object, property, receiver)
   },
 })
 

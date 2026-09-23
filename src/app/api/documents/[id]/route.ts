@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { queryOne } from '@/lib/db'
 import { requireRole } from '@/lib/auth-guard'
+import { normalizeRole } from '@/lib/roles'
 import { getSignedDownloadUrl } from '@/lib/storage'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +38,14 @@ export async function GET(
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })
   }
 
+  // An engineer may read the documents on their own requisitions only.
+  // Reviewers see every requisition by the nature of their stage, so the role
+  // itself is the grant — but a requester must not be able to walk ids.
+  const role = normalizeRole(guard.user.role)
+  if (role === 'engineer' && row.requester_id !== guard.user.id) {
+    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+  }
+
   // Already an absolute URL (legacy rows, or a data: URL) — hand it back as-is.
   if (/^(https?|data|blob):/.test(row.file_url)) {
     return NextResponse.redirect(row.file_url)
@@ -61,15 +70,23 @@ export async function GET(
 interface AttachmentRow {
   file_name: string
   file_url: string
+  /** The requisition the document hangs off, for the ownership check. */
+  request_id: string | null
+  /** Who raised that requisition. */
+  requester_id: string | null
 }
 
 async function findAttachment(id: string): Promise<AttachmentRow | null> {
   // The PO's own uploaded file has no attachment row of its own.
   if (id.startsWith('po-file-')) {
     return await queryOne<AttachmentRow>(
-      `SELECT COALESCE(file_name, 'Purchase order') AS file_name, file_path AS file_url
-         FROM public.purchase_orders
-        WHERE id = $1 AND file_path IS NOT NULL
+      `SELECT COALESCE(po.file_name, 'Purchase order') AS file_name,
+              po.file_path AS file_url,
+              po.request_id,
+              r.created_by AS requester_id
+         FROM public.purchase_orders po
+         LEFT JOIN public.requests r ON r.id = po.request_id
+        WHERE po.id = $1 AND po.file_path IS NOT NULL
         LIMIT 1`,
       [id.slice('po-file-'.length)]
     )
@@ -77,11 +94,20 @@ async function findAttachment(id: string): Promise<AttachmentRow | null> {
 
   return (
     (await queryOne<AttachmentRow>(
-      `SELECT file_name, file_url FROM public.request_attachments WHERE id = $1 LIMIT 1`,
+      `SELECT ra.file_name, ra.file_url, ra.request_id, r.created_by AS requester_id
+         FROM public.request_attachments ra
+         LEFT JOIN public.requests r ON r.id = ra.request_id
+        WHERE ra.id = $1
+        LIMIT 1`,
       [id]
     )) ??
     (await queryOne<AttachmentRow>(
-      `SELECT file_name, file_url FROM public.po_attachments WHERE id = $1 LIMIT 1`,
+      `SELECT pa.file_name, pa.file_url, po.request_id, r.created_by AS requester_id
+         FROM public.po_attachments pa
+         JOIN public.purchase_orders po ON po.id = pa.po_id
+         LEFT JOIN public.requests r ON r.id = po.request_id
+        WHERE pa.id = $1
+        LIMIT 1`,
       [id]
     ))
   )

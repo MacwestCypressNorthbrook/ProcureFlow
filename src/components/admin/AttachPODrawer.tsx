@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
+import { uploadDocument } from '@/lib/upload-client'
 
 export interface AttachPODrawerProps {
   isOpen: boolean
@@ -71,6 +72,7 @@ export default function AttachPODrawer({
         : ''
   )
   const [file, setFile] = useState<File | null>(null)
+  const [progress, setProgress] = useState<number | null>(null)
   const [comment, setComment] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -108,23 +110,52 @@ export default function AttachPODrawer({
     }
 
     setIsSubmitting(true)
+    setProgress(null)
 
     try {
-      const formData = new FormData()
-      formData.append('po_number', poNumber.trim())
-      if (vendorName.trim()) formData.append('vendor_name', vendorName.trim())
-      if (totalAmount.trim()) formData.append('total_amount', totalAmount.trim())
-      if (comment.trim()) formData.append('comment', comment.trim())
-      formData.append('approve', 'true')
-
+      // Send the PDF straight to storage when we can, so a dropped connection
+      // costs one retry of the file rather than the whole submission.
+      let uploaded: Awaited<ReturnType<typeof uploadDocument>> | null = null
       if (file) {
-        formData.append('file', file)
+        setProgress(0)
+        uploaded = await uploadDocument(file, {
+          scope: `po-docs/${requestId}`,
+          onProgress: setProgress,
+        })
       }
 
-      const res = await fetch(`/api/requests/${requestId}/attach-po`, {
-        method: 'POST',
-        body: formData,
-      })
+      let res: Response
+      if (file && uploaded && !uploaded.viaServer) {
+        // The file is already in storage; only its reference travels now.
+        res = await fetch(`/api/requests/${requestId}/attach-po`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            po_number: poNumber.trim(),
+            vendor_name: vendorName.trim() || undefined,
+            total_amount: totalAmount.trim() || undefined,
+            comment: comment.trim() || undefined,
+            approve: true,
+            file_name: uploaded.fileName,
+            file_url: uploaded.key,
+            file_size: uploaded.fileSize,
+            file_type: uploaded.contentType,
+          }),
+        })
+      } else {
+        const formData = new FormData()
+        formData.append('po_number', poNumber.trim())
+        if (vendorName.trim()) formData.append('vendor_name', vendorName.trim())
+        if (totalAmount.trim()) formData.append('total_amount', totalAmount.trim())
+        if (comment.trim()) formData.append('comment', comment.trim())
+        formData.append('approve', 'true')
+        if (file) formData.append('file', file)
+
+        res = await fetch(`/api/requests/${requestId}/attach-po`, {
+          method: 'POST',
+          body: formData,
+        })
+      }
 
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -135,10 +166,15 @@ export default function AttachPODrawer({
       onClose()
       onSuccess?.()
       router.refresh()
-    } catch {
-      setError('Network error: Could not complete PO upload.')
+    } catch (err) {
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : 'Network error: Could not complete PO upload.'
+      )
     } finally {
       setIsSubmitting(false)
+      setProgress(null)
     }
   }
 
@@ -378,7 +414,11 @@ export default function AttachPODrawer({
             {isSubmitting ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>Uploading & Approving...</span>
+                <span>
+                  {progress !== null && progress < 100
+                    ? `Uploading ${progress}%…`
+                    : 'Uploading & Approving...'}
+                </span>
               </>
             ) : (
               <>

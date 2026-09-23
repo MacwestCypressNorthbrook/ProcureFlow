@@ -4,6 +4,8 @@ import { requireCapability } from '@/lib/auth-guard'
 import { createNotification, notifyStage } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { checkUpload, isOwnStorageKey } from '@/lib/uploads'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
 
 export async function POST(
@@ -13,6 +15,9 @@ export async function POST(
   const { id } = await params
   const guard = await requireCapability('request:convert')
   if (guard.error) return guard.error
+
+  const limit = await rateLimit(`po-upload:${guard.user.id}`, { max: 20, windowSeconds: 300 })
+  if (!limit.ok) return tooManyRequests('Too many uploads. Wait a few minutes and try again.', limit.retryAfter)
 
   const contentType = request.headers.get('content-type') || ''
 
@@ -43,9 +48,13 @@ export async function POST(
 
     const file = formData.get('file') as File | null
     if (file && file.size > 0) {
+      const check = checkUpload(file)
+      if (!check.ok) {
+        return NextResponse.json({ error: check.error }, { status: 413 })
+      }
       fileName = file.name
       fileSize = file.size
-      fileMimeType = file.type || 'application/pdf'
+      fileMimeType = check.mime
       const arrayBuffer = await file.arrayBuffer()
       fileBuffer = Buffer.from(arrayBuffer)
     }
@@ -75,6 +84,11 @@ export async function POST(
 
   if (!poNumber) {
     return NextResponse.json({ error: 'Odoo PO reference / number is required' }, { status: 400 })
+  }
+
+  // A key supplied in JSON must be one the presign endpoint issued.
+  if (fileUrl && !fileUrl.startsWith('data:') && !isOwnStorageKey(fileUrl)) {
+    return NextResponse.json({ error: 'That upload reference is not valid.' }, { status: 400 })
   }
 
   const req = await queryOne<DbRequest>(

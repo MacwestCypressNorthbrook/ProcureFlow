@@ -1,4 +1,46 @@
-import * as Iconsax from 'iconsax-react'
+// Named imports, never `import * as`: a namespace import of iconsax-react drags
+// the whole 18 MB icon set into the client bundle, since nothing can be
+// tree-shaken out of a namespace object.
+import {
+  Add as RawAdd,
+  Archive as RawArchive,
+  ArrowDown as RawArrowDown,
+  ArrowDown2 as RawArrowDown2,
+  ArrowLeft as RawArrowLeft,
+  ArrowRight as RawArrowRight,
+  Briefcase as RawBriefcase,
+  Calendar as RawCalendar,
+  Card as RawCard,
+  Category as RawCategory,
+  Chart as RawChart,
+  ClipboardTick as RawClipboardTick,
+  Clock as RawClock,
+  CloseCircle as RawCloseCircle,
+  ConvertCard as RawConvertCard,
+  Dash as RawDash,
+  Document as RawDocument,
+  Eye as RawEye,
+  EyeSlash as RawEyeSlash,
+  Flash as RawFlash,
+  I3Dcube as RawI3Dcube,
+  Lock1 as RawLock1,
+  Logout as RawLogout,
+  Menu as RawMenu,
+  Message as RawMessage,
+  Minus as RawMinus,
+  People as RawPeople,
+  SearchNormal1 as RawSearchNormal1,
+  Setting as RawSetting,
+  Setting2 as RawSetting2,
+  Shield as RawShield,
+  ShoppingCart as RawShoppingCart,
+  Tag as RawTag,
+  TickCircle as RawTickCircle,
+  Trash as RawTrash,
+  User as RawUser,
+  UserAdd as RawUserAdd,
+  Warning2 as RawWarning2,
+} from 'iconsax-react'
 import type { IconProps, Icon } from 'iconsax-react'
 
 /**
@@ -17,41 +59,41 @@ function withDefaultColor(IconComponent: Icon): Icon {
   return Wrapped
 }
 
-export const Add = withDefaultColor(Iconsax.Add)
-export const Archive = withDefaultColor(Iconsax.Archive)
-export const ArrowDown = withDefaultColor(Iconsax.ArrowDown)
-export const ArrowDown2 = withDefaultColor(Iconsax.ArrowDown2)
-export const ArrowLeft = withDefaultColor(Iconsax.ArrowLeft)
-export const ArrowRight = withDefaultColor(Iconsax.ArrowRight)
-export const Briefcase = withDefaultColor(Iconsax.Briefcase)
-export const Calendar = withDefaultColor(Iconsax.Calendar)
-export const Card = withDefaultColor(Iconsax.Card)
-export const Category = withDefaultColor(Iconsax.Category)
-export const Chart = withDefaultColor(Iconsax.Chart)
-export const ClipboardTick = withDefaultColor(Iconsax.ClipboardTick)
-export const Clock = withDefaultColor(Iconsax.Clock)
-export const CloseCircle = withDefaultColor(Iconsax.CloseCircle)
-export const ConvertCard = withDefaultColor(Iconsax.ConvertCard)
-export const Dash = withDefaultColor(Iconsax.Dash)
-export const Document = withDefaultColor(Iconsax.Document)
-export const Eye = withDefaultColor(Iconsax.Eye)
-export const EyeSlash = withDefaultColor(Iconsax.EyeSlash)
-export const Flash = withDefaultColor(Iconsax.Flash)
-export const I3Dcube = withDefaultColor(Iconsax.I3Dcube)
-export const Lock1 = withDefaultColor(Iconsax.Lock1)
-export const Logout = withDefaultColor(Iconsax.Logout)
-export const Menu = withDefaultColor(Iconsax.Menu)
-export const Message = withDefaultColor(Iconsax.Message)
-export const Minus = withDefaultColor(Iconsax.Minus)
-export const People = withDefaultColor(Iconsax.People)
-export const SearchNormal1 = withDefaultColor(Iconsax.SearchNormal1)
-export const Setting = withDefaultColor(Iconsax.Setting)
-export const Setting2 = withDefaultColor(Iconsax.Setting2)
-export const Shield = withDefaultColor(Iconsax.Shield)
-export const ShoppingCart = withDefaultColor(Iconsax.ShoppingCart)
-export const Tag = withDefaultColor(Iconsax.Tag)
-export const TickCircle = withDefaultColor(Iconsax.TickCircle)
-export const Trash = withDefaultColor(Iconsax.Trash)
-export const User = withDefaultColor(Iconsax.User)
-export const UserAdd = withDefaultColor(Iconsax.UserAdd)
-export const Warning2 = withDefaultColor(Iconsax.Warning2)
+export const Add = withDefaultColor(RawAdd)
+export const Archive = withDefaultColor(RawArchive)
+export const ArrowDown = withDefaultColor(RawArrowDown)
+export const ArrowDown2 = withDefaultColor(RawArrowDown2)
+export const ArrowLeft = withDefaultColor(RawArrowLeft)
+export const ArrowRight = withDefaultColor(RawArrowRight)
+export const Briefcase = withDefaultColor(RawBriefcase)
+export const Calendar = withDefaultColor(RawCalendar)
+export const Card = withDefaultColor(RawCard)
+export const Category = withDefaultColor(RawCategory)
+export const Chart = withDefaultColor(RawChart)
+export const ClipboardTick = withDefaultColor(RawClipboardTick)
+export const Clock = withDefaultColor(RawClock)
+export const CloseCircle = withDefaultColor(RawCloseCircle)
+export const ConvertCard = withDefaultColor(RawConvertCard)
+export const Dash = withDefaultColor(RawDash)
+export const Document = withDefaultColor(RawDocument)
+export const Eye = withDefaultColor(RawEye)
+export const EyeSlash = withDefaultColor(RawEyeSlash)
+export const Flash = withDefaultColor(RawFlash)
+export const I3Dcube = withDefaultColor(RawI3Dcube)
+export const Lock1 = withDefaultColor(RawLock1)
+export const Logout = withDefaultColor(RawLogout)
+export const Menu = withDefaultColor(RawMenu)
+export const Message = withDefaultColor(RawMessage)
+export const Minus = withDefaultColor(RawMinus)
+export const People = withDefaultColor(RawPeople)
+export const SearchNormal1 = withDefaultColor(RawSearchNormal1)
+export const Setting = withDefaultColor(RawSetting)
+export const Setting2 = withDefaultColor(RawSetting2)
+export const Shield = withDefaultColor(RawShield)
+export const ShoppingCart = withDefaultColor(RawShoppingCart)
+export const Tag = withDefaultColor(RawTag)
+export const TickCircle = withDefaultColor(RawTickCircle)
+export const Trash = withDefaultColor(RawTrash)
+export const User = withDefaultColor(RawUser)
+export const UserAdd = withDefaultColor(RawUserAdd)
+export const Warning2 = withDefaultColor(RawWarning2)

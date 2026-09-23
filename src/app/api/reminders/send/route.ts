@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { dispatchPendingReminders } from '@/lib/notifications'
+import { pruneRateLimits } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   // Allow authorization via Bearer CRON_SECRET or session
@@ -19,5 +20,10 @@ export async function POST(request: Request) {
   }
 
   const result = await dispatchPendingReminders()
+
+  // Housekeeping rides along with the cron that already runs: rate-limit
+  // counters are only meaningful for an hour, so anything older is dead weight.
+  await pruneRateLimits()
+
   return NextResponse.json({ success: true, processed: result.processed })
 }

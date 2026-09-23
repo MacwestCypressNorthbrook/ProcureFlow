@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SupplierPicker, { type SupplierOption } from '@/components/shared/SupplierPicker'
+import { uploadDocument } from '@/lib/upload-client'
 import type { Project } from '@/lib/types'
 import {
   CheckCircle2,
@@ -90,6 +91,7 @@ export default function RequestForm({
   const [notifyEmail, setNotifyEmail] = useState(requester.email)
 
   const [submitting, setSubmitting] = useState(false)
+  const [uploading, setUploading] = useState<{ index: number; total: number; percent: number } | null>(null)
   const [submitted, setSubmitted] = useState<{ total: number; lines: number } | null>(null)
   const [error, setError] = useState('')
 
@@ -194,15 +196,39 @@ export default function RequestForm({
       // Attachments upload after the requisition exists; a failure here must
       // not discard a requisition that already saved.
       if (files.length > 0 && payload.data?.id) {
-        for (const file of files) {
-          const form = new FormData()
-          form.append('file', file)
+        const requestId = payload.data.id
+        for (const [index, file] of files.entries()) {
+          setUploading({ index, total: files.length, percent: 0 })
           try {
-            await fetch(`/api/requests/${payload.data.id}/attachments`, { method: 'POST', body: form })
+            // Straight to storage where possible, so a weak connection retries
+            // one file instead of losing the whole batch.
+            const uploaded = await uploadDocument(file, {
+              scope: `request-docs/${requestId}`,
+              onProgress: (percent: number) =>
+                setUploading({ index, total: files.length, percent }),
+            })
+
+            if (uploaded.viaServer) {
+              const form = new FormData()
+              form.append('file', file)
+              await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
+            } else {
+              await fetch(`/api/requests/${requestId}/attachments`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  file_name: uploaded.fileName,
+                  file_url: uploaded.key,
+                  file_size: uploaded.fileSize,
+                  file_type: uploaded.contentType,
+                }),
+              })
+            }
           } catch (uploadErr) {
             console.error('Attachment upload failed:', uploadErr)
           }
         }
+        setUploading(null)
       }
 
       setSubmitted({ total: grandTotal, lines: payloadLines.length })
@@ -676,7 +702,11 @@ export default function RequestForm({
               className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60 sm:h-11 sm:w-auto sm:px-6 sm:text-sm"
             >
               {submitting ? <Loader2 size={18} className="animate-spin sm:h-4 sm:w-4" /> : <Send size={18} className="sm:h-4 sm:w-4" />}
-              {submitting ? 'Submitting…' : 'Submit requisition'}
+              {submitting
+                ? uploading
+                  ? `Uploading ${uploading.index + 1} of ${uploading.total} · ${uploading.percent}%`
+                  : 'Submitting…'
+                : 'Submit requisition'}
             </button>
           </div>
         </div>

@@ -2,6 +2,7 @@ import { queryOne } from '@/lib/db'
 import { requireRole } from '@/lib/auth-guard'
 import { inviteUser } from '@/lib/email/invite'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { User } from '@/lib/types'
 
 /**
@@ -13,6 +14,9 @@ import type { User } from '@/lib/types'
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireRole('administrator')
   if (guard.error) return guard.error
+
+  const limit = await rateLimit(`invite:${guard.user.id}`, { max: 10, windowSeconds: 600 })
+  if (!limit.ok) return tooManyRequests('Too many invitations sent. Wait a few minutes.', limit.retryAfter)
 
   const { id } = await params
 

@@ -94,6 +94,45 @@ export async function getSignedDownloadUrl(
   }
 }
 
+/** Is object storage configured at all? Callers fall back when it is not. */
+export function storageConfigured(): boolean {
+  return Boolean(
+    process.env.AWS_ACCESS_KEY_ID &&
+      process.env.AWS_SECRET_ACCESS_KEY &&
+      (ENDPOINT || process.env.AWS_REGION)
+  )
+}
+
+/**
+ * A short-lived URL the browser can PUT a file to directly.
+ *
+ * Uploading through the app server means the file crosses the network twice
+ * and a dropped connection wastes the whole transfer. Handing the browser a
+ * signed URL lets it talk to the bucket itself: one hop, and a retry resends
+ * only what failed.
+ *
+ * The content type is signed in, so a client cannot present one type to the
+ * server for validation and then store something else.
+ */
+export async function getSignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresInSeconds: number = 900
+): Promise<string | null> {
+  if (!storageConfigured()) return null
+  try {
+    const command = new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+      ContentType: contentType,
+    })
+    return await getSignedUrl(getS3Client(), command, { expiresIn: expiresInSeconds })
+  } catch (err) {
+    console.error(`Failed to sign an upload URL for key "${key}":`, err)
+    return null
+  }
+}
+
 /**
  * Delete a file from the bucket.
  */

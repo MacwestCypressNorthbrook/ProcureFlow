@@ -2,6 +2,8 @@ import { query, queryOne } from '@/lib/db'
 import { uploadFile } from '@/lib/storage'
 import { requireRole } from '@/lib/auth-guard'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { checkUpload, safeStorageKey, isOwnStorageKey } from '@/lib/uploads'
 import type { RequestAttachment } from '@/lib/types'
 
 export async function GET(
@@ -19,6 +21,9 @@ export async function GET(
     'administrator'
   )
   if (guard.error) return guard.error
+
+  const limit = await rateLimit(`upload:${guard.user.id}`, { max: 20, windowSeconds: 300 })
+  if (!limit.ok) return tooManyRequests('Too many uploads. Wait a few minutes and try again.', limit.retryAfter)
 
   const existing = await queryOne<{ id: string }>(
     `SELECT id FROM public.requests WHERE id = $1 LIMIT 1`,
@@ -78,10 +83,15 @@ export async function POST(
       return NextResponse.json({ error: 'A file is required' }, { status: 400 })
     }
 
+    const check = checkUpload(file)
+    if (!check.ok) {
+      return NextResponse.json({ error: check.error }, { status: 413 })
+    }
+
     fileName = file.name
     fileSize = file.size
-    fileMime = file.type || 'application/octet-stream'
-    const storageKey = `request-docs/${id}/${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    fileMime = check.mime
+    const storageKey = safeStorageKey(`request-docs/${id}`, fileName)
 
     try {
       const arrayBuffer = await file.arrayBuffer()
@@ -107,6 +117,17 @@ export async function POST(
         { status: 400 }
       )
     }
+
+    // Only a key this app issued may be recorded — see `isOwnStorageKey`.
+    if (!isOwnStorageKey(fileUrl)) {
+      return NextResponse.json(
+        { error: 'That upload reference is not valid.' },
+        { status: 400 }
+      )
+    }
+
+    fileSize = typeof body.file_size === 'number' ? body.file_size : null
+    fileMime = typeof body.file_type === 'string' ? body.file_type : null
   }
 
   const inserted = await queryOne<RequestAttachment>(

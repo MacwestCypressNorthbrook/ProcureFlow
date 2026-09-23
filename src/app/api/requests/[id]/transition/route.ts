@@ -13,6 +13,7 @@ import {
 import { createNotification } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
 
 type Action = 'approve' | 'send_back' | 'resubmit' | 'reject'
@@ -64,6 +65,9 @@ async function notifyStage(
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUserFromSession()
   if (!user) return NextResponse.json({ error: 'Not signed in' }, { status: 401 })
+
+  const limit = await rateLimit(`transition:${user.id}`, { max: 40, windowSeconds: 60 })
+  if (!limit.ok) return tooManyRequests('Too many approvals at once. Give it a moment.', limit.retryAfter)
 
   const { id } = await params
 

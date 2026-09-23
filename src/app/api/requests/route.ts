@@ -3,6 +3,7 @@ import { requireCapability, isElevated } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
 import { sendRequisitionAlertEmail } from '@/lib/email/client'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { Request as DbRequest, User } from '@/lib/types'
 import { statusForStage } from '@/lib/workflow'
 
@@ -26,6 +27,9 @@ const toNumber = (v: unknown): number => {
 export async function POST(request: Request) {
   const guard = await requireCapability('request:create')
   if (guard.error) return guard.error
+
+  const limit = await rateLimit(`request-create:${guard.user.id}`, { max: 20, windowSeconds: 300 })
+  if (!limit.ok) return tooManyRequests('Too many requisitions submitted. Wait a few minutes.', limit.retryAfter)
 
   let body: Record<string, unknown>
   try {

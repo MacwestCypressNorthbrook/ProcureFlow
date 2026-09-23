@@ -2,6 +2,7 @@ import { query, queryOne } from '@/lib/db'
 import { requireCapability } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
 import { NextResponse } from 'next/server'
+import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { PurchaseOrder } from '@/lib/types'
 
 export async function GET(
@@ -11,6 +12,9 @@ export async function GET(
   const { id } = await params
   const guard = await requireCapability('po:comment')
   if (guard.error) return guard.error
+
+  const limit = await rateLimit(`comment:${guard.user.id}`, { max: 30, windowSeconds: 60 })
+  if (!limit.ok) return tooManyRequests('Too many comments at once. Give it a moment.', limit.retryAfter)
 
   const existing = await queryOne<{ id: string }>(
     `SELECT id FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
