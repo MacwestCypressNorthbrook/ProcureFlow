@@ -28,12 +28,23 @@ export async function resolveAttachments(
   attachments: any[]
 ): Promise<any[]> {
   if (!Array.isArray(attachments)) return []
-  return Promise.all(
-    attachments.map(async (att) => {
-      if (att && typeof att.file_url === 'string') {
-        return { ...att, file_url: await resolveFileUrl(att.file_url) }
-      }
-      return att
-    })
+  // Resolved to an API href rather than a signed URL: signing happens per
+  // click, so a link can never expire while the page is open.
+  return attachments.map((att) =>
+    att && typeof att.file_url === 'string' && att.id
+      ? { ...att, file_url: documentHref(String(att.id), att.file_url) }
+      : att
   )
+}
+
+/**
+ * The URL the browser should use for an attachment.
+ *
+ * Absolute and data: URLs pass through; anything else is a storage key, which
+ * must be served via `/api/documents/<id>` so it gets signed server-side.
+ */
+export function documentHref(id: string, fileUrl: string | null | undefined): string {
+  if (!fileUrl) return ''
+  if (/^(https?|data|blob):/.test(fileUrl)) return fileUrl
+  return `/api/documents/${encodeURIComponent(id)}`
 }

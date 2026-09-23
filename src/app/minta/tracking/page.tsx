@@ -1,6 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { monthSplit } from '@/components/shared/stat-presets'
 import { FileText, Eye, CheckCircle, XCircle } from 'lucide-react'
@@ -16,9 +15,14 @@ export default async function TrackingPage() {
   if (user?.id) {
     try {
       requests = await query<Request>(
-        `SELECT * FROM public.requests
-         WHERE created_by = $1
-         ORDER BY created_at DESC`,
+        `SELECT r.*, 
+          CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
+          po.po_number,
+          po.status AS po_status
+         FROM public.requests r
+         LEFT JOIN public.purchase_orders po ON po.request_id = r.id
+         WHERE r.created_by = $1
+         ORDER BY r.created_at DESC`,
         [user.id]
       )
     } catch (err) {
@@ -35,12 +39,7 @@ export default async function TrackingPage() {
   const month = monthSplit(requests.map((r) => r.created_at))
 
   return (
-    <DashboardLayout
-      title="Track Request Status"
-      subtitle="Visual pipeline of your requests through the approval workflow"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'engineer'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <StatGrid
           stats={[
@@ -80,6 +79,6 @@ export default async function TrackingPage() {
         />
         <TrackingClient requests={requests} />
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

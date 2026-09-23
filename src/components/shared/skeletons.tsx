@@ -1,5 +1,4 @@
 import { cn } from '@/lib/utils'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { PageContainer } from '@/components/shared/ui-kit'
 
 /** Base shimmer block. */
@@ -51,17 +50,9 @@ export function StatGridSkeleton({ count = 4 }: { count?: number }) {
 }
 
 /** Dashboard landing skeleton — hero band, KPI cards, first table. */
-export function DashboardSkeleton({
-  role,
-  title,
-  stats = 4,
-}: {
-  role?: string | null
-  title?: string
-  stats?: number
-}) {
+export function DashboardSkeleton({ stats = 4 }: { stats?: number }) {
   return (
-    <DashboardLayout title={title ?? 'Loading…'} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <div className="surface rounded-2xl px-5 py-6 sm:px-7 sm:py-7">
           <Skeleton className="h-2.5 w-20" />
@@ -79,7 +70,7 @@ export function DashboardSkeleton({
           <TableSkeleton />
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }
 
@@ -125,9 +116,9 @@ export function PanelSkeleton({ lines = 4, className }: { lines?: number; classN
 }
 
 /** Generic list / dashboard page skeleton (stat strip + table). */
-export function ListPageSkeleton({ role, title, stats = true }: { role?: string | null; title?: string; stats?: boolean }) {
+export function ListPageSkeleton({ stats = true }: { stats?: boolean }) {
   return (
-    <DashboardLayout title={title ?? 'Loading…'} role={role}>
+    <>
       <PageContainer className="space-y-8">
         {stats && <StatGridSkeleton count={4} />}
         <div className="space-y-3">
@@ -135,14 +126,14 @@ export function ListPageSkeleton({ role, title, stats = true }: { role?: string 
           <TableSkeleton />
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }
 
 /** Detail page skeleton — header, progress bar, two-column body. */
-export function DetailPageSkeleton({ role, title }: { role?: string | null; title?: string }) {
+export function DetailPageSkeleton() {
   return (
-    <DashboardLayout title={title ?? 'Loading…'} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <div className="space-y-2">
           <Skeleton className="h-3 w-28" />
@@ -173,6 +164,6 @@ export function DetailPageSkeleton({ role, title }: { role?: string | null; titl
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

@@ -1,7 +1,6 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query, queryOne } from '@/lib/db'
 import { getRequestItems } from '@/lib/requests'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DocumentList from '@/components/shared/DocumentList'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
@@ -11,6 +10,10 @@ import { resolveAttachments } from '@/lib/resolve-file-url'
 import { FileText, Paperclip, Clock, Package } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
+import ApprovalPanel from '@/components/shared/ApprovalPanel'
+import StageProgress from '@/components/shared/StageProgress'
+import { getReviewBundle } from '@/lib/review'
+import { currentStage } from '@/lib/workflow'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +48,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   if (!requestData) {
     return (
-      <DashboardLayout title="Request Details" user={user ? { name: user.name, email: user.email } : null} role={user?.role ?? 'engineer'}>
+      <>
         <PageContainer>
           <EmptyState
             icon={<FileText size={20} />}
@@ -53,14 +56,20 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
             action={<Link href="/minta/requests" className="text-sm font-medium text-primary hover:underline">Back to requests</Link>}
           />
         </PageContainer>
-      </DashboardLayout>
+      </>
     )
   }
 
   const status = String(requestData.status || '')
-  const canEdit = status === 'new' || status === 'pending' || status === 'reviewing' || status === 'under_review'
-  const canDelete = status === 'new' || status === 'pending'
+  // A requisition is the requester's to change only before the first review
+  // picks it up, or once a reviewer has sent it back.
+  const canEdit = status === 'draft' || status === 'pending_lead' || status === 'sent_back'
+  const canDelete = status === 'draft' || status === 'pending_lead'
   const isOwner = requestData.created_by === user?.id
+
+  const bundle = await getReviewBundle(id)
+  const approvalHistory = bundle?.history ?? []
+  const reviewStage = currentStage(status, (requestData.sent_back_to as string | null) ?? null)
 
   const docs = attachments
     .filter((a) => typeof a.file_url === 'string' && a.file_url)
@@ -79,12 +88,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   if (status === 'rejected') timeline.push({ label: 'Rejected', date: String(requestData.updated_at || ''), done: true })
 
   return (
-    <DashboardLayout
-      title="Request Details"
-      subtitle={String(requestData.purpose || '')}
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'engineer'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref="/minta/requests"
@@ -161,6 +165,13 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               )}
             </Panel>
 
+            <Panel title="Progress">
+              <StageProgress
+                status={status}
+                sentBackTo={(requestData.sent_back_to as string | null) ?? null}
+              />
+            </Panel>
+
             <Panel title={`Attachments${docs.length ? ` (${docs.length})` : ''}`} icon={<Paperclip size={16} />}>
               <DocumentList docs={docs} emptyLabel="No attachments on this request." />
             </Panel>
@@ -168,6 +179,22 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/*
+              The requester acts here only when a reviewer sent it back: the
+              panel carries the comment trail that explains why, and the
+              resubmit that puts it back in front of them.
+            */}
+            <ApprovalPanel
+              requestId={id}
+              stage={reviewStage}
+              canAct={isOwner && requestData.status === 'sent_back'}
+              isRequester
+              sentBack={requestData.status === 'sent_back'}
+              documents={[]}
+              history={approvalHistory}
+              showDocuments={false}
+            />
+
             <Panel title="Details">
               <div className="space-y-3">
                 <Field label="Requester"><p className="text-sm font-semibold text-foreground">{String(requestData.requester_name || requestData.guest_name || '—')}</p></Field>
@@ -202,6 +229,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

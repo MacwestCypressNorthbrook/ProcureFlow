@@ -4,6 +4,7 @@ import { createNotification } from '@/lib/notifications'
 import { sendRequisitionAlertEmail } from '@/lib/email/client'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest, User } from '@/lib/types'
+import { statusForStage } from '@/lib/workflow'
 
 /** One material line as submitted by the requisition form. */
 interface IncomingItem {
@@ -121,7 +122,9 @@ export async function POST(request: Request) {
       typeof body.guest_name === 'string' ? body.guest_name : null,
       typeof body.guest_email === 'string' ? body.guest_email : null,
       guard.user.id,
-      'pending',
+      // Enters the chain at the first review stage, so it lands in the
+      // Project Lead's queue rather than a legacy status nothing looks at.
+      statusForStage('lead'),
     ]
   )
 

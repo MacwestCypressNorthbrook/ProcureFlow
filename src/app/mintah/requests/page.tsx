@@ -1,6 +1,5 @@
 import { requirePageCapability } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import RequestTable from '@/components/shared/RequestTable'
 import { monthSplit } from '@/components/shared/stat-presets'
 import { PageContainer, SectionHeader, StatGrid, EmptyState } from '@/components/shared/ui-kit'
@@ -17,10 +16,22 @@ export default async function MintahRequestsPage() {
   try {
     const [newRes, reviewingRes] = await Promise.all([
       query<Record<string, unknown>>(
-        `SELECT * FROM public.requests WHERE status IN ('pending_lead') ORDER BY created_at DESC`
+        `SELECT r.*, 
+          CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
+          po.po_number,
+          po.status AS po_status
+         FROM public.requests r
+         LEFT JOIN public.purchase_orders po ON po.request_id = r.id
+         WHERE r.status IN ('pending_lead') ORDER BY r.created_at DESC`
       ),
       query<Record<string, unknown>>(
-        `SELECT * FROM public.requests WHERE status IN ('pending_supply_chain') ORDER BY created_at DESC`
+        `SELECT r.*, 
+          CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
+          po.po_number,
+          po.status AS po_status
+         FROM public.requests r
+         LEFT JOIN public.purchase_orders po ON po.request_id = r.id
+         WHERE r.status IN ('pending_supply_chain') ORDER BY r.created_at DESC`
       ),
     ])
     newRequests = newRes
@@ -40,12 +51,7 @@ export default async function MintahRequestsPage() {
       : null
 
   return (
-    <DashboardLayout
-      title="Incoming Requests"
-      subtitle="Review and process incoming requisitions"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'supply_chain'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <StatGrid
           stats={[
@@ -92,6 +98,6 @@ export default async function MintahRequestsPage() {
           )}
         </section>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

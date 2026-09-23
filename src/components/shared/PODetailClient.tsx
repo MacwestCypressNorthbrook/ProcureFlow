@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -51,12 +50,7 @@ export default function PODetailClient({ po, user, role }: PODetailProps) {
   const backHref = role === 'mintah' ? '/mintah' : '/sam'
 
   return (
-    <DashboardLayout
-      title="PO Review"
-      subtitle="Inspect the Purchase Order and make your decision"
-      user={user}
-      role={role}
-    >
+    <>
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href={backHref}
@@ -220,6 +214,6 @@ export default function PODetailClient({ po, user, role }: PODetailProps) {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

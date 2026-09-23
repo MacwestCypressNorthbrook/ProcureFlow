@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getUserFromSession } from '@/lib/auth/server'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { TickCircle, ArrowRight, Document } from '@/lib/icons'
@@ -14,11 +13,7 @@ export default async function RequestSuccessPage() {
   if (!user) redirect('/auth/login?redirect=/request')
 
   return (
-    <DashboardLayout
-      title="Request Submitted"
-      user={{ name: user.name, email: user.email }}
-      role={user.role}
-    >
+    <>
       <main className="mx-auto max-w-2xl px-4 py-12">
         <Card className="animate-scale-in glass-card-elevated border-border/40">
           <CardContent className="p-10 text-center">
@@ -46,6 +41,6 @@ export default async function RequestSuccessPage() {
           </CardContent>
         </Card>
       </main>
-    </DashboardLayout>
+    </>
   )
 }

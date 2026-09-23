@@ -1,6 +1,5 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -50,12 +49,7 @@ export default async function StageReview({
   const poDoc = documents.find((d) => d.source === 'po')
 
   return (
-    <DashboardLayout
-      title={request.purpose}
-      subtitle={stage ? `Currently with ${STAGES[stage].label}` : 'Closed'}
-      user={{ name: user.name, email: user.email }}
-      role={user.role}
-    >
+    <>
       <PageContainer className="space-y-6">
         <Link
           href={backHref}
@@ -69,7 +63,8 @@ export default async function StageReview({
           title={request.purpose}
           subtitle={
             <>
-              Raised by {request.requester_name ?? request.guest_name ?? 'Unknown'} ·{' '}
+              {stage ? `Currently with ${STAGES[stage].label}` : 'Closed'} · Raised by{' '}
+              {request.requester_name ?? request.guest_name ?? 'Unknown'} ·{' '}
               {formatDate(request.created_at)}
               {request.project_name ? ` · ${request.project_name}` : ''}
             </>
@@ -240,7 +235,7 @@ export default async function StageReview({
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }
 

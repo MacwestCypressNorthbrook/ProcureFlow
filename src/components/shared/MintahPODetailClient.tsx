@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import DocumentList from '@/components/shared/DocumentList'
@@ -67,7 +66,7 @@ export default function MintahPODetailClient({
   const isRich = isRichRequisition(po.description)
 
   return (
-    <DashboardLayout title="PO Details" subtitle={`Purchase Order #${po.id.slice(0, 8)}`} user={user} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref="/mintah/pos"
@@ -171,6 +170,6 @@ export default function MintahPODetailClient({
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

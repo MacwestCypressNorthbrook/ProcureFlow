@@ -58,7 +58,8 @@ export async function uploadFile(
  */
 export async function getSignedDownloadUrl(
   key: string,
-  expiresInSeconds: number = 3600
+  expiresInSeconds: number = 3600,
+  options: { fileName?: string; download?: boolean } = {}
 ): Promise<string> {
   if (!key) return ''
   // If it's already a full HTTP(S) URL or data URL, return as-is
@@ -73,9 +74,18 @@ export async function getSignedDownloadUrl(
 
   try {
     const client = getS3Client()
+
+    // Ask the object store to echo a disposition so the browser either shows
+    // the file inline or saves it under its original name.
+    const safeName = (options.fileName ?? key.split('/').pop() ?? 'document').replace(/"/g, '')
+    const disposition = options.download
+      ? `attachment; filename="${safeName}"`
+      : `inline; filename="${safeName}"`
+
     const command = new GetObjectCommand({
       Bucket: BUCKET_NAME,
       Key: key,
+      ResponseContentDisposition: disposition,
     })
     return await getSignedUrl(client, command, { expiresIn: expiresInSeconds })
   } catch (err) {

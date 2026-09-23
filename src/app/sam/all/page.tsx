@@ -1,6 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import POTable from '@/components/shared/POTable'
 import { PageContainer, StatGrid, SectionHeader, EmptyState } from '@/components/shared/ui-kit'
 import { poSummaryStats } from '@/components/shared/stat-presets'
@@ -10,7 +9,7 @@ import type { PurchaseOrder } from '@/lib/types'
 export const dynamic = 'force-dynamic'
 
 export default async function SamAllPage() {
-  const user = await requirePageRole('project_lead', 'cost_control')
+  await requirePageRole('project_lead', 'cost_control')
   let pos: PurchaseOrder[] = []
 
   try {
@@ -22,12 +21,7 @@ export default async function SamAllPage() {
   }
 
   return (
-    <DashboardLayout
-      title="All Purchase Orders"
-      subtitle="Complete history of purchase orders"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'project_lead'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <StatGrid
           stats={poSummaryStats({
@@ -45,6 +39,6 @@ export default async function SamAllPage() {
           <EmptyState icon={<Archive size={20} />} title="No purchase orders" description="Purchase orders will appear here." />
         )}
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

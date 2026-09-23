@@ -1,7 +1,6 @@
 import { requirePageCapability, isElevated } from '@/lib/auth-guard'
 import { getActiveProjects, getProjectsForUser } from '@/lib/projects'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import RequestForm from './RequestForm'
 import { dashboardPathForRole } from '@/lib/roles'
 import type { SupplierOption } from '@/components/shared/SupplierPicker'
@@ -26,18 +25,13 @@ export default async function NewRequestPage() {
   ])
 
   return (
-    <DashboardLayout
-      title="New Request"
-      subtitle="Raise a requisition for review"
-      user={{ name: user.name, email: user.email }}
-      role={user.role}
-    >
+    <>
       <RequestForm
         requester={{ name: user.name, email: user.email }}
         projects={projects}
         suppliers={suppliers}
         dashboardPath={dashboardPathForRole(user.role)}
       />
-    </DashboardLayout>
+    </>
   )
 }

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import POProgress from '@/components/shared/POProgress'
@@ -75,7 +74,7 @@ export default function EnhancedFinanceDetailClient({
   }
 
   return (
-    <DashboardLayout title="Payment Review" subtitle="Verify and process payment for this purchase order" user={user} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref="/finance"
@@ -210,6 +209,6 @@ export default function EnhancedFinanceDetailClient({
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

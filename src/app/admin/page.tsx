@@ -1,4 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
+import { can } from '@/lib/roles'
 import { query } from '@/lib/db'
 import AdminClient, { type AuditEntry } from '@/components/admin/AdminClient'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
@@ -14,8 +15,15 @@ export const dynamic = 'force-dynamic'
 export default async function AdminPage() {
   const user = await requirePageRole('administrator', 'super_user')
 
+  // People and the audit trail are Super User data. Fetching them for an
+  // Administrator would ship the rows in the RSC payload even with the tab
+  // hidden, so the queries are skipped outright.
+  const maySeeUsers = can(user.role, 'admin:users')
+  const maySeeAudit = can(user.role, 'admin:audit')
+
   const [users, projects, suppliers, requests, pos, auditTrail] = await Promise.all([
-    query<UserWithProjects>(
+    maySeeUsers
+      ? query<UserWithProjects>(
       `SELECT u.*,
               COALESCE(
                 json_agg(
@@ -30,7 +38,8 @@ export default async function AdminPage() {
         GROUP BY u.id
         ORDER BY u.created_at DESC
         LIMIT 500`
-    ),
+        )
+      : Promise.resolve([]),
     query<ProjectWithMemberCount>(
       `SELECT p.*, COUNT(pm.user_id)::int AS member_count
          FROM public.projects p
@@ -64,7 +73,8 @@ export default async function AdminPage() {
        LIMIT 200`
     ),
     query<PurchaseOrder>(`SELECT * FROM public.purchase_orders ORDER BY created_at DESC LIMIT 200`),
-    query<AuditEntry>(
+    maySeeAudit
+      ? query<AuditEntry>(
       `SELECT a.*,
               json_build_object('id', po.id, 'purpose', po.purpose, 'status', po.status) as po,
               json_build_object('id', u.id, 'name', u.name, 'email', u.email) as performer
@@ -73,7 +83,8 @@ export default async function AdminPage() {
        LEFT JOIN public.users u ON u.id = a.performed_by
        ORDER BY a.created_at DESC
        LIMIT 100`
-    ),
+        )
+      : Promise.resolve([]),
   ])
 
   return (

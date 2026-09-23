@@ -6,6 +6,7 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Paperclip, ShoppingBag } from 'lucide-react'
 import type { QueueRow } from '@/lib/review'
+import Link from 'next/link'
 
 /**
  * A stage's inbox.
@@ -33,7 +34,15 @@ export default function QueueTable({
       sortValue: (r) => r.purpose,
       cell: (r) => (
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{r.purpose}</p>
+          {/* A real anchor, not just the row's click handler — so the
+              requisition can be opened in a new tab and reached by keyboard. */}
+          <Link
+            href={`${hrefBase}/${r.id}`}
+            className="block truncate text-sm font-medium text-foreground outline-none hover:underline focus-visible:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r.purpose}
+          </Link>
           <p className="truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
             {r.project_name ? ` · ${r.project_name}` : ''}

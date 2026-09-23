@@ -31,6 +31,8 @@ export default function RequestCard({ request, href }: RequestCardProps) {
     }
   }
 
+  const hasPo = request.has_po === true
+
   return (
     <Card className="group transition-all hover:shadow-md hover:border-primary/20 animate-fade-in">
       <CardHeader className="pb-3">
@@ -39,6 +41,11 @@ export default function RequestCard({ request, href }: RequestCardProps) {
             {request.purpose}
           </CardTitle>
           <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
+          {hasPo && (
+            <span className="rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wider">
+              PO attached
+            </span>
+          )}
         </div>
       </CardHeader>
       <CardContent className="pb-3">

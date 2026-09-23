@@ -322,3 +322,30 @@ ALTER TABLE public.purchase_orders
     ADD COLUMN IF NOT EXISTS sam_approved_at TIMESTAMPTZ;
 ALTER TABLE public.purchase_orders
     ADD COLUMN IF NOT EXISTS sam_rejection_reason TEXT;
+
+-- ── Request status vocabulary ───────────────────────────────────────────────
+-- The stage-based workflow in src/lib/workflow.ts is the source of truth for
+-- these values. The original CHECK predates it and rejects every new status,
+-- which blocks raising a requisition outright. Legacy values are kept so rows
+-- written before the workflow landed still satisfy the constraint.
+ALTER TABLE public.requests DROP CONSTRAINT IF EXISTS requests_status_check;
+ALTER TABLE public.requests ADD CONSTRAINT requests_status_check CHECK (
+    status IN (
+        -- current workflow
+        'draft',
+        'pending_lead',
+        'pending_supply_chain',
+        'pending_admin',
+        'pending_cost_control',
+        'pending_finance',
+        'sent_back',
+        'completed',
+        'rejected',
+        'cancelled',
+        -- legacy
+        'pending',
+        'under_review',
+        'approved',
+        'converted'
+    )
+);

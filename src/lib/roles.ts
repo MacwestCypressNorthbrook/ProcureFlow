@@ -73,7 +73,7 @@ export const ROLES: Record<RoleId, RoleDefinition> = {
   super_user: {
     id: 'super_user',
     label: 'Super User',
-    description: 'Full access to every area, including user management.',
+    description: 'Owns the system: people, roles, audit trail and configuration.',
     dashboard: '/admin',
     elevated: true,
     accent: 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
@@ -82,9 +82,11 @@ export const ROLES: Record<RoleId, RoleDefinition> = {
   administrator: {
     id: 'administrator',
     label: 'Administrator',
-    description: 'Raises purchase orders and manages users, projects and suppliers.',
+    description: 'Raises purchase orders against approved requisitions.',
     dashboard: '/admin',
-    elevated: true,
+    // Deliberately NOT elevated. `elevated` is a blanket bypass in `can()`,
+    // so granting it here would hand the Administrator every system-management
+    // screen. Their access is the explicit capability list below.
     accent: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
     dot: 'bg-slate-500',
   },
@@ -163,6 +165,15 @@ export type Capability =
   | 'po:pay'
   | 'po:comment'
   | 'admin:manage'
+  // System management — Super User only. Split out so the Administrator can
+  // run procurement without inheriting the keys to the whole system.
+  | 'admin:users'
+  | 'admin:audit'
+  | 'admin:email'
+  | 'admin:preferences'
+  // Operational reference data the Administrator does own.
+  | 'admin:projects'
+  | 'admin:suppliers'
 
 export const CAPABILITIES: Record<Capability, RoleId[]> = {
   // Site staff raise the requisition.
@@ -177,8 +188,8 @@ export const CAPABILITIES: Record<Capability, RoleId[]> = {
   'request:convert': ['administrator'],
 
   // Everyone in the chain can read a PO and discuss it.
-  'po:view': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance'],
-  'po:comment': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance'],
+  'po:view': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance', 'administrator'],
+  'po:comment': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance', 'administrator'],
 
   // Cost Control reviews the purchase order it did not create.
   'po:approve': ['cost_control'],
@@ -186,7 +197,19 @@ export const CAPABILITIES: Record<Capability, RoleId[]> = {
   // Payment is Finance alone.
   'po:pay': ['finance'],
 
-  'admin:manage': [],
+  'admin:manage': ['super_user'],
+
+  // People, the audit trail, email templates and workspace preferences belong
+  // to the Super User alone — an Administrator must not see or change them.
+  'admin:users': ['super_user'],
+  'admin:audit': ['super_user'],
+  'admin:email': ['super_user'],
+  'admin:preferences': ['super_user'],
+
+  // Project sites and suppliers are procurement reference data, so the
+  // Administrator maintains them.
+  'admin:projects': ['super_user', 'administrator'],
+  'admin:suppliers': ['super_user', 'administrator'],
 }
 
 /** Does this role satisfy one of the listed roles? Elevated roles always do. */

@@ -1,6 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { queryOne } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { PageContainer, PageHeader, EmptyState } from '@/components/shared/ui-kit'
 import { Lock, FileText } from 'lucide-react'
 import Link from 'next/link'
@@ -10,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function EditRequestPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await requirePageRole('engineer')
+  await requirePageRole('engineer')
 
   let request: Record<string, unknown> | null = null
 
@@ -25,11 +24,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
 
   if (!request) {
     return (
-      <DashboardLayout
-        title="Edit Request"
-        user={user ? { name: user.name, email: user.email } : null}
-        role={user?.role ?? 'minta'}
-      >
+      <>
         <PageContainer>
           <EmptyState
             icon={<FileText size={20} />}
@@ -37,34 +32,20 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
             action={<Link href="/minta/requests" className="text-sm font-medium text-primary hover:underline">Back to requests</Link>}
           />
         </PageContainer>
-      </DashboardLayout>
+      </>
     )
   }
 
   const status = request.status as string
   const canEdit = status === 'new' || status === 'reviewing'
 
-  // Parse description for pre-fill
-  let descriptionText = (request.description as string) || ''
-  let richData: Record<string, unknown> | null = null
-  if (descriptionText.trim().startsWith('{')) {
-    try {
-      const parsed = JSON.parse(descriptionText)
-      if (parsed && parsed.type === 'rich_requisition') {
-        richData = parsed
-      }
-    } catch {
-      // Use raw description
-    }
-  }
+  // A rich requisition stores its structure as JSON in `description`; the edit
+  // form only needs the plain text, so anything structured is left to the form
+  // to re-read from the line items.
+  const descriptionText = (request.description as string) || ''
 
   return (
-    <DashboardLayout
-      title="Edit Request"
-      subtitle={request.purpose as string}
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'minta'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <PageHeader backHref={`/minta/requests/${id}`} backLabel="Back to request" title="Edit Request" subtitle={request.purpose as string} />
 
@@ -89,6 +70,6 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
           />
         )}
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

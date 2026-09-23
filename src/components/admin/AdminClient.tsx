@@ -6,15 +6,15 @@ import Link from 'next/link'
 import type { Request, PurchaseOrder, ProjectWithMemberCount, UserWithProjects } from '@/lib/types'
 import { ROLE_LABELS, PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import ThemeToggle from '@/components/layout/ThemeToggle'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import StatusBadge from '@/components/shared/StatusBadge'
-import { PageContainer, Panel, SectionHeader, StatGrid, DashboardHero } from '@/components/shared/ui-kit'
+import { PageContainer, PageHeader, Panel, SectionHeader, StatGrid, DashboardHero } from '@/components/shared/ui-kit'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import UsersPanel from './UsersPanel'
 import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
 import EmailPreviewModal from './EmailPreviewModal'
+import AttachPODrawer from './AttachPODrawer'
 import {
   LayoutGrid,
   Users as PeopleIcon,
@@ -30,9 +30,11 @@ import {
   Truck,
   Wallet,
   Mail,
+  FileUp,
   SlidersHorizontal,
 } from 'lucide-react'
 import { AUDIT_ACTION_LABELS } from '@/lib/audit'
+import { can, type Capability } from '@/lib/roles'
 
 const ghs = (n: number | null) =>
   n == null
@@ -59,20 +61,31 @@ const roleDot: Record<string, string> = {
   sam: 'bg-indigo-500',
 }
 
+/** A requisition row as the admin page queries it — with its purchase order folded in. */
+type AdminRequest = Request & {
+  po_id?: string | null
+  po_number?: string | null
+  po_status?: string | null
+}
+
 type Section = 'overview' | 'users' | 'projects' | 'suppliers' | 'requests' | 'pos' | 'audit' | 'emails' | 'settings'
 
 const SECTIONS: Section[] = ['overview', 'users', 'projects', 'suppliers', 'requests', 'pos', 'audit', 'emails', 'settings']
 
-const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
+/**
+ * Each tab declares the capability it needs, so a section the viewer cannot
+ * hold is neither listed nor reachable by typing `?tab=` into the address bar.
+ */
+const nav: { id: Section; label: string; icon: React.ReactNode; capability?: Capability }[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutGrid size={18} /> },
-  { id: 'users', label: 'Users', icon: <PeopleIcon size={18} /> },
-  { id: 'projects', label: 'Projects', icon: <Building2 size={18} /> },
-  { id: 'suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
+  { id: 'users', label: 'Users', icon: <PeopleIcon size={18} />, capability: 'admin:users' },
+  { id: 'projects', label: 'Projects', icon: <Building2 size={18} />, capability: 'admin:projects' },
+  { id: 'suppliers', label: 'Suppliers', icon: <Truck size={18} />, capability: 'admin:suppliers' },
   { id: 'requests', label: 'Requests', icon: <ClipboardCheck size={18} /> },
   { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> },
-  { id: 'audit', label: 'Audit Trail', icon: <History size={18} /> },
-  { id: 'emails', label: 'Email Templates', icon: <Mail size={18} /> },
-  { id: 'settings', label: 'Workspace Preferences', icon: <SlidersHorizontal size={18} /> },
+  { id: 'audit', label: 'Audit Trail', icon: <History size={18} />, capability: 'admin:audit' },
+  { id: 'emails', label: 'Email Templates', icon: <Mail size={18} />, capability: 'admin:email' },
+  { id: 'settings', label: 'Workspace Preferences', icon: <SlidersHorizontal size={18} />, capability: 'admin:preferences' },
 ]
 
 
@@ -170,7 +183,7 @@ export default function AdminClient({
   users: UserWithProjects[]
   projects: ProjectWithMemberCount[]
   suppliers: SupplierRow[]
-  requests: Request[]
+  requests: AdminRequest[]
   pos: PurchaseOrder[]
   auditTrail: AuditEntry[]
 }) {
@@ -179,10 +192,22 @@ export default function AdminClient({
 
   // The tab lives in the URL so /admin?tab=users is linkable and survives a
   // refresh — the sidebar's deep links depend on it.
+  const visibleNav = useMemo(
+    () => nav.filter((n) => !n.capability || can(role, n.capability)),
+    [role],
+  )
+  const allowedSections = useMemo(
+    () => new Set(visibleNav.map((n) => n.id)),
+    [visibleNav],
+  )
+
   const tabParam = searchParams.get('tab')
-  const section: Section = SECTIONS.includes(tabParam as Section)
-    ? (tabParam as Section)
-    : 'overview'
+  // An unreachable tab silently falls back to Overview rather than rendering
+  // a section this role is not permitted to see.
+  const section: Section =
+    SECTIONS.includes(tabParam as Section) && allowedSections.has(tabParam as Section)
+      ? (tabParam as Section)
+      : 'overview'
 
   // A notification deep-links an administrator to their own panel rather than
   // into another team's area; `focus` carries the record id so the list opens
@@ -243,7 +268,48 @@ export default function AdminClient({
 
   const firstName = user?.name?.split(' ')[0]
 
-  const requestCols: DataColumn<Request>[] = [
+  /**
+   * Requisitions both reviews have cleared, waiting on the Administrator to
+   * raise the purchase order in Odoo and attach the PDF here.
+   */
+  const awaitingPo = useMemo(
+    () => requests.filter((r) => r.status === 'pending_admin'),
+    [requests]
+  )
+
+  const [poTarget, setPoTarget] = useState<AdminRequest | null>(null)
+
+  const summaryFor = (r: AdminRequest) => ({
+    purpose: r.purpose,
+    department: r.department ?? undefined,
+    totalAmount: r.total_amount != null ? Number(r.total_amount) : undefined,
+    currency: r.currency ?? undefined,
+    requesterName: r.guest_name ?? undefined,
+  })
+
+  /** The action that turns a cleared requisition into a purchase order. */
+  const attachColumn: DataColumn<AdminRequest> = {
+    id: 'attach',
+    label: 'Action',
+    align: 'right',
+    cell: (r) =>
+      r.status === 'pending_admin' ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            setPoTarget(r)
+          }}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        >
+          <FileUp size={13} /> Attach PO
+        </button>
+      ) : (
+        <span className="text-xs text-muted-foreground">—</span>
+      ),
+  }
+
+  const requestCols: DataColumn<AdminRequest>[] = [
     {
       id: 'purpose',
       label: 'Purpose',
@@ -272,17 +338,15 @@ export default function AdminClient({
       id: 'po',
       label: 'Purchase Order',
       sortable: true,
-      sortValue: (r) => (r as any).po_number || ((r as any).po_id ? 'PO' : 'None'),
+      sortValue: (r) => r.po_number || (r.po_id ? 'PO' : 'None'),
       cell: (r) => {
-        const poNumber = (r as any).po_number
-        const poId = (r as any).po_id
-        const poStatus = (r as any).po_status
+        const { po_number: poNumber, po_id: poId, po_status: poStatus } = r
         if (poId || poNumber) {
           return (
             <div className="flex flex-col items-start gap-1">
               <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
                 <ShoppingBag size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
-                <span>{poNumber || `PO #${poId.slice(0, 8)}`}</span>
+                <span>{poNumber || (poId ? `PO #${poId.slice(0, 8)}` : 'PO')}</span>
               </span>
               {poStatus && (
                 <span className="text-[10px] text-muted-foreground font-medium">
@@ -317,15 +381,15 @@ export default function AdminClient({
     },
   ]
 
-  const requestFacets: DataFacet<Request>[] = [
+  const requestFacets: DataFacet<AdminRequest>[] = [
     {
       id: 'po_state',
       label: 'PO Attached',
       options: [
         { value: 'has_po', label: 'PO Attached' },
-        { value: 'no_po', label: 'No PO (Awaiting PO)' },
+        { value: 'no_po', label: 'No PO attached' },
       ],
-      matches: (r, value) => (value === 'has_po' ? Boolean((r as any).po_id) : !((r as any).po_id)),
+      matches: (r, value) => (value === 'has_po' ? Boolean(r.po_id) : !r.po_id),
     },
     {
       id: 'status',
@@ -447,14 +511,6 @@ export default function AdminClient({
     },
   ]
 
-  const customNav = nav.map((n) => ({
-    id: n.id,
-    label: n.label,
-    icon: n.icon,
-    active: section === n.id,
-    onClick: () => setSection(n.id),
-  }))
-
   const sectionMeta: Record<Section, { title: string; sub: string }> = {
     overview: { title: 'Overview', sub: 'System health and activity at a glance' },
     users: { title: 'User Management', sub: 'Roles, project assignments and account access' },
@@ -468,14 +524,12 @@ export default function AdminClient({
   }
 
   return (
-    <DashboardLayout
-      title={sectionMeta[section].title}
-      subtitle={sectionMeta[section].sub}
-      user={user}
-      role={role}
-      customNav={customNav}
-    >
-      <PageContainer>
+    <>
+      <PageContainer className="space-y-5">
+        {section !== 'overview' && (
+          <PageHeader title={sectionMeta[section].title} subtitle={sectionMeta[section].sub} />
+        )}
+
         {section === 'overview' && (
           <div className="space-y-6">
             <DashboardHero
@@ -525,10 +579,19 @@ export default function AdminClient({
                   onClick: () => setSection('suppliers'),
                 },
                 {
+                  label: 'Awaiting a PO document',
+                  value: awaitingPo.length,
+                  icon: <FileUp size={18} />,
+                  tone: 'amber',
+                  badge: awaitingPo.length > 0 ? 'Needs action' : undefined,
+                  compare: 'Cleared by both reviews — attach the Odoo PDF',
+                  onClick: () => setSection('requests'),
+                },
+                {
                   label: 'Requisitions',
                   value: stats.requests,
                   icon: <ClipboardCheck size={18} />,
-                  tone: 'amber',
+                  tone: 'indigo',
                   hint: `${stats.converted} converted to POs`,
                   share: stats.requests > 0 ? stats.converted / stats.requests : 0,
                   onClick: () => setSection('requests'),
@@ -701,8 +764,9 @@ export default function AdminClient({
           <DataView
             rows={requests}
             getRowId={(r) => r.id}
-            columns={requestCols}
+            columns={[...requestCols, attachColumn]}
             facets={requestFacets}
+            onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
             searchPlaceholder="Search requisitions…"
             searchText={(r) => [r.id, r.purpose, r.guest_name, r.guest_email, r.department]}
             initialTerm={focusId}
@@ -1034,6 +1098,20 @@ export default function AdminClient({
         currentUserEmail={user?.email}
       />
 
+      {poTarget && (
+        <AttachPODrawer
+          isOpen={Boolean(poTarget)}
+          onClose={() => setPoTarget(null)}
+          requestId={poTarget.id}
+          requestSummary={summaryFor(poTarget)}
+          onSuccess={() => {
+            setPoTarget(null)
+            notify('Purchase order attached — sent to Cost Control', true)
+            router.refresh()
+          }}
+        />
+      )}
+
       {toast && (
         <div
           className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 animate-scale-in rounded-xl border px-5 py-3 text-xs font-semibold shadow-xl ${
@@ -1043,6 +1121,6 @@ export default function AdminClient({
           {toast.msg}
         </div>
       )}
-    </DashboardLayout>
+    </>
   )
 }

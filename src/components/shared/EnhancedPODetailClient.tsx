@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import POProgress from '@/components/shared/POProgress'
@@ -84,7 +83,7 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
     po.status === 'pending_cost_control' && can(role, 'po:approve')
 
   return (
-    <DashboardLayout title="PO Review" subtitle="Inspect the Purchase Order and make your decision" user={user} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref={dashboardPathForRole(role)}
@@ -216,6 +215,6 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

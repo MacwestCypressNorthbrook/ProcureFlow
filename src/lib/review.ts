@@ -2,6 +2,7 @@ import { query, queryOne } from '@/lib/db'
 import type { Stage, RequestStatus } from '@/lib/workflow'
 import type { PurchaseOrder, Request as DbRequest } from '@/lib/types'
 import type { ApprovalEntry, ReviewDocument } from '@/components/shared/ApprovalPanel'
+import { documentHref } from '@/lib/resolve-file-url'
 
 export interface QueueRow extends DbRequest {
   sent_back_to: string | null
@@ -13,6 +14,8 @@ export interface QueueRow extends DbRequest {
   po_id: string | null
   po_number: string | null
   po_status: string | null
+  /** True once a purchase order exists for this requisition. */
+  has_po: boolean
 }
 
 /**
@@ -33,7 +36,8 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
               (SELECT COUNT(*)::int FROM public.request_attachments ra WHERE ra.request_id = r.id) AS document_count,
               po.id AS po_id,
               po.po_number,
-              po.status AS po_status
+              po.status AS po_status,
+              (po.id IS NOT NULL) AS has_po
          FROM public.requests r
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.users u ON u.id = r.created_by
@@ -166,7 +170,9 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
     const documents: ReviewDocument[] = requestDocs.map((d) => ({
       id: d.id,
       file_name: d.file_name,
-      file_url: d.file_url,
+      // Served through our own route, which signs on demand — a raw storage
+      // key is a relative URL and would navigate to the wrong origin.
+      file_url: documentHref(d.id, d.file_url),
       file_size: d.file_size,
       source: 'request' as const,
     }))
@@ -183,7 +189,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
         documents.push({
           id: d.id,
           file_name: d.file_name,
-          file_url: d.file_url,
+          file_url: documentHref(d.id, d.file_url),
           file_size: d.file_size,
           source: 'po',
         })
@@ -194,7 +200,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
         documents.push({
           id: `po-file-${po.id}`,
           file_name: po.file_name ?? 'Purchase order',
-          file_url: po.file_path,
+          file_url: documentHref(`po-file-${po.id}`, po.file_path),
           source: 'po',
         })
       }

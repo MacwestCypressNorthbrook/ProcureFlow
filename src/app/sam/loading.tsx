@@ -1,5 +1,5 @@
 import { DashboardSkeleton } from '@/components/shared/skeletons'
 
 export default function Loading() {
-  return <DashboardSkeleton role="sam" title="Sam's Dashboard" stats={4} />
+  return <DashboardSkeleton stats={4} />
 }

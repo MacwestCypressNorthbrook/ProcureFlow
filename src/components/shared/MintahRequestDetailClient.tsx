@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import DocumentList from '@/components/shared/DocumentList'
@@ -110,7 +109,7 @@ export default function MintahRequestDetailClient({
       : '—'
 
   return (
-    <DashboardLayout title="Request Details" subtitle="Review this request in detail" user={user} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref="/mintah/requests"
@@ -185,6 +184,6 @@ export default function MintahRequestDetailClient({
           </div>
         </div>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

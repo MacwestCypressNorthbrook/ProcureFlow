@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -33,12 +32,7 @@ export default function FinanceDetailClient({ po, user, role }: FinanceDetailPro
   }
 
   return (
-    <DashboardLayout
-      title="Payment Processing"
-      subtitle="Verify details and disburse payment"
-      user={user}
-      role={role}
-    >
+    <>
       <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         <Link
           href="/finance"
@@ -169,6 +163,6 @@ export default function FinanceDetailClient({ po, user, role }: FinanceDetailPro
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </>
   )
 }

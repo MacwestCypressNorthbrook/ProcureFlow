@@ -1,6 +1,5 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import RequestTable from '@/components/shared/RequestTable'
 import POTable from '@/components/shared/POTable'
 import { PageContainer, SectionHeader, StatGrid, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
@@ -56,12 +55,7 @@ export default async function MintahPage() {
   const firstName = user?.name?.split(' ')[0]
 
   return (
-    <DashboardLayout
-      title="Supply Chain & Procurement"
-      subtitle="Review requisitions and manage purchase orders"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'supply_chain'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <DashboardHero
           eyebrow="Procurement desk"
@@ -163,6 +157,6 @@ export default async function MintahPage() {
           )}
         </section>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

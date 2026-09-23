@@ -108,7 +108,7 @@ export const REQUEST_STATUS_CONFIG: Record<string, { label: string; color: strin
     dot: 'bg-amber-500',
   },
   pending_admin: {
-    label: 'Awaiting PO',
+    label: 'Awaiting PO document',
     color: 'bg-violet-50 text-violet-700 border-violet-200',
     dot: 'bg-violet-500',
   },

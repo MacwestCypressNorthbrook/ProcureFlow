@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -52,7 +51,7 @@ export default function CreatePOClient({ request, user, role }: CreatePOProps) {
   }
 
   return (
-    <DashboardLayout title="Create Purchase Order" subtitle={`Converting request: ${request.purpose}`} user={user} role={role}>
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref={`/mintah/requests/${request.id}`}
@@ -123,6 +122,6 @@ export default function CreatePOClient({ request, user, role }: CreatePOProps) {
           </div>
         </form>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

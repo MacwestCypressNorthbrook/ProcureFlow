@@ -66,6 +66,7 @@ export default function RequestTable({
       sortValue: (r) => r.purpose,
       cell: (r) => {
         const summary = itemSummary(r.description)
+        const hasPo = r.has_po === true
         return (
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -74,6 +75,11 @@ export default function RequestTable({
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-foreground">{r.purpose}</p>
               {summary && <p className="truncate text-xs text-muted-foreground">{summary}</p>}
+              {hasPo && (
+                <span className="rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wider">
+                  PO attached
+                </span>
+              )}
             </div>
           </div>
         )

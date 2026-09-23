@@ -56,6 +56,18 @@ export interface Request {
   notes?: string | null
   created_at: string
   updated_at: string
+  /**
+   * Purchase-order summary, present when the query joins it in. A requisition
+   * with `has_po: false` is one still waiting for an administrator to raise
+   * and attach its PO.
+   */
+  /** Set when a reviewer returns the requisition to an earlier stage. */
+  sent_back_to?: string | null
+  return_to_stage?: string | null
+  has_po?: boolean
+  po_id?: string | null
+  po_number?: string | null
+  po_status?: string | null
 }
 
 export type POStatus =

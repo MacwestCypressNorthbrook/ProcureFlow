@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { PageContainer, PageHeader } from '@/components/shared/ui-kit'
@@ -34,12 +33,7 @@ export default function RequestDetailClient({ request, user, role }: RequestDeta
   }
 
   return (
-    <DashboardLayout
-      title="Request Details"
-      subtitle="Review this request and convert it to a Purchase Order"
-      user={user}
-      role={role}
-    >
+    <>
       <PageContainer className="space-y-6">
         <PageHeader
           backHref="/mintah"
@@ -89,6 +83,6 @@ export default function RequestDetailClient({ request, user, role }: RequestDeta
           </Link>
         )}
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }

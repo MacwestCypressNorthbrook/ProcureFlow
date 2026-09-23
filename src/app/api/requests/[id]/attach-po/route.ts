@@ -86,6 +86,21 @@ export async function POST(
     return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   }
 
+  // A purchase order document belongs to a requisition both earlier reviews
+  // have cleared. Attaching one to anything else would skip a stage, so the
+  // queue gating in the UI is re-checked here.
+  if (req.status !== 'pending_admin') {
+    return NextResponse.json(
+      {
+        error:
+          req.status === 'sent_back'
+            ? 'This requisition was sent back and is not awaiting a purchase order.'
+            : 'This requisition has not cleared Project Lead and Supply Chain review yet.',
+      },
+      { status: 409 }
+    )
+  }
+
   // If a data: URL was provided without a raw buffer, decode it to buffer for S3 upload
   if (!fileBuffer && fileUrl && fileUrl.startsWith('data:')) {
     const match = fileUrl.match(/^data:([^;]+);base64,(.+)$/)

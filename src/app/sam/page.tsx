@@ -1,86 +1,72 @@
 import { requirePageRole } from '@/lib/auth-guard'
-import { query } from '@/lib/db'
-import DashboardLayout from '@/components/layout/DashboardLayout'
-import POTable from '@/components/shared/POTable'
-import { PageContainer, SectionHeader, StatGrid, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
+import QueueTable from '@/components/shared/QueueTable'
 import { Button } from '@/components/ui/button'
-import { ClipboardCheck, Clock, CheckCircle, Archive, ArrowRight } from 'lucide-react'
+import {
+  PageContainer,
+  SectionHeader,
+  StatGrid,
+  DashboardHero,
+  EmptyState,
+} from '@/components/shared/ui-kit'
+import { monthSplit, statMoney } from '@/components/shared/stat-presets'
+import { getStageQueue } from '@/lib/review'
+import { statusForStage } from '@/lib/workflow'
+import { ClipboardCheck, CheckCircle, Clock, Wallet, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
-import type { PurchaseOrder } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
+/** Whole days since the oldest item in a queue; null when the queue is empty. */
+function oldestWaitingDays(dates: string[]): number | null {
+  const times = dates.map((d) => new Date(d).getTime()).filter((t) => !Number.isNaN(t))
+  if (times.length === 0) return null
+  return Math.max(0, Math.floor((Date.now() - Math.min(...times)) / 86_400_000))
+}
+
 export default async function SamPage() {
-  const user = await requirePageRole('project_lead', 'cost_control')
-  let allPos: PurchaseOrder[] = []
+  const user = await requirePageRole('project_lead')
 
-  try {
-    allPos = await query<PurchaseOrder>(
-      `SELECT * FROM public.purchase_orders ORDER BY created_at DESC`
-    )
-  } catch (err) {
-    console.error('Failed to load POs for review from Neon:', err)
-  }
+  // The Project Lead is the first review in the chain; everything downstream is
+  // shown only as context for what they have already cleared.
+  const [waiting, downstream] = await Promise.all([
+    getStageQueue([statusForStage('lead')]),
+    getStageQueue([
+      statusForStage('supply_chain'),
+      statusForStage('admin'),
+      statusForStage('cost_control'),
+      statusForStage('finance'),
+    ]),
+  ])
 
-  const pendingCount = allPos.filter((p) => p.status === 'pending_cost_control').length
-  const revisionCount = allPos.filter((p) => p.status === 'sent_back').length
-  const approvedToday = allPos.filter((p) => {
-    const approvedAt = p.approved_at || p.sam_approved_at
-    if (!approvedAt) return false
-    const today = new Date()
-    const approved = new Date(approvedAt)
-    return approved.toDateString() === today.toDateString()
-  }).length
-  const totalReviewed = allPos.filter((p) => (p.approved_by || p.sam_approved_by) === user?.id).length
-  const approvedYesterday = allPos.filter((p) => {
-    const approvedAt = p.approved_at || p.sam_approved_at
-    if (!approvedAt) return false
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    return new Date(approvedAt).toDateString() === yesterday.toDateString()
-  }).length
-  const approvedDelta =
-    approvedYesterday > 0 ? ((approvedToday - approvedYesterday) / approvedYesterday) * 100 : undefined
-
-  // Must stay in step with `queue` below (pendingCount + revisionCount) —
-  // a header count that disagrees with the table under it stalls approvals.
-  const recentPending = allPos.filter(
-    (p) => p.status === 'pending_cost_control' || p.status === 'sent_back'
-  )
-
-  const queue = pendingCount + revisionCount
-  const firstName = user?.name?.split(' ')[0]
+  const month = monthSplit(waiting.map((r) => r.created_at))
+  const queueValue = waiting.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
+  const oldestDays = oldestWaitingDays(waiting.map((r) => r.created_at))
+  const firstName = user.name?.split(' ')[0]
 
   return (
-    <DashboardLayout
-      title="Approvals & Review"
-      subtitle="Review and approve purchase orders and requisitions"
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'project_lead'}
-    >
+    <>
       <PageContainer className="space-y-6">
         <DashboardHero
-          eyebrow="Approvals"
+          eyebrow="Review queue"
           title={
-            queue === 0
+            waiting.length === 0
               ? 'You are all caught up'
-              : `${queue} decision${queue === 1 ? '' : 's'} waiting on you`
+              : `${waiting.length} requisition${waiting.length === 1 ? '' : 's'} waiting on you`
           }
           description={
-            queue === 0
+            waiting.length === 0
               ? firstName
-                ? `Nothing needs your signature right now, ${firstName}. New purchase orders will appear here as procurement raises them.`
-                : 'Nothing needs your signature right now. New purchase orders will appear here as procurement raises them.'
-              : 'Each approval is timestamped and recorded against your name — sign off from any device.'
+                ? `Nothing needs your review right now, ${firstName}. New requisitions land here the moment they are raised.`
+                : 'Nothing needs your review right now. New requisitions land here the moment they are raised.'
+              : 'Nothing moves past you until each one is approved or sent back — both carry your comment.'
           }
           meta={[
-            { label: `${pendingCount} pending`, tone: pendingCount > 0 ? 'amber' : 'emerald' },
-            { label: `${revisionCount} need revision`, tone: revisionCount > 0 ? 'red' : 'slate' },
-            { label: `${approvedToday} approved today`, tone: 'emerald' },
+            { label: `${statMoney(queueValue)} in the queue`, tone: 'indigo' },
+            { label: `${downstream.length} moving downstream`, tone: 'emerald' },
           ]}
           actions={
-            queue > 0 ? (
-              <Link href="/sam/pending">
+            waiting.length > 0 ? (
+              <Link href="/sam/requests">
                 <Button className="h-10 gap-1.5 px-4">
                   Start reviewing <ArrowRight size={15} />
                 </Button>
@@ -92,54 +78,55 @@ export default async function SamPage() {
         <StatGrid
           stats={[
             {
-              label: 'Pending approval',
-              value: pendingCount,
+              label: 'Awaiting your review',
+              value: waiting.length,
               icon: <ClipboardCheck size={18} />,
-              tone: 'amber',
-              hint: 'Waiting for your sign-off',
-              badge: pendingCount > 0 ? 'Needs action' : undefined,
-              href: '/sam/pending',
+              tone: 'indigo',
+              delta: month.delta,
+              badge: waiting.length > 0 ? 'Needs action' : undefined,
+              compare:
+                month.lastMonth > 0
+                  ? `vs. ${month.lastMonth} last month`
+                  : `${month.thisMonth} raised this month`,
+              href: '/sam/requests',
             },
             {
-              label: 'Needs revision',
-              value: revisionCount,
+              label: 'Queue value',
+              value: statMoney(queueValue),
+              icon: <Wallet size={18} />,
+              tone: 'purple',
+              compare: `Across ${waiting.length} requisition${waiting.length === 1 ? '' : 's'}`,
+            },
+            {
+              label: 'Longest waiting',
+              value: oldestDays !== null ? `${oldestDays}d` : '—',
               icon: <Clock size={18} />,
-              tone: 'red',
-              hint: 'Sent back to procurement',
-              href: '/sam/revision',
+              tone: oldestDays !== null && oldestDays > 7 ? 'red' : 'amber',
+              compare: oldestDays !== null ? 'Since it was raised' : 'Nothing in the queue',
             },
             {
-              label: 'Approved today',
-              value: approvedToday,
+              label: 'Cleared by you',
+              value: downstream.length,
               icon: <CheckCircle size={18} />,
               tone: 'emerald',
-              delta: approvedDelta,
-              compare:
-                approvedYesterday > 0
-                  ? `vs. ${approvedYesterday} yesterday`
-                  : 'Nothing approved yesterday',
-              href: '/sam/approved',
-            },
-            {
-              label: 'Total reviewed',
-              value: totalReviewed,
-              icon: <Archive size={18} />,
-              tone: 'indigo',
-              hint: 'Signed off by you, all time',
-              href: '/sam/all',
+              compare: 'Now with later stages',
             },
           ]}
         />
 
         <section>
-          <SectionHeader title="Awaiting Your Review" count={recentPending.length} />
-          {recentPending.length > 0 ? (
-            <POTable pos={recentPending} hrefBase="/sam" showRejection compact />
+          <SectionHeader title="Awaiting your review" count={waiting.length} />
+          {waiting.length > 0 ? (
+            <QueueTable rows={waiting} hrefBase="/sam/requests" storageKey="lead-dashboard-queue" />
           ) : (
-            <EmptyState icon={<CheckCircle size={20} />} title="All caught up" description="No purchase orders awaiting your review." />
+            <EmptyState
+              icon={<CheckCircle size={20} />}
+              title="All caught up"
+              description="No requisitions are waiting on your review."
+            />
           )}
         </section>
       </PageContainer>
-    </DashboardLayout>
+    </>
   )
 }
