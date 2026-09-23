@@ -36,10 +36,12 @@ import {
 import { AUDIT_ACTION_LABELS } from '@/lib/audit'
 import { can, type Capability } from '@/lib/roles'
 
-const ghs = (n: number | null) =>
-  n == null
-    ? '—'
-    : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
+const ghs = (n: number | string | null | undefined) => {
+  if (n == null || n === '') return '—'
+  const val = Number(n)
+  if (isNaN(val)) return '—'
+  return new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(val)
+}
 
 const shortDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
@@ -234,10 +236,10 @@ export default function AdminClient({
       requests: requests.length,
       pos: pos.length,
       completed: pos.filter((p) => p.status === 'paid').length,
-      value: pos.reduce((s, p) => s + (p.total_amount ?? 0), 0),
+      value: pos.reduce((s, p) => s + (Number(p.total_amount) || 0), 0),
       settledValue: pos
         .filter((p) => p.status === 'paid')
-        .reduce((s, p) => s + (p.total_amount ?? 0), 0),
+        .reduce((s, p) => s + (Number(p.total_amount) || 0), 0),
       pending: pos.filter((p) => p.status === 'pending_cost_control' || p.status === 'pending_finance').length,
       converted: requests.filter((r) => r.status === 'converted' || r.status === 'approved').length,
       activeUsers: users.filter((u) => u.is_active !== false).length,
