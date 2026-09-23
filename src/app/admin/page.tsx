@@ -45,7 +45,24 @@ export default async function AdminPage() {
         GROUP BY s.id
         ORDER BY s.is_active DESC, s.name ASC`
     ),
-    query<Request>(`SELECT * FROM public.requests ORDER BY created_at DESC LIMIT 200`),
+    query<Request & { po_id?: string | null; po_number?: string | null; po_status?: string | null; po_vendor_name?: string | null; po_amount?: number | null }>(
+      `SELECT r.*,
+              po.id as po_id,
+              po.po_number as po_number,
+              po.status as po_status,
+              po.vendor_name as po_vendor_name,
+              po.total_amount as po_amount
+       FROM public.requests r
+       LEFT JOIN LATERAL (
+         SELECT id, po_number, status, vendor_name, total_amount
+         FROM public.purchase_orders
+         WHERE request_id = r.id
+         ORDER BY created_at DESC
+         LIMIT 1
+       ) po ON true
+       ORDER BY r.created_at DESC
+       LIMIT 200`
+    ),
     query<PurchaseOrder>(`SELECT * FROM public.purchase_orders ORDER BY created_at DESC LIMIT 200`),
     query<AuditEntry>(
       `SELECT a.*,

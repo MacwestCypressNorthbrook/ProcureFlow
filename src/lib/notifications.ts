@@ -204,3 +204,42 @@ export async function dispatchPendingReminders(): Promise<{ processed: number }>
     return { processed: 0 }
   }
 }
+
+/** Notify everyone who can act at a stage, plus record it in-app and by email. */
+export async function notifyStage(
+  stage: import('@/lib/workflow').Stage,
+  requestId: string,
+  title: string,
+  message: string,
+  type: 'info' | 'approval' | 'reminder' | 'warning' | 'success' = 'approval',
+  excludeUserId?: string
+): Promise<number> {
+  const { STAGES } = await import('@/lib/workflow')
+  const stageDef = STAGES[stage]
+  if (!stageDef) return 0
+
+  const holders = await query<{ id: string }>(
+    `SELECT id FROM public.users
+      WHERE role = ANY($1::text[])
+        AND COALESCE(is_active, true)
+        AND auth_id NOT LIKE 'pending:%'`,
+    [stageDef.roles]
+  )
+
+  const targets = excludeUserId ? holders.filter((h) => h.id !== excludeUserId) : holders
+
+  await Promise.all(
+    targets.map((h) =>
+      createNotification({
+        userId: h.id,
+        title,
+        message,
+        type,
+        target: { type: 'request', id: requestId },
+        sendEmailAlert: true,
+      })
+    )
+  )
+  return targets.length
+}
+

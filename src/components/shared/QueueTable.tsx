@@ -70,16 +70,20 @@ export default function QueueTable({
     },
     {
       id: 'po',
-      label: 'PO',
-      hideBelow: 'lg',
+      label: 'PO State',
+      sortable: true,
+      sortValue: (r) => (r.po_id ? 1 : 0),
       cell: (r) =>
         r.po_id ? (
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-foreground">
-            <ShoppingBag size={12} className="text-muted-foreground" />
-            {r.po_number ?? 'Raised'}
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+            <ShoppingBag size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
+            <span>{r.po_number || 'PO Attached'}</span>
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">—</span>
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+            No PO
+          </span>
         ),
     },
     {
@@ -99,11 +103,24 @@ export default function QueueTable({
     },
   ]
 
+  const facets = [
+    {
+      id: 'po_filter',
+      label: 'PO Status',
+      options: [
+        { value: 'has_po', label: 'PO Attached' },
+        { value: 'no_po', label: 'No PO (Pre-PO)' },
+      ],
+      matches: (r: QueueRow, value: string) => (value === 'has_po' ? Boolean(r.po_id) : !r.po_id),
+    },
+  ]
+
   return (
     <DataView
       rows={rows}
       getRowId={(r) => r.id}
       columns={columns}
+      facets={facets}
       searchPlaceholder="Search requisitions…"
       searchText={(r) => [r.purpose, r.requester_name, r.project_name, r.po_number]}
       defaultSort={{ id: 'created_at', dir: 'asc' }}
@@ -121,8 +138,21 @@ export default function QueueTable({
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
             {r.project_name ? ` · ${r.project_name}` : ''}
           </p>
-          <div className="mt-auto flex items-center justify-between gap-2 pt-4 text-xs text-muted-foreground">
-            <span className="tabular-nums">
+          <div className="mt-2">
+            {r.po_id ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">
+                <ShoppingBag size={11} className="shrink-0" />
+                {r.po_number || 'PO Attached'}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[10px] text-muted-foreground">
+                <span className="h-1 w-1 rounded-full bg-slate-400" />
+                No PO Attached
+              </span>
+            )}
+          </div>
+          <div className="mt-auto flex items-center justify-between gap-2 pt-3 text-xs text-muted-foreground">
+            <span className="tabular-nums font-medium text-foreground">
               {r.total_amount != null ? formatCurrency(Number(r.total_amount)) : '—'}
             </span>
             <span className="inline-flex items-center gap-1">

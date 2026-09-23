@@ -1,6 +1,7 @@
 import { queryOne, execute } from '@/lib/db'
 import { requireCapability } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
+import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import type { PurchaseOrder } from '@/lib/types'
 
@@ -75,6 +76,15 @@ export async function POST(
       type: 'warning',
       target: { type: 'po', id },
       sendEmailAlert: true,
+    })
+
+    await dispatchWorkflowEmail({
+      eventType: 'po_sent_back',
+      poId: id,
+      requestId: existing.request_id || undefined,
+      recipientUserId: existing.created_by,
+      performerId: guard.user.id,
+      comments: reason,
     })
   }
 

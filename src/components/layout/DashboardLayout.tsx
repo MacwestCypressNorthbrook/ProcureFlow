@@ -1,3 +1,5 @@
+
+
 'use client'
 
 import { useState } from 'react'
@@ -25,6 +27,12 @@ import {
   Banknote,
   Receipt,
   Scale,
+  Users,
+  Building2,
+  Truck,
+  Mail,
+  History,
+  FileCheck2,
 } from 'lucide-react'
 
 interface NavItem {
@@ -126,20 +134,52 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
   ],
   administrator: [
     {
-      label: 'Workflow',
-      items: [{ href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> }],
+      label: 'Core Workflow',
+      items: [
+        { href: '/admin', label: 'Admin Dashboard', icon: <LayoutDashboard size={18} /> },
+        { href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> },
+        { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
+        { href: '/admin?tab=requests', label: 'All Requisitions', icon: <FileText size={18} /> },
+      ],
     },
     {
-      label: 'Administration',
-      items: [{ href: '/admin', label: 'Admin Panel', icon: <Settings size={18} /> }],
+      label: 'Management',
+      items: [
+        { href: '/admin?tab=users', label: 'Users & Roles', icon: <Users size={18} /> },
+        { href: '/admin?tab=projects', label: 'Project Sites', icon: <Building2 size={18} /> },
+        { href: '/admin?tab=suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
+        { href: '/admin?tab=emails', label: 'Email Templates', icon: <Mail size={18} /> },
+        { href: '/admin?tab=audit', label: 'Audit Trail', icon: <History size={18} /> },
+      ],
+    },
+  ],
+  super_user: [
+    {
+      label: 'Operations',
+      items: [
+        { href: '/admin', label: 'Admin Overview', icon: <LayoutDashboard size={18} /> },
+        { href: '/admin/requests', label: 'Raise Purchase Orders', icon: <ShoppingBag size={18} /> },
+        { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
+        { href: '/admin?tab=requests', label: 'All Requisitions', icon: <FileText size={18} /> },
+      ],
     },
     {
-      label: 'Dashboards',
+      label: 'Cross-Department Dashboards',
       items: [
         { href: '/sam/requests', label: 'Project Lead', icon: <ClipboardCheck size={18} /> },
         { href: '/mintah/queue', label: 'Supply Chain', icon: <Eye size={18} /> },
         { href: '/cost-control', label: 'Cost Control', icon: <Scale size={18} /> },
         { href: '/finance', label: 'Finance', icon: <CreditCard size={18} /> },
+      ],
+    },
+    {
+      label: 'System Management',
+      items: [
+        { href: '/admin?tab=users', label: 'Users & Roles', icon: <Users size={18} /> },
+        { href: '/admin?tab=projects', label: 'Project Sites', icon: <Building2 size={18} /> },
+        { href: '/admin?tab=suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
+        { href: '/admin?tab=emails', label: 'Email Templates', icon: <Mail size={18} /> },
+        { href: '/admin?tab=audit', label: 'Audit Trail', icon: <History size={18} /> },
       ],
     },
   ],
@@ -150,8 +190,7 @@ roleNavSections.minta = roleNavSections.engineer
 roleNavSections.mintah = roleNavSections.supply_chain
 roleNavSections.sam = roleNavSections.project_lead
 roleNavSections.lead = roleNavSections.project_lead
-roleNavSections.super_user = roleNavSections.administrator
-roleNavSections.superuser = roleNavSections.administrator
+roleNavSections.superuser = roleNavSections.super_user
 roleNavSections.admin = roleNavSections.administrator
 roleNavSections.adminstrator = roleNavSections.administrator
 
@@ -180,14 +219,23 @@ export default function DashboardLayout({
     ? [{ label: 'Navigation', items: customNav as SidebarItem[] }]
     : roleNavSections[resolvedRole] || roleNavSections.engineer
 
+  // Check if base navigation already includes account or settings to prevent duplicate items
+  const alreadyHasSettings = baseSections.some((s) =>
+    s.items.some((item) => item.label.toLowerCase() === 'settings' || item.href === '/settings')
+  )
+
   // Every role gets its own account settings — a signed-in user should never
   // have to guess where their profile and password live.
   const sections: { label: string; items: SidebarItem[] }[] = [
     ...baseSections,
-    {
-      label: 'Account',
-      items: [{ href: '/settings', label: 'Settings', icon: <Settings size={18} /> }],
-    },
+    ...(alreadyHasSettings
+      ? []
+      : [
+        {
+          label: 'Account',
+          items: [{ href: '/settings', label: 'Settings', icon: <Settings size={18} /> }],
+        },
+      ]),
   ]
 
   const userInitials = (user?.name || user?.email || 'U')

@@ -10,7 +10,7 @@ import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate } f
 import { currentStage, STAGES, canActAt } from '@/lib/workflow'
 import { isElevated } from '@/lib/roles'
 import type { ResolvedUser } from '@/lib/auth/server'
-import { ArrowLeft, ShoppingBag } from 'lucide-react'
+import { ArrowLeft, ShoppingBag, FileText, ExternalLink } from 'lucide-react'
 
 /**
  * One requisition, as any stage of the chain sees it.
@@ -43,6 +43,11 @@ export default async function StageReview({
       : stage !== null && canActAt(user.role, stage)
 
   const total = items.reduce((sum, i) => sum + (Number(i.line_total) || 0), 0)
+  const suggestedSupplier =
+    items.find((i) => i.supplier_name)?.supplier_name ??
+    ((request as unknown as Record<string, unknown>).vendor_name as string | undefined) ??
+    ''
+  const poDoc = documents.find((d) => d.source === 'po')
 
   return (
     <DashboardLayout
@@ -75,6 +80,40 @@ export default async function StageReview({
         <section className="surface rounded-xl p-4 sm:p-5">
           <StageProgress status={request.status} sentBackTo={request.sent_back_to} />
         </section>
+
+        {stage === 'admin' && holdsStage && (
+          <div className="rounded-xl border border-primary/25 bg-primary/[0.04] p-4 sm:p-5 text-sm">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <ShoppingBag size={20} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-foreground">Odoo Purchase Order Workflow</h3>
+                  <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+                    Administrator Review
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                  Review the requisition and materials below. Then open your <strong>Odoo system</strong> to generate the Purchase Order (PDF). When ready, upload the PO PDF and enter the Odoo PO reference in the right-hand panel to approve and submit to Cost Control.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  {suggestedSupplier && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs">
+                      <span className="text-muted-foreground">Supplier:</span> <strong className="font-semibold">{suggestedSupplier}</strong>
+                    </span>
+                  )}
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs">
+                    <span className="text-muted-foreground">Grand Total:</span> <strong className="font-semibold">{formatCurrency(total || request.total_amount || 0)}</strong>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs">
+                    <span className="text-muted-foreground">Items:</span> <strong className="font-semibold">{items.length} line item{items.length === 1 ? '' : 's'}</strong>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
           <div className="min-w-0 space-y-6">
@@ -153,8 +192,20 @@ export default async function StageReview({
                     </p>
                   </Field>
                 </div>
-                <div className="mt-4">
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                   <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
+                  {poDoc && (
+                    <a
+                      href={poDoc.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-primary hover:border-ring transition-colors"
+                    >
+                      <FileText size={14} />
+                      <span>{poDoc.file_name}</span>
+                      <ExternalLink size={12} className="text-muted-foreground" />
+                    </a>
+                  )}
                 </div>
               </Panel>
             )}
@@ -175,6 +226,16 @@ export default async function StageReview({
               sentBack={request.status === 'sent_back'}
               documents={documents}
               history={history}
+              po={po}
+              requestSummary={{
+                purpose: request.purpose,
+                department: request.department ?? undefined,
+                projectName: request.project_name ?? undefined,
+                totalAmount: Number(total || request.total_amount || 0),
+                currency: request.currency ?? 'GHS',
+                suggestedSupplier,
+                itemCount: items.length,
+              }}
             />
           </div>
         </div>
@@ -182,3 +243,4 @@ export default async function StageReview({
     </DashboardLayout>
   )
 }
+

@@ -14,6 +14,7 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import UsersPanel from './UsersPanel'
 import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
+import EmailPreviewModal from './EmailPreviewModal'
 import {
   LayoutGrid,
   Users as PeopleIcon,
@@ -28,6 +29,8 @@ import {
   Building2,
   Truck,
   Wallet,
+  Mail,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { AUDIT_ACTION_LABELS } from '@/lib/audit'
 
@@ -56,9 +59,9 @@ const roleDot: Record<string, string> = {
   sam: 'bg-indigo-500',
 }
 
-type Section = 'overview' | 'users' | 'projects' | 'suppliers' | 'requests' | 'pos' | 'audit' | 'settings'
+type Section = 'overview' | 'users' | 'projects' | 'suppliers' | 'requests' | 'pos' | 'audit' | 'emails' | 'settings'
 
-const SECTIONS: Section[] = ['overview', 'users', 'projects', 'suppliers', 'requests', 'pos', 'audit', 'settings']
+const SECTIONS: Section[] = ['overview', 'users', 'projects', 'suppliers', 'requests', 'pos', 'audit', 'emails', 'settings']
 
 const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutGrid size={18} /> },
@@ -68,7 +71,8 @@ const nav: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'requests', label: 'Requests', icon: <ClipboardCheck size={18} /> },
   { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> },
   { id: 'audit', label: 'Audit Trail', icon: <History size={18} /> },
-  { id: 'settings', label: 'Settings', icon: <Settings size={18} /> },
+  { id: 'emails', label: 'Email Templates', icon: <Mail size={18} /> },
+  { id: 'settings', label: 'Workspace Preferences', icon: <SlidersHorizontal size={18} /> },
 ]
 
 
@@ -191,6 +195,7 @@ export default function AdminClient({
   }
 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
 
   /** Surface the outcome of an admin action, then re-fetch server data. */
   const notify = (msg: string, ok: boolean) => {
@@ -264,6 +269,38 @@ export default function AdminClient({
       cell: (r) => <span className="tabular-nums text-muted-foreground">{ghs(r.total_amount ?? null)}</span>,
     },
     {
+      id: 'po',
+      label: 'Purchase Order',
+      sortable: true,
+      sortValue: (r) => (r as any).po_number || ((r as any).po_id ? 'PO' : 'None'),
+      cell: (r) => {
+        const poNumber = (r as any).po_number
+        const poId = (r as any).po_id
+        const poStatus = (r as any).po_status
+        if (poId || poNumber) {
+          return (
+            <div className="flex flex-col items-start gap-1">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+                <ShoppingBag size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
+                <span>{poNumber || `PO #${poId.slice(0, 8)}`}</span>
+              </span>
+              {poStatus && (
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  {PO_STATUS_CONFIG[poStatus]?.label || poStatus}
+                </span>
+              )}
+            </div>
+          )
+        }
+        return (
+          <span className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+            No PO Attached
+          </span>
+        )
+      },
+    },
+    {
       id: 'status',
       label: 'Status',
       sortable: true,
@@ -281,6 +318,15 @@ export default function AdminClient({
   ]
 
   const requestFacets: DataFacet<Request>[] = [
+    {
+      id: 'po_state',
+      label: 'PO Attached',
+      options: [
+        { value: 'has_po', label: 'PO Attached' },
+        { value: 'no_po', label: 'No PO (Awaiting PO)' },
+      ],
+      matches: (r, value) => (value === 'has_po' ? Boolean((r as any).po_id) : !((r as any).po_id)),
+    },
     {
       id: 'status',
       label: 'Status',
@@ -417,7 +463,8 @@ export default function AdminClient({
     requests: { title: 'Requisitions Raised', sub: 'Every request raised across the organization' },
     pos: { title: 'Purchase Orders', sub: 'Purchase orders from creation through payment' },
     audit: { title: 'Audit Trail', sub: 'Track all actions across the procurement pipeline' },
-    settings: { title: 'Administration Settings', sub: 'Preferences and system information' },
+    emails: { title: 'Email Notification Studio', sub: 'Preview and test transactional email templates tailored to active workflows' },
+    settings: { title: 'Workspace Preferences', sub: 'Preferences, role distribution and system information' },
   }
 
   return (
@@ -724,6 +771,153 @@ export default function AdminClient({
           />
         )}
 
+        {section === 'emails' && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-muted/30 p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="max-w-2xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="rounded-md border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-xs font-bold text-primary uppercase tracking-wider">
+                      ProcureFlow Email System
+                    </span>
+                    <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      Tailored to Request
+                    </span>
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                    Transactional Workflow Notifications
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                    Stakeholders receive rich, responsive HTML emails tailored to the active requisition — featuring
+                    project site locations, itemized line tables, financial currency summaries, reviewer notes, and bulletproof
+                    role-aware action buttons.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEmailModalOpen(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:shadow-lg press-active shrink-0"
+                >
+                  <Mail size={16} />
+                  <span>Launch Template Studio</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Grid of the 4 milestone templates */}
+            <div className="grid gap-5 md:grid-cols-2">
+              {/* 1. PO Approved */}
+              <div className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-emerald-500/40 hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <CheckCircle size={20} />
+                  </div>
+                  <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                    Approved
+                  </span>
+                </div>
+                <h4 className="mt-3.5 text-base font-bold text-foreground">Purchase Order Approved</h4>
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                  Dispatched to the requisition submitter and creator when Cost Control clears the PO. Notifies them that the order is queued for Finance disbursement.
+                </p>
+                <div className="mt-4 pt-3.5 border-t border-border/60 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-muted-foreground">Trigger: Cost Control Approval</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <span>Preview & Test</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. PO Sent Back */}
+              <div className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-amber-500/40 hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <AlertTriangle size={20} />
+                  </div>
+                  <span className="rounded-full bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide">
+                    Revision Required
+                  </span>
+                </div>
+                <h4 className="mt-3.5 text-base font-bold text-foreground">PO Sent Back for Revision</h4>
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                  Dispatched when an order is returned for correction. Prominently quotes reviewer feedback and notes, with instructions on how to amend and resubmit.
+                </p>
+                <div className="mt-4 pt-3.5 border-t border-border/60 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-muted-foreground">Trigger: Reviewer Send-Back</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <span>Preview & Test</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Payment Complete */}
+              <div className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-teal-500/40 hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                    <Wallet size={20} />
+                  </div>
+                  <span className="rounded-full bg-teal-500/10 border border-teal-500/20 px-2.5 py-0.5 text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wide">
+                    Payment Disbursed
+                  </span>
+                </div>
+                <h4 className="mt-3.5 text-base font-bold text-foreground">Payment Completed & Disbursed</h4>
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                  Dispatched when Finance completes and records disbursement. Confirms settlement details, vendor payment confirmation, and closes the requisition lifecycle.
+                </p>
+                <div className="mt-4 pt-3.5 border-t border-border/60 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-muted-foreground">Trigger: Finance Disbursement</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <span>Preview & Test</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Converted to PO */}
+              <div className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition-all hover:border-indigo-500/40 hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                    <ClipboardCheck size={20} />
+                  </div>
+                  <span className="rounded-full bg-indigo-500/10 border border-indigo-500/20 px-2.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">
+                    PO Generated
+                  </span>
+                </div>
+                <h4 className="mt-3.5 text-base font-bold text-foreground">Requisition Converted to PO</h4>
+                <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">
+                  Dispatched to the submitter when Administration converts their requisition into an official Purchase Order. Shows PO number and assigned vendor.
+                </p>
+                <div className="mt-4 pt-3.5 border-t border-border/60 flex items-center justify-between">
+                  <span className="text-[11px] font-medium text-muted-foreground">Trigger: Admin PO Conversion</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEmailModalOpen(true)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                  >
+                    <span>Preview & Test</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {section === 'settings' && (
           <div className="grid gap-6 lg:grid-cols-2">
             <Panel title="Workspace">
@@ -792,6 +986,20 @@ export default function AdminClient({
               </p>
             </Panel>
 
+            <Panel title="Email Notifications">
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                Preview all responsive email templates tailored to active purchase orders and requisitions.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsEmailModalOpen(true)}
+                className="mt-3 inline-flex h-9 items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/20 press-active"
+              >
+                <Mail size={15} />
+                Open Email Studio
+              </button>
+            </Panel>
+
             <Panel title="Appearance">
               <div className="flex items-center justify-between gap-4">
                 <div>
@@ -819,6 +1027,12 @@ export default function AdminClient({
           </div>
         )}
       </PageContainer>
+
+      <EmailPreviewModal
+        isOpen={isEmailModalOpen}
+        onClose={() => setIsEmailModalOpen(false)}
+        currentUserEmail={user?.email}
+      />
 
       {toast && (
         <div

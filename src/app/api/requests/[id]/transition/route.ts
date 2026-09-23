@@ -11,6 +11,7 @@ import {
   type Stage,
 } from '@/lib/workflow'
 import { createNotification } from '@/lib/notifications'
+import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
 
@@ -166,6 +167,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           link: `/minta/requests/${id}`,
           sendEmailAlert: true,
         })
+
+        await dispatchWorkflowEmail({
+          eventType: 'payment_complete',
+          requestId: id,
+          poId: po?.id,
+          recipientUserId: existing.created_by,
+          performerId: user.id,
+          comments: comment,
+        })
       }
       return NextResponse.json({ success: true, status: 'completed' })
     }
@@ -205,6 +215,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         type: 'success',
         link: `/minta/requests/${id}`,
       })
+
+      if (po && stage === 'cost_control') {
+        await dispatchWorkflowEmail({
+          eventType: 'po_approved',
+          requestId: id,
+          poId: po.id,
+          recipientUserId: existing.created_by,
+          performerId: user.id,
+          comments: comment,
+        })
+      }
     }
 
     return NextResponse.json({
@@ -262,6 +283,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           type: 'warning',
           link: `/minta/requests/${id}`,
           sendEmailAlert: true,
+        })
+
+        await dispatchWorkflowEmail({
+          eventType: 'po_sent_back',
+          requestId: id,
+          poId: po?.id,
+          recipientUserId: existing.created_by,
+          performerId: user.id,
+          comments: comment,
         })
       }
       return NextResponse.json({ success: true, status: 'sent_back', stage: back, notified: 1 })
