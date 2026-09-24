@@ -16,21 +16,25 @@ export default async function MintahRequestsPage() {
   try {
     const [newRes, reviewingRes] = await Promise.all([
       query<Record<string, unknown>>(
-        `SELECT r.*, 
+        `SELECT r.*,
+          pr.name AS project_name, 
           CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
           po.po_number,
           po.status AS po_status
          FROM public.requests r
          LEFT JOIN public.purchase_orders po ON po.request_id = r.id
+         LEFT JOIN public.projects pr ON pr.id = r.project_id
          WHERE r.status IN ('pending_lead') ORDER BY r.created_at DESC`
       ),
       query<Record<string, unknown>>(
-        `SELECT r.*, 
+        `SELECT r.*,
+          pr.name AS project_name, 
           CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
           po.po_number,
           po.status AS po_status
          FROM public.requests r
          LEFT JOIN public.purchase_orders po ON po.request_id = r.id
+         LEFT JOIN public.projects pr ON pr.id = r.project_id
          WHERE r.status IN ('pending_supply_chain') ORDER BY r.created_at DESC`
       ),
     ])

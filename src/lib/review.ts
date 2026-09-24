@@ -213,6 +213,67 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
   }
 }
 
+export interface StageDecision {
+  id: string
+  request_id: string
+  action: string
+  comment: string | null
+  created_at: string
+  actor_name: string | null
+  purpose: string
+  total_amount: number | null
+  project_name: string | null
+  requester_name: string | null
+  po_number: string | null
+  po_status: string | null
+}
+
+/**
+ * What a stage has already decided.
+ *
+ * A queue only answers "what is waiting on me"; once a reviewer approves, the
+ * requisition moves on and leaves their screen with no trace. The decisions are
+ * recorded either way — this reads them back so a stage can see its own record.
+ *
+ * Any stage can be passed, so the same view works for Project Lead, Supply
+ * Chain and Finance.
+ */
+export async function getStageDecisions(
+  stage: Stage,
+  { limit = 200, actorId }: { limit?: number; actorId?: string } = {}
+): Promise<StageDecision[]> {
+  try {
+    return await query<StageDecision>(
+      `SELECT a.id,
+              a.request_id,
+              a.action,
+              a.comment,
+              a.created_at,
+              u.name AS actor_name,
+              r.purpose,
+              r.total_amount,
+              p.name AS project_name,
+              ru.name AS requester_name,
+              po.po_number,
+              po.status AS po_status
+         FROM public.request_approvals a
+         JOIN public.requests r ON r.id = a.request_id
+         LEFT JOIN public.users u ON u.id = a.performed_by
+         LEFT JOIN public.users ru ON ru.id = r.created_by
+         LEFT JOIN public.projects p ON p.id = r.project_id
+         LEFT JOIN public.purchase_orders po ON po.id = a.po_id
+        WHERE a.stage = $1
+          AND ($2::uuid IS NULL OR a.performed_by = $2)
+        ORDER BY a.created_at DESC
+        LIMIT $3`,
+      [stage, actorId ?? null, limit]
+    )
+  } catch (err) {
+    console.error('Failed to load stage decisions from Neon:', err)
+    return []
+  }
+}
+
 /** Count waiting at each of a role's stages, for dashboard tiles. */
 export async function getStageCounts(): Promise<Record<string, number>> {
   try {

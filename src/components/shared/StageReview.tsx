@@ -3,13 +3,14 @@ import { notFound } from 'next/navigation'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
+import PoDocumentActions from '@/components/shared/PoDocumentActions'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
 import { getReviewBundle } from '@/lib/review'
 import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { currentStage, STAGES, canActAt } from '@/lib/workflow'
 import { isElevated } from '@/lib/roles'
 import type { ResolvedUser } from '@/lib/auth/server'
-import { ArrowLeft, ShoppingBag, FileText, ExternalLink } from 'lucide-react'
+import { ArrowLeft, ShoppingBag } from 'lucide-react'
 
 /**
  * One requisition, as any stage of the chain sees it.
@@ -187,19 +188,14 @@ export default async function StageReview({
                     </p>
                   </Field>
                 </div>
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="mt-4 flex flex-col gap-3">
                   <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
                   {poDoc && (
-                    <a
-                      href={poDoc.file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background/60 px-3 py-1.5 text-xs font-medium text-primary hover:border-ring transition-colors"
-                    >
-                      <FileText size={14} />
-                      <span>{poDoc.file_name}</span>
-                      <ExternalLink size={12} className="text-muted-foreground" />
-                    </a>
+                    <PoDocumentActions
+                      documentId={poDoc.id}
+                      fileName={poDoc.file_name}
+                      fileUrl={poDoc.file_url}
+                    />
                   )}
                 </div>
               </Panel>

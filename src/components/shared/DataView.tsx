@@ -151,7 +151,12 @@ export default function DataView<T>({
   initialPageSize?: number
   emptyTitle?: string
   emptyMessage?: string
-  toolbarExtra?: React.ReactNode
+  /**
+   * Extra toolbar content. Given a function, it receives the rows the viewer is
+   * actually looking at — filtered, searched and sorted, across every page — so
+   * an export can match the screen instead of dumping the raw list.
+   */
+  toolbarExtra?: React.ReactNode | ((visibleRows: T[]) => React.ReactNode)
   /** Dashboard preview mode: no toolbar, no pagination, renders every row given. */
   compact?: boolean
   /** Pre-filled search, used to focus a record arrived at from a deep link. */
@@ -356,7 +361,7 @@ export default function DataView<T>({
               )}
             </div>
 
-            {toolbarExtra}
+            {typeof toolbarExtra === 'function' ? toolbarExtra(processed) : toolbarExtra}
 
             {renderCard && (
               <div className="inline-flex shrink-0 rounded-lg border border-input bg-card p-0.5" role="group" aria-label="View mode">

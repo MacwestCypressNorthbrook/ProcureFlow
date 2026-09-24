@@ -21,10 +21,18 @@ export default async function MintahPage() {
   try {
     const [incomingRes, reviewingRes, poRes] = await Promise.all([
       query<Record<string, unknown>>(
-        `SELECT * FROM public.requests WHERE status IN ('pending_lead') ORDER BY created_at DESC LIMIT 8`
+        `SELECT r.*, pr.name AS project_name
+           FROM public.requests r
+           LEFT JOIN public.projects pr ON pr.id = r.project_id
+          WHERE r.status IN ('pending_lead')
+          ORDER BY r.created_at DESC LIMIT 8`
       ),
       query<Record<string, unknown>>(
-        `SELECT * FROM public.requests WHERE status IN ('pending_supply_chain') ORDER BY created_at DESC LIMIT 8`
+        `SELECT r.*, pr.name AS project_name
+           FROM public.requests r
+           LEFT JOIN public.projects pr ON pr.id = r.project_id
+          WHERE r.status IN ('pending_supply_chain')
+          ORDER BY r.created_at DESC LIMIT 8`
       ),
       query<Record<string, unknown>>(
         `SELECT * FROM public.purchase_orders WHERE created_by = $1 ORDER BY created_at DESC`,

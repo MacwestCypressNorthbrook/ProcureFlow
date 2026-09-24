@@ -56,12 +56,14 @@ export default async function AdminPage() {
     ),
     query<Request & { po_id?: string | null; po_number?: string | null; po_status?: string | null; po_vendor_name?: string | null; po_amount?: number | null }>(
       `SELECT r.*,
+              pr.name AS project_name,
               po.id as po_id,
               po.po_number as po_number,
               po.status as po_status,
               po.vendor_name as po_vendor_name,
               po.total_amount as po_amount
        FROM public.requests r
+       LEFT JOIN public.projects pr ON pr.id = r.project_id
        LEFT JOIN LATERAL (
          SELECT id, po_number, status, vendor_name, total_amount
          FROM public.purchase_orders

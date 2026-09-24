@@ -21,6 +21,26 @@ export function openDocument(url: string) {
   }
 }
 
+/**
+ * Where to fetch an attachment from.
+ *
+ * Most rows store a storage key such as `uploads/po-docs/<id>/file.pdf`, which
+ * is not a URL — pointed at directly it resolves against the current origin and
+ * 404s. `/api/documents/<id>` signs a short-lived link and redirects, and is the
+ * only path that also checks the viewer is allowed the file. Legacy rows that
+ * hold a real URL are used as they are.
+ *
+ * `download` asks the browser to save the file rather than display it.
+ */
+export function documentUrl(
+  id: string,
+  fileUrl: string,
+  { download = false }: { download?: boolean } = {}
+): string {
+  if (/^(https?|data|blob):/i.test(fileUrl)) return fileUrl
+  return `/api/documents/${encodeURIComponent(id)}${download ? '?download=1' : ''}`
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`

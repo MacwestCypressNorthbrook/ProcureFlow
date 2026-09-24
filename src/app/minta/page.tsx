@@ -22,9 +22,11 @@ export default async function MintaPage() {
   if (user?.id) {
     try {
       myRequests = await query<Record<string, unknown>>(
-        `SELECT * FROM public.requests
-         WHERE created_by = $1
-         ORDER BY created_at DESC`,
+        `SELECT r.*, pr.name AS project_name
+           FROM public.requests r
+           LEFT JOIN public.projects pr ON pr.id = r.project_id
+          WHERE r.created_by = $1
+          ORDER BY r.created_at DESC`,
         [user.id]
       )
     } catch (err) {

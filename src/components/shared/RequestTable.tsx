@@ -18,6 +18,8 @@ interface RequestRow {
   total_amount?: number | null
   status: string
   created_at: string
+  /** Joined from public.projects — the site the materials are for. */
+  project_name?: string | null
   [key: string]: unknown
 }
 
@@ -84,6 +86,21 @@ export default function RequestTable({
           </div>
         )
       },
+    },
+    {
+      id: 'project',
+      label: 'Project site',
+      hideBelow: 'md',
+      sortable: true,
+      sortValue: (r) => r.project_name ?? '',
+      cell: (r) =>
+        r.project_name ? (
+          <span className="block max-w-[200px] truncate text-sm text-foreground" title={r.project_name}>
+            {r.project_name}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        ),
     },
     {
       id: 'requester',

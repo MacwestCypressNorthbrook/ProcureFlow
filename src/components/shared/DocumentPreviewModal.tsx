@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
-import { X, ExternalLink, AlertCircle } from 'lucide-react'
+import { X, ExternalLink, Download, AlertCircle } from 'lucide-react'
 import { dataUrlToBlob, openDocument } from '@/lib/files'
 
 interface DocumentPreviewModalProps {
@@ -10,9 +10,17 @@ interface DocumentPreviewModalProps {
   onClose: () => void
   fileName: string
   fileUrl: string
+  /** Save-to-disk link. Omitted for data URLs, which the browser saves itself. */
+  downloadUrl?: string
 }
 
-export default function DocumentPreviewModal({ isOpen, onClose, fileName, fileUrl }: DocumentPreviewModalProps) {
+export default function DocumentPreviewModal({
+  isOpen,
+  onClose,
+  fileName,
+  fileUrl,
+  downloadUrl,
+}: DocumentPreviewModalProps) {
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -48,9 +56,17 @@ export default function DocumentPreviewModal({ isOpen, onClose, fileName, fileUr
         <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-3">
           <h2 className="truncate text-sm font-semibold text-foreground">{fileName}</h2>
           <div className="flex shrink-0 items-center gap-2">
+            <a
+              href={downloadUrl ?? fileUrl}
+              download={fileName}
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-input bg-card px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <Download size="13" />
+              Download
+            </a>
             <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => openDocument(fileUrl)}>
               <ExternalLink size="13" />
-              Open in New Tab
+              Open in new tab
             </Button>
             <Button variant="ghost" size="icon-sm" onClick={onClose}>
               <X size="16" />

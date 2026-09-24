@@ -34,6 +34,23 @@ export default function TrackingClient({ requests }: { requests: Request[] }) {
       ),
     },
     {
+      id: 'project',
+      label: 'Project site',
+      hideBelow: 'md',
+      sortable: true,
+      sortValue: (r) => (r as unknown as { project_name?: string | null }).project_name ?? '',
+      cell: (r) => {
+        const site = (r as unknown as { project_name?: string | null }).project_name
+        return site ? (
+          <span className="block max-w-[200px] truncate text-sm text-foreground" title={site}>
+            {site}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        )
+      },
+    },
+    {
       id: 'amount',
       label: 'Amount',
       align: 'right',
@@ -95,7 +112,11 @@ export default function TrackingClient({ requests }: { requests: Request[] }) {
       columns={columns}
       facets={facets}
       searchPlaceholder="Search your requests…"
-      searchText={(r) => [r.purpose, r.description]}
+      searchText={(r) => [
+        r.purpose,
+        r.description,
+        (r as unknown as { project_name?: string | null }).project_name,
+      ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey="minta-tracking"
       onRowClick={(r) => router.push(`/minta/requests/${r.id}`)}

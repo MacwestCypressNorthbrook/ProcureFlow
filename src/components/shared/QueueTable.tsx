@@ -45,10 +45,24 @@ export default function QueueTable({
           </Link>
           <p className="truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
-            {r.project_name ? ` · ${r.project_name}` : ''}
           </p>
         </div>
       ),
+    },
+    {
+      id: 'project',
+      label: 'Project site',
+      hideBelow: 'md',
+      sortable: true,
+      sortValue: (r) => r.project_name ?? '',
+      cell: (r) =>
+        r.project_name ? (
+          <span className="block max-w-[200px] truncate text-sm text-foreground" title={r.project_name}>
+            {r.project_name}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        ),
     },
     {
       id: 'amount',
