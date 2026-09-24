@@ -5,6 +5,8 @@ import type { ProjectWithMemberCount } from '@/lib/types'
 import { AdminButton, AdminError, AdminField, AdminModal, ConfirmPanel, adminInputClass } from './admin-ui'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { MapPin, Plus, Users as UsersIcon } from 'lucide-react'
+import ExportButton from './ExportButton'
+import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
 
 const STATUSES: { value: string; label: string }[] = [
   { value: 'active', label: 'Active' },
@@ -140,6 +142,16 @@ export default function ProjectsPanel({
     }
   }
 
+  const projectCsv: CsvColumn<ProjectWithMemberCount>[] = [
+    { header: 'Name', value: (p) => p.name },
+    { header: 'Code', value: (p) => p.code ?? '' },
+    { header: 'Location', value: (p) => p.site_location ?? '' },
+    { header: 'Client', value: (p) => p.client ?? '' },
+    { header: 'Status', value: (p) => p.status },
+    { header: 'Members', value: (p) => p.member_count ?? 0 },
+    { header: 'Created', value: (p) => csvDate(p.created_at) },
+  ]
+
   const columns: DataColumn<ProjectWithMemberCount>[] = [
     {
       id: 'name',
@@ -222,11 +234,14 @@ export default function ProjectsPanel({
         onRowClick={openEdit}
         emptyTitle="No project sites yet"
         emptyMessage="Create one so engineers can raise requisitions against a site."
-        toolbarExtra={
-          <AdminButton type="button" onClick={openCreate} className="shrink-0">
-            <Plus size={16} /> New project
-          </AdminButton>
-        }
+        toolbarExtra={(visible) => (
+          <>
+            <ExportButton rows={visible} columns={projectCsv} section="project-sites" />
+            <AdminButton type="button" onClick={openCreate} className="shrink-0">
+              <Plus size={16} /> New project
+            </AdminButton>
+          </>
+        )}
         renderCard={(p) => (
           <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
             <div className="flex items-start justify-between gap-3">

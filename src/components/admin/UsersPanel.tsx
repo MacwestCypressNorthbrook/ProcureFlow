@@ -6,6 +6,8 @@ import { ROLES, ASSIGNABLE_ROLES, normalizeRole, roleLabel } from '@/lib/roles'
 import { AdminButton, AdminError, AdminField, AdminModal, ConfirmPanel, adminInputClass } from './admin-ui'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { Mail, ShieldCheck, UserPlus } from 'lucide-react'
+import ExportButton from './ExportButton'
+import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
 
 /** A profile created by an admin that nobody has signed up against yet. */
 const isPending = (u: UserWithProjects) => Boolean(u.auth_id?.startsWith('pending:'))
@@ -226,6 +228,19 @@ export default function UsersPanel({
       )
     : projects
 
+  const userCsv: CsvColumn<UserWithProjects>[] = [
+    { header: 'Name', value: (u) => u.name ?? '' },
+    { header: 'Email', value: (u) => u.email },
+    { header: 'Role', value: (u) => roleLabel(u.role) },
+    {
+      header: 'Status',
+      value: (u) => (u.is_active === false ? 'Disabled' : isPending(u) ? 'Invited' : 'Active'),
+    },
+    { header: 'Project sites', value: (u) => (u.projects ?? []).map((p) => p.name).join('; ') },
+    { header: 'Phone', value: (u) => u.phone ?? '' },
+    { header: 'Created', value: (u) => csvDate(u.created_at) },
+  ]
+
   const columns: DataColumn<UserWithProjects>[] = [
     {
       id: 'name',
@@ -372,11 +387,14 @@ export default function UsersPanel({
         onRowClick={openEdit}
         emptyTitle="No users yet"
         emptyMessage="People appear here once they are added or sign in."
-        toolbarExtra={
-          <AdminButton type="button" onClick={openCreate} className="shrink-0">
-            <UserPlus size={16} /> Add user
-          </AdminButton>
-        }
+        toolbarExtra={(visible) => (
+          <>
+            <ExportButton rows={visible} columns={userCsv} section="users" />
+            <AdminButton type="button" onClick={openCreate} className="shrink-0">
+              <UserPlus size={16} /> Add user
+            </AdminButton>
+          </>
+        )}
         renderCard={(u) => (
           <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
             <div className="flex items-start gap-3">

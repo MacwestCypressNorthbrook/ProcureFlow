@@ -15,6 +15,8 @@ import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
 import EmailPreviewModal from './EmailPreviewModal'
 import AttachPODrawer from './AttachPODrawer'
+import ExportButton from './ExportButton'
+import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
 import {
   LayoutGrid,
   Users as PeopleIcon,
@@ -65,6 +67,7 @@ const roleDot: Record<string, string> = {
 
 /** A requisition row as the admin page queries it — with its purchase order folded in. */
 type AdminRequest = Request & {
+  project_name?: string | null
   po_id?: string | null
   po_number?: string | null
   po_status?: string | null
@@ -311,6 +314,38 @@ export default function AdminClient({
       ),
   }
 
+  /* ── CSV shapes: flat, spreadsheet-friendly, labels matching the screen ── */
+
+  const requestCsv: CsvColumn<AdminRequest>[] = [
+    { header: 'Purpose', value: (r) => r.purpose },
+    { header: 'Requester', value: (r) => r.guest_name ?? '' },
+    { header: 'Project site', value: (r) => r.project_name ?? '' },
+    { header: 'Department', value: (r) => r.department ?? '' },
+    { header: 'Amount (GHS)', value: (r) => csvNumber(r.total_amount) },
+    { header: 'Status', value: (r) => REQUEST_STATUS_CONFIG[r.status]?.label ?? r.status },
+    { header: 'PO number', value: (r) => r.po_number ?? '' },
+    { header: 'PO status', value: (r) => (r.po_status ? PO_STATUS_CONFIG[r.po_status]?.label ?? r.po_status : '') },
+    { header: 'Created', value: (r) => csvDate(r.created_at) },
+  ]
+
+  const poCsv: CsvColumn<PurchaseOrder>[] = [
+    { header: 'PO number', value: (p) => p.po_number ?? '' },
+    { header: 'Purpose', value: (p) => p.purpose },
+    { header: 'Vendor', value: (p) => p.vendor_name ?? '' },
+    { header: 'Amount (GHS)', value: (p) => csvNumber(p.total_amount) },
+    { header: 'Status', value: (p) => PO_STATUS_CONFIG[p.status]?.label ?? p.status },
+    { header: 'Created', value: (p) => csvDate(p.created_at) },
+    { header: 'Paid on', value: (p) => csvDate(p.paid_at ?? null) },
+  ]
+
+  const auditCsv: CsvColumn<AuditEntry>[] = [
+    { header: 'Action', value: (e) => AUDIT_ACTION_LABELS[e.action] ?? e.action },
+    { header: 'Purchase order', value: (e) => e.po?.purpose ?? '' },
+    { header: 'Performed by', value: (e) => e.performer?.name ?? e.performer?.email ?? '' },
+    { header: 'Notes', value: (e) => e.notes ?? '' },
+    { header: 'Time', value: (e) => csvDate(e.created_at) },
+  ]
+
   const requestCols: DataColumn<AdminRequest>[] = [
     {
       id: 'purpose',
@@ -326,6 +361,21 @@ export default function AdminClient({
       sortable: true,
       sortValue: (r) => r.guest_name ?? '',
       cell: (r) => <span className="text-sm text-muted-foreground">{r.guest_name ?? '—'}</span>,
+    },
+    {
+      id: 'project',
+      label: 'Project site',
+      hideBelow: 'lg',
+      sortable: true,
+      sortValue: (r) => r.project_name ?? '',
+      cell: (r) =>
+        r.project_name ? (
+          <span className="block max-w-[190px] truncate text-sm text-foreground" title={r.project_name}>
+            {r.project_name}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">Unassigned</span>
+        ),
     },
     {
       id: 'amount',
@@ -770,10 +820,13 @@ export default function AdminClient({
             facets={requestFacets}
             onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
             searchPlaceholder="Search requisitions…"
-            searchText={(r) => [r.id, r.purpose, r.guest_name, r.guest_email, r.department]}
+            searchText={(r) => [r.id, r.purpose, r.guest_name, r.guest_email, r.department, r.project_name]}
             initialTerm={focusId}
             defaultSort={{ id: 'created_at', dir: 'desc' }}
             storageKey="admin-requests"
+            toolbarExtra={(visible) => (
+              <ExportButton rows={visible} columns={requestCsv} section="requisitions" />
+            )}
             emptyTitle="No requests raised yet"
             renderCard={(r) => (
               <article className="surface flex h-full flex-col rounded-xl p-4">
@@ -804,6 +857,9 @@ export default function AdminClient({
             initialTerm={focusId}
             defaultSort={{ id: 'created_at', dir: 'desc' }}
             storageKey="admin-pos"
+            toolbarExtra={(visible) => (
+              <ExportButton rows={visible} columns={poCsv} section="purchase-orders" />
+            )}
             emptyTitle="No purchase orders yet"
             renderCard={(p) => (
               <article className="surface flex h-full flex-col rounded-xl p-4">
@@ -832,6 +888,9 @@ export default function AdminClient({
             searchPlaceholder="Search the audit trail…"
             searchText={(e) => [e.action, e.notes, e.po?.purpose, e.performer?.name, e.performer?.email]}
             defaultSort={{ id: 'created_at', dir: 'desc' }}
+            toolbarExtra={(visible) => (
+              <ExportButton rows={visible} columns={auditCsv} section="audit-trail" />
+            )}
             storageKey="admin-audit"
             emptyTitle="No audit trail entries yet"
           />

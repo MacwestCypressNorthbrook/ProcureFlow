@@ -12,6 +12,7 @@ import {
   ShoppingBag,
   Eye,
   ExternalLink,
+  Download,
   RefreshCw,
   AlertCircle,
   FileCheck2,
@@ -20,6 +21,7 @@ import {
 import { STAGES, type Stage } from '@/lib/workflow'
 import type { PurchaseOrder } from '@/lib/types'
 import DocumentPreviewModal from '@/components/shared/DocumentPreviewModal'
+import { documentUrl } from '@/lib/files'
 import AttachPODrawer from '@/components/admin/AttachPODrawer'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -108,7 +110,11 @@ export default function ApprovalPanel({
   const [error, setError] = useState<string | null>(null)
 
   // Document preview modal state
-  const [previewDoc, setPreviewDoc] = useState<{ name: string; url: string } | null>(null)
+  const [previewDoc, setPreviewDoc] = useState<{
+    name: string
+    url: string
+    downloadUrl: string
+  } | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   const act = async (action: 'approve' | 'send_back' | 'resubmit') => {
@@ -136,7 +142,11 @@ export default function ApprovalPanel({
 
   const requestDocs = documents.filter((d) => d.source === 'request')
   const poDocs = documents.filter((d) => d.source === 'po')
-  const activePoDoc = poDocs[0] || (po?.file_path ? { file_name: po.file_name || 'PO Document', file_url: po.file_path } : null)
+  const activePoDoc =
+    poDocs[0] ||
+    (po?.file_path
+      ? { id: `po-file-${po.id}`, file_name: po.file_name || 'PO Document', file_url: po.file_path }
+      : null)
 
   const isAdminStage = stage === 'admin' && canAct
 
@@ -149,6 +159,7 @@ export default function ApprovalPanel({
           onClose={() => setPreviewDoc(null)}
           fileName={previewDoc.name}
           fileUrl={previewDoc.url}
+          downloadUrl={previewDoc.downloadUrl}
         />
       )}
 
@@ -191,19 +202,34 @@ export default function ApprovalPanel({
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setPreviewDoc({ name: doc.file_name, url: doc.file_url })}
+                          onClick={() =>
+                            setPreviewDoc({
+                              name: doc.file_name,
+                              url: documentUrl(doc.id, doc.file_url),
+                              downloadUrl: documentUrl(doc.id, doc.file_url, { download: true }),
+                            })
+                          }
                           className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
-                          title="Preview document"
+                          title={`Preview ${doc.file_name}`}
                         >
                           <Eye size={13} />
                           Preview
                         </button>
                         <a
-                          href={doc.file_url}
+                          href={documentUrl(doc.id, doc.file_url, { download: true })}
+                          download={doc.file_name}
+                          className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          title={`Download ${doc.file_name}`}
+                        >
+                          <Download size={13} />
+                          <span className="hidden sm:inline">Download</span>
+                        </a>
+                        <a
+                          href={documentUrl(doc.id, doc.file_url)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 rounded p-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                          title="Open in new tab"
+                          title="Open in a new tab"
                         >
                           <ExternalLink size={13} />
                         </a>
@@ -272,7 +298,15 @@ export default function ApprovalPanel({
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs gap-1.5"
-                          onClick={() => setPreviewDoc({ name: activePoDoc.file_name, url: activePoDoc.file_url })}
+                          onClick={() =>
+                            setPreviewDoc({
+                              name: activePoDoc.file_name,
+                              url: documentUrl(activePoDoc.id, activePoDoc.file_url),
+                              downloadUrl: documentUrl(activePoDoc.id, activePoDoc.file_url, {
+                                download: true,
+                              }),
+                            })
+                          }
                         >
                           <Eye size={13} />
                           Preview Odoo PDF

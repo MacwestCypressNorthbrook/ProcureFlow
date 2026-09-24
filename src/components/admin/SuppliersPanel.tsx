@@ -5,6 +5,8 @@ import type { Supplier } from '@/lib/types'
 import { AdminButton, AdminError, AdminField, AdminModal, ConfirmPanel, adminInputClass } from './admin-ui'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { Mail, Phone, Plus } from 'lucide-react'
+import ExportButton from './ExportButton'
+import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
 
 export type SupplierRow = Supplier & { usage_count?: number }
 
@@ -131,6 +133,17 @@ export default function SuppliersPanel({
     }
   }
 
+  const supplierCsv: CsvColumn<SupplierRow>[] = [
+    { header: 'Name', value: (s) => s.name },
+    { header: 'Category', value: (s) => s.category ?? '' },
+    { header: 'Contact', value: (s) => s.contact_name ?? '' },
+    { header: 'Phone', value: (s) => s.phone ?? '' },
+    { header: 'Email', value: (s) => s.email ?? '' },
+    { header: 'Active', value: (s) => s.is_active },
+    { header: 'Times used', value: (s) => s.usage_count ?? 0 },
+    { header: 'Created', value: (s) => csvDate(s.created_at) },
+  ]
+
   const columns: DataColumn<SupplierRow>[] = [
     {
       id: 'name',
@@ -221,11 +234,14 @@ export default function SuppliersPanel({
         onRowClick={openEdit}
         emptyTitle="No suppliers yet"
         emptyMessage="Add vendors here so engineers can pick them on a requisition."
-        toolbarExtra={
-          <AdminButton type="button" onClick={openCreate} className="shrink-0">
-            <Plus size={16} /> New supplier
-          </AdminButton>
-        }
+        toolbarExtra={(visible) => (
+          <>
+            <ExportButton rows={visible} columns={supplierCsv} section="suppliers" />
+            <AdminButton type="button" onClick={openCreate} className="shrink-0">
+              <Plus size={16} /> New supplier
+            </AdminButton>
+          </>
+        )}
         renderCard={(s) => (
           <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
             <div className="flex items-start justify-between gap-3">
