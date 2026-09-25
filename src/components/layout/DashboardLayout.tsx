@@ -34,6 +34,7 @@ import {
   History,
   FileCheck2,
   Lock,
+  SlidersHorizontal,
 } from 'lucide-react'
 
 interface NavItem {
@@ -264,6 +265,7 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
         { href: '/admin?tab=suppliers', label: 'Suppliers', icon: <Truck size={18} /> },
         { href: '/admin?tab=emails', label: 'Email Templates', icon: <Mail size={18} /> },
         { href: '/admin?tab=audit', label: 'Audit Trail', icon: <History size={18} /> },
+        { href: '/admin?tab=settings', label: 'Workspace Preferences', icon: <SlidersHorizontal size={18} /> },
       ],
     },
   ],
