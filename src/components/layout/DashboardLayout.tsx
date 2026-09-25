@@ -4,7 +4,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import ThemeToggle from '@/components/layout/ThemeToggle'
 import NotificationBell from '@/components/layout/NotificationBell'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
@@ -33,6 +33,7 @@ import {
   Mail,
   History,
   FileCheck2,
+  Lock,
 } from 'lucide-react'
 
 interface NavItem {
@@ -70,6 +71,13 @@ interface DashboardLayoutProps {
    */
   navSkeleton?: boolean
   navBadges?: Record<string, number>
+  /**
+   * Nav items to render as closed rather than as a link, keyed by href, with
+   * the reason shown as a tooltip. Currently how the Super User-configured
+   * requisition submission window keeps "New Request" out of reach on days
+   * it's closed, without hiding the item outright.
+   */
+  disabledNav?: Record<string, string>
 }
 
 /**
@@ -99,6 +107,40 @@ const ROUTE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/admin': { title: 'Administration', subtitle: 'Requisitions, purchase orders and reference data' },
   '/admin/requests': { title: 'Requisitions', subtitle: 'Every request raised across the organization' },
   '/settings': { title: 'Settings', subtitle: 'Your profile and preferences' },
+}
+
+/**
+ * Picks the single sidebar item that best matches the current location, so
+ * a parent route (e.g. `/minta`) never lights up alongside a more specific
+ * child route (`/minta/requests/:id`), and so tab-based routes (`/admin?tab=x`)
+ * are matched on their query string, not just the pathname.
+ */
+function activeHrefFor(hrefs: string[], pathname: string, currentTab: string | null): string | null {
+  let best: string | null = null
+  let bestScore = -1
+  for (const href of hrefs) {
+    const [itemPath, itemQuery] = href.split('?')
+    if (itemQuery) {
+      const itemTab = new URLSearchParams(itemQuery).get('tab')
+      if (pathname === itemPath && currentTab === itemTab) {
+        const score = href.length
+        if (score > bestScore) {
+          bestScore = score
+          best = href
+        }
+      }
+    } else {
+      const matches = pathname === itemPath || (itemPath !== '/' && pathname.startsWith(itemPath + '/'))
+      if (matches && !currentTab) {
+        const score = itemPath.length
+        if (score > bestScore) {
+          bestScore = score
+          best = href
+        }
+      }
+    }
+  }
+  return best
 }
 
 function titleForPath(pathname: string): { title: string; subtitle?: string } {
@@ -246,8 +288,11 @@ export default function DashboardLayout({
   customNav,
   navBadges,
   navSkeleton = false,
+  disabledNav,
 }: DashboardLayoutProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const currentTab = searchParams.get('tab')
   const [mobileOpen, setMobileOpen] = useState(false)
   const routeMeta = titleForPath(pathname)
   const headerTitle = title ?? routeMeta.title
@@ -297,6 +342,14 @@ export default function DashboardLayout({
     .slice(0, 2)
     .toUpperCase()
 
+  // Computed once across every item so exactly one sidebar entry lights up —
+  // never a parent route alongside its more specific child.
+  const activeHref = activeHrefFor(
+    sections.flatMap((s) => s.items.map((i) => i.href).filter((h): h is string => !!h)),
+    pathname,
+    currentTab
+  )
+
   const sidebarContent = (onNavigate?: () => void) => (
     <div className="flex h-full flex-col bg-card/50 dark:bg-card/30 backdrop-blur-md">
       {/* Sidebar Header */}
@@ -339,9 +392,7 @@ export default function DashboardLayout({
             <div className="space-y-0.5">
               {section.items.map((item) => {
                 const href = item.href
-                const isActive =
-                  item.active ??
-                  (href ? pathname === href || (href !== '/' && pathname.startsWith(href + '/')) : false)
+                const isActive = item.active ?? (href ? href === activeHref : false)
                 const badgeCount = href ? navBadges?.[href] : undefined
                 const content = (
                   <>
@@ -372,6 +423,22 @@ export default function DashboardLayout({
                     >
                       {content}
                     </button>
+                  )
+                }
+
+                const disabledReason = href ? disabledNav?.[href] : undefined
+                if (disabledReason) {
+                  return (
+                    <span
+                      key={href}
+                      title={disabledReason}
+                      aria-disabled="true"
+                      className={`${baseClass} cursor-not-allowed opacity-50`}
+                    >
+                      <span className="transition-transform duration-200">{item.icon}</span>
+                      <span className="flex-1">{item.label}</span>
+                      <Lock size={14} className="shrink-0" />
+                    </span>
                   )
                 }
 

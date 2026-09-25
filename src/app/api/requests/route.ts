@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { Request as DbRequest, User } from '@/lib/types'
 import { statusForStage } from '@/lib/workflow'
+import { getRequestWindowSettings, isRequestDayBlocked, blockedDaysLabel } from '@/lib/settings'
 
 /** One material line as submitted by the requisition form. */
 interface IncomingItem {
@@ -30,6 +31,18 @@ export async function POST(request: Request) {
 
   const limit = await rateLimit(`request-create:${guard.user.id}`, { max: 20, windowSeconds: 300 })
   if (!limit.ok) return tooManyRequests('Too many requisitions submitted. Wait a few minutes.', limit.retryAfter)
+
+  // The UI already closes the form on these days; this is the backstop for a
+  // tab left open from before the window closed.
+  if (!isElevated(guard.user.role)) {
+    const requestWindow = await getRequestWindowSettings()
+    if (isRequestDayBlocked(requestWindow)) {
+      return NextResponse.json(
+        { error: `Requisitions cannot be raised on ${blockedDaysLabel(requestWindow.blockedDays)}.` },
+        { status: 403 }
+      )
+    }
+  }
 
   let body: Record<string, unknown>
   try {

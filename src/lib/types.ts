@@ -68,6 +68,8 @@ export interface Request {
   po_id?: string | null
   po_number?: string | null
   po_status?: string | null
+  /** Overall discount Supply Chain applied across the materials, subtracted from the line-item subtotal. */
+  discount_amount?: number | null
 }
 
 export type POStatus =

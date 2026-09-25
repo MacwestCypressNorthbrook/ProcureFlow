@@ -17,6 +17,7 @@ import {
   AlertCircle,
   FileCheck2,
   FileUp,
+  Upload,
 } from 'lucide-react'
 import { STAGES, type Stage } from '@/lib/workflow'
 import type { PurchaseOrder } from '@/lib/types'
@@ -116,6 +117,29 @@ export default function ApprovalPanel({
     downloadUrl: string
   } | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [uploadingDoc, setUploadingDoc] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  const uploadDocument = async (file: File | undefined) => {
+    if (!file) return
+    setUploadingDoc(true)
+    setUploadError(null)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      const res = await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setUploadError(payload.error ?? 'Could not attach that file.')
+        return
+      }
+      router.refresh()
+    } catch {
+      setUploadError('Network error — the file was not attached.')
+    } finally {
+      setUploadingDoc(false)
+    }
+  }
 
   const act = async (action: 'approve' | 'send_back' | 'resubmit') => {
     setBusy(action)
@@ -171,8 +195,31 @@ export default function ApprovalPanel({
               <Paperclip size={15} className="text-muted-foreground" />
               Documents
             </h2>
-            <span className="text-xs text-muted-foreground">{documents.length}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{documents.length}</span>
+              {canAct && !isAdminStage && (
+                <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
+                  {uploadingDoc ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                  Attach
+                  <input
+                    type="file"
+                    className="sr-only"
+                    disabled={uploadingDoc}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      uploadDocument(file)
+                      e.target.value = ''
+                    }}
+                  />
+                </label>
+              )}
+            </div>
           </div>
+          {uploadError && (
+            <p className="border-b border-border bg-destructive/10 px-4 py-2 text-xs font-medium text-destructive">
+              {uploadError}
+            </p>
+          )}
           <div className="p-4">
             {documents.length === 0 ? (
               <p className="text-sm text-muted-foreground">No documents were attached.</p>

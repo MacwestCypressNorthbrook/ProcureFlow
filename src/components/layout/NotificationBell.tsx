@@ -46,6 +46,17 @@ export default function NotificationBell() {
     }
   }
 
+  const clearAll = async () => {
+    const previous = notifications
+    setNotifications([])
+    try {
+      await fetch('/api/notifications', { method: 'DELETE' })
+    } catch {
+      // Restore so a network failure doesn't quietly lose the list.
+      setNotifications(previous)
+    }
+  }
+
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
   const getIcon = (type: string) => {
@@ -83,7 +94,7 @@ export default function NotificationBell() {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 top-12 z-50 w-80 sm:w-96 rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="fixed inset-x-4 top-20 z-50 max-h-[75vh] overflow-hidden rounded-2xl border border-border bg-card/95 backdrop-blur-md shadow-xl animate-in fade-in zoom-in-95 sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:max-h-none sm:w-96">
             <div className="flex items-center justify-between border-b border-border/80 px-4 py-3 bg-muted/30">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-foreground">Notifications & Alerts</span>
@@ -93,6 +104,15 @@ export default function NotificationBell() {
                   </span>
                 )}
               </div>
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={clearAll}
+                  className="text-[11px] font-medium text-muted-foreground hover:text-destructive"
+                >
+                  Clear all
+                </button>
+              )}
             </div>
 
             <div className="max-h-[360px] overflow-y-auto divide-y divide-border/50">

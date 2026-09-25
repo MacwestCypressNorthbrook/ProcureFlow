@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getUserFromSession } from '@/lib/auth/server'
-import { getUserNotifications, markNotificationAsRead } from '@/lib/notifications'
+import { clearUserNotifications, getUserNotifications, markNotificationAsRead } from '@/lib/notifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,5 +26,15 @@ export async function POST(request: Request) {
   }
 
   await markNotificationAsRead(id, user.id)
+  return NextResponse.json({ success: true })
+}
+
+export async function DELETE() {
+  const user = await getUserFromSession()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  await clearUserNotifications(user.id)
   return NextResponse.json({ success: true })
 }

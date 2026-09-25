@@ -146,6 +146,17 @@ export async function markNotificationAsRead(id: string, userId: string): Promis
 }
 
 /**
+ * Delete every notification belonging to a user (the dropdown's "Clear all").
+ */
+export async function clearUserNotifications(userId: string): Promise<void> {
+  try {
+    await execute(`DELETE FROM public.notifications WHERE user_id = $1`, [userId])
+  } catch (err) {
+    console.error('Failed to clear user notifications:', err)
+  }
+}
+
+/**
  * Process due reminders and send out emails & in-app alerts.
  */
 export async function dispatchPendingReminders(): Promise<{ processed: number }> {

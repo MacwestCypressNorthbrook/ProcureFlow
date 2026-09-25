@@ -49,7 +49,7 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
                LIMIT 1
          ) po ON true
         WHERE r.status = ANY($1::text[])
-        ORDER BY r.created_at ASC`,
+        ORDER BY r.created_at DESC`,
       [statuses]
     )
   } catch (err) {
@@ -93,6 +93,7 @@ export interface RequestItemRow {
   unit: string | null
   unit_price: number
   line_total: number
+  supplier_id: string | null
   supplier_name: string | null
   remarks: string | null
 }
@@ -135,7 +136,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
       query<RequestItemRow>(
         `SELECT ri.id, ri.position, ri.description, ri.quantity, ri.unit,
                 ri.unit_price, ri.line_total, ri.remarks,
-                s.name AS supplier_name
+                ri.supplier_id, s.name AS supplier_name
            FROM public.request_items ri
            LEFT JOIN public.suppliers s ON s.id = ri.supplier_id
           WHERE ri.request_id = $1
@@ -153,7 +154,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
         `SELECT id, file_name, file_url, file_size
            FROM public.request_attachments
           WHERE request_id = $1
-          ORDER BY created_at ASC`,
+          ORDER BY created_at DESC`,
         [requestId]
       ),
       query<ApprovalEntry>(
@@ -182,7 +183,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
         `SELECT id, file_name, file_url, file_size
            FROM public.po_attachments
           WHERE po_id = $1
-          ORDER BY created_at ASC`,
+          ORDER BY created_at DESC`,
         [po.id]
       )
       for (const d of poDocs) {

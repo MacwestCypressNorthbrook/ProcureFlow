@@ -14,6 +14,7 @@ import UsersPanel from './UsersPanel'
 import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
 import EmailPreviewModal from './EmailPreviewModal'
+import RequestWindowPanel from './RequestWindowPanel'
 import AttachPODrawer from './AttachPODrawer'
 import ExportButton from './ExportButton'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
@@ -182,6 +183,7 @@ export default function AdminClient({
   requests,
   pos,
   auditTrail,
+  requestWindowBlockedDays,
 }: {
   user: { name?: string; email: string } | null
   role: string | null
@@ -191,6 +193,7 @@ export default function AdminClient({
   requests: AdminRequest[]
   pos: PurchaseOrder[]
   auditTrail: AuditEntry[]
+  requestWindowBlockedDays: number[]
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1045,6 +1048,10 @@ export default function AdminClient({
 
         {section === 'settings' && (
           <div className="grid gap-6 lg:grid-cols-2">
+            <div className="lg:col-span-2">
+              <RequestWindowPanel initialBlockedDays={requestWindowBlockedDays} />
+            </div>
+
             <Panel title="Workspace">
               <dl className="divide-y divide-border">
                 {[

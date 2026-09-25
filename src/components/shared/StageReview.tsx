@@ -4,8 +4,11 @@ import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
 import PoDocumentActions from '@/components/shared/PoDocumentActions'
+import MaterialsPricingPanel from '@/components/shared/MaterialsPricingPanel'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
 import { getReviewBundle } from '@/lib/review'
+import { query } from '@/lib/db'
+import type { SupplierOption } from '@/components/shared/SupplierPicker'
 import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { currentStage, STAGES, canActAt } from '@/lib/workflow'
 import { isElevated } from '@/lib/roles'
@@ -42,7 +45,21 @@ export default async function StageReview({
       ? isRequester || isElevated(user.role)
       : stage !== null && canActAt(user.role, stage)
 
-  const total = items.reduce((sum, i) => sum + (Number(i.line_total) || 0), 0)
+  // Supply Chain is the one stage that edits money on the requisition — every
+  // other stage only ever reads what's here.
+  const canEditPricing = stage === 'supply_chain' && holdsStage
+  const suppliers = canEditPricing
+    ? await query<SupplierOption>(
+        `SELECT id, name, category, contact_name, phone
+           FROM public.suppliers
+          WHERE is_active
+          ORDER BY name ASC`
+      )
+    : []
+
+  const subtotal = items.reduce((sum, i) => sum + (Number(i.line_total) || 0), 0)
+  const discountAmount = Number(request.discount_amount) || 0
+  const total = Math.max(0, subtotal - discountAmount)
   const suggestedSupplier =
     items.find((i) => i.supplier_name)?.supplier_name ??
     ((request as unknown as Record<string, unknown>).vendor_name as string | undefined) ??
@@ -129,43 +146,13 @@ export default async function StageReview({
               </div>
 
               {items.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] border-collapse">
-                    <thead className="bg-muted/50">
-                      <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        <th className="px-4 py-2.5">Material</th>
-                        <th className="w-24 px-3 py-2.5">Qty</th>
-                        <th className="w-32 px-3 py-2.5">Unit price</th>
-                        <th className="w-40 px-3 py-2.5">Supplier</th>
-                        <th className="w-32 px-4 py-2.5 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id} className="border-t border-border align-top">
-                          <td className="px-4 py-3">
-                            <p className="text-sm text-foreground">{item.description}</p>
-                            {item.remarks && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">{item.remarks}</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-sm tabular-nums text-foreground">
-                            {item.quantity} {item.unit ?? ''}
-                          </td>
-                          <td className="px-3 py-3 text-sm tabular-nums text-foreground">
-                            {formatCurrency(Number(item.unit_price))}
-                          </td>
-                          <td className="px-3 py-3 text-sm text-muted-foreground">
-                            {item.supplier_name ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-foreground">
-                            {formatCurrency(Number(item.line_total))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <MaterialsPricingPanel
+                  requestId={request.id}
+                  items={items}
+                  suppliers={suppliers}
+                  discountAmount={discountAmount}
+                  canEdit={canEditPricing}
+                />
               ) : (
                 <p className="p-4 text-sm text-muted-foreground">
                   {request.description ?? 'No line items were recorded.'}

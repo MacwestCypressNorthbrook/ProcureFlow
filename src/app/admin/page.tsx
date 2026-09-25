@@ -1,6 +1,7 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { can } from '@/lib/roles'
 import { query } from '@/lib/db'
+import { getRequestWindowSettings } from '@/lib/settings'
 import AdminClient, { type AuditEntry } from '@/components/admin/AdminClient'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
 import type {
@@ -20,8 +21,9 @@ export default async function AdminPage() {
   // hidden, so the queries are skipped outright.
   const maySeeUsers = can(user.role, 'admin:users')
   const maySeeAudit = can(user.role, 'admin:audit')
+  const maySeePreferences = can(user.role, 'admin:preferences')
 
-  const [users, projects, suppliers, requests, pos, auditTrail] = await Promise.all([
+  const [users, projects, suppliers, requests, pos, auditTrail, requestWindow] = await Promise.all([
     maySeeUsers
       ? query<UserWithProjects>(
       `SELECT u.*,
@@ -87,6 +89,7 @@ export default async function AdminPage() {
        LIMIT 100`
         )
       : Promise.resolve([]),
+    maySeePreferences ? getRequestWindowSettings() : Promise.resolve({ blockedDays: [] }),
   ])
 
   return (
@@ -99,6 +102,7 @@ export default async function AdminPage() {
       requests={requests}
       pos={pos}
       auditTrail={auditTrail}
+      requestWindowBlockedDays={requestWindow.blockedDays}
     />
   )
 }

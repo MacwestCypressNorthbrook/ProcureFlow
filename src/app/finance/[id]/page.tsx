@@ -61,7 +61,7 @@ export default async function FinanceDetailPage({ params }: { params: Promise<{ 
     `SELECT id, po_id, file_name, file_url, uploaded_by, created_at
      FROM public.po_attachments
      WHERE po_id = $1
-     ORDER BY created_at ASC`,
+     ORDER BY created_at DESC`,
     [id]
   )
 

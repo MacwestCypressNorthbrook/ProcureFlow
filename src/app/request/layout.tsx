@@ -1,5 +1,6 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import { getRequestWindowSettings, isRequestDayBlocked, blockedDaysLabel } from '@/lib/settings'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,8 +14,13 @@ export const dynamic = 'force-dynamic'
 export default async function AreaLayout({ children }: { children: React.ReactNode }) {
   const user = await requirePageRole('engineer')
 
+  const requestWindow = await getRequestWindowSettings()
+  const disabledNav = isRequestDayBlocked(requestWindow)
+    ? { '/request': `Submissions are closed on ${blockedDaysLabel(requestWindow.blockedDays)} — try again tomorrow.` }
+    : undefined
+
   return (
-    <DashboardLayout user={{ name: user.name, email: user.email }} role={user.role}>
+    <DashboardLayout user={{ name: user.name, email: user.email }} role={user.role} disabledNav={disabledNav}>
       {children}
     </DashboardLayout>
   )

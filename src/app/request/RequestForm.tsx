@@ -8,6 +8,8 @@ import { uploadDocument } from '@/lib/upload-client'
 import type { Project } from '@/lib/types'
 import {
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   FileText,
   HardHat,
   Info,
@@ -86,6 +88,7 @@ export default function RequestForm({
   const [department, setDepartment] = useState(requester.department || 'Operations')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [lines, setLines] = useState<Line[]>([blankLine()])
+  const [collapsedLines, setCollapsedLines] = useState<Set<string>>(new Set())
   const [notes, setNotes] = useState('')
   const [files, setFiles] = useState<File[]>([])
   const [notifyEmail, setNotifyEmail] = useState(requester.email)
@@ -101,10 +104,24 @@ export default function RequestForm({
   const updateLine = (id: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
-  const addLine = () => setLines((ls) => [...ls, blankLine()])
+  const addLine = () =>
+    setLines((ls) => {
+      // Collapsing what's already there before adding a blank one keeps the
+      // card the engineer is about to fill the only one open on a phone screen.
+      setCollapsedLines((prev) => new Set([...prev, ...ls.map((l) => l.id)]))
+      return [...ls, blankLine()]
+    })
 
   const removeLine = (id: string) =>
     setLines((ls) => (ls.length === 1 ? [blankLine()] : ls.filter((l) => l.id !== id)))
+
+  const toggleCollapsed = (id: string) =>
+    setCollapsedLines((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const registerSupplier = (s: SupplierOption) =>
     setSuppliers((list) => (list.some((x) => x.id === s.id) ? list : [...list, s].sort((a, b) => a.name.localeCompare(b.name))))
@@ -126,9 +143,9 @@ export default function RequestForm({
       setError('Select the project site this requisition is for.')
       return
     }
-    const unpriced = payloadLines.find((l) => !(Number(l.quantity) > 0) || !(Number(l.unitPrice) > 0))
+    const unpriced = payloadLines.find((l) => !(Number(l.quantity) > 0))
     if (unpriced) {
-      setError('Every material needs a quantity and a unit price greater than zero.')
+      setError('Every material needs a quantity greater than zero.')
       return
     }
 
@@ -383,24 +400,48 @@ export default function RequestForm({
             </button>
           </div>
 
-          {/* Mobile & tablet: one card per material */}
-          <div className="space-y-4 xl:hidden">
-            {lines.map((line, i) => (
+          {/* Mobile & tablet: one card per material, collapsible once there's more than one */}
+          <div className="space-y-3 xl:hidden">
+            {lines.map((line, i) => {
+              const isCollapsed = lines.length > 1 && collapsedLines.has(line.id)
+              return (
               <div key={line.id} className="rounded-xl border border-border bg-background/40 p-4">
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Item {i + 1}
-                  </span>
+                <div className={`flex items-center justify-between gap-2 ${isCollapsed ? '' : 'mb-3'}`}>
+                  <button
+                    type="button"
+                    onClick={() => lines.length > 1 && toggleCollapsed(line.id)}
+                    disabled={lines.length <= 1}
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Item {i + 1}
+                    </span>
+                    {isCollapsed && (
+                      <span className="truncate text-sm text-foreground">
+                        {line.description.trim() || 'Untitled material'}
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          · {line.quantity || 0} {line.unit}
+                          {Number(line.unitPrice) > 0 ? ` · ${ghs(lineTotal(line))}` : ''}
+                        </span>
+                      </span>
+                    )}
+                    {lines.length > 1 && (
+                      <span className="ml-auto shrink-0 text-muted-foreground">
+                        {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                      </span>
+                    )}
+                  </button>
                   <button
                     type="button"
                     onClick={() => removeLine(line.id)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                     aria-label={`Remove item ${i + 1}`}
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
 
+                {!isCollapsed && (
                 <div className="space-y-4">
                   <div>
                     <Label required>Material description</Label>
@@ -441,13 +482,13 @@ export default function RequestForm({
                   </div>
 
                   <div>
-                    <Label required>Unit price (GHS)</Label>
+                    <Label>Unit price (GHS)</Label>
                     <input
                       type="number"
                       inputMode="decimal"
                       min="0"
                       step="0.01"
-                      placeholder="0.00"
+                      placeholder="0.00 (optional)"
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
                       className={inputClass}
@@ -455,7 +496,7 @@ export default function RequestForm({
                   </div>
 
                   <div>
-                    <Label>Supplier</Label>
+                    <Label>Supplier (optional)</Label>
                     <SupplierPicker
                       value={line.supplierId}
                       suppliers={suppliers}
@@ -483,8 +524,10 @@ export default function RequestForm({
                     </span>
                   </div>
                 </div>
+                )}
               </div>
-            ))}
+              )
+            })}
           </div>
 
           {/* Desktop: spreadsheet-style grid */}
