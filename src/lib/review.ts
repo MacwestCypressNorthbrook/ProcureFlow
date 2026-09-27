@@ -96,6 +96,7 @@ export interface RequestItemRow {
   supplier_id: string | null
   supplier_name: string | null
   remarks: string | null
+  category: 'material' | 'labour'
 }
 
 export interface ReviewBundle {
@@ -135,7 +136,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
     const [items, po, requestDocs, history] = await Promise.all([
       query<RequestItemRow>(
         `SELECT ri.id, ri.position, ri.description, ri.quantity, ri.unit,
-                ri.unit_price, ri.line_total, ri.remarks,
+                ri.unit_price, ri.line_total, ri.remarks, ri.category,
                 ri.supplier_id, s.name AS supplier_name
            FROM public.request_items ri
            LEFT JOIN public.suppliers s ON s.id = ri.supplier_id

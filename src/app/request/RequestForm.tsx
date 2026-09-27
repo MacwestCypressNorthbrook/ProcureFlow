@@ -14,25 +14,32 @@ import {
   HardHat,
   Info,
   Loader2,
+  Package,
   Paperclip,
   Plus,
   Send,
   Trash2,
+  Users,
   X,
 } from 'lucide-react'
 
 const ghs = (n: number) =>
   new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', minimumFractionDigits: 2 }).format(n || 0)
 
-const UNITS = ['pcs', 'bags', 'tonnes', 'kg', 'litres', 'm', 'm²', 'm³', 'rolls', 'trips', 'lumpsum']
+const MATERIAL_UNITS = ['pcs', 'bags', 'tonnes', 'kg', 'litres', 'm', 'm²', 'm³', 'rolls', 'trips', 'lumpsum']
+const LABOUR_UNITS = ['man-days', 'days', 'hours', 'trips', 'lumpsum']
+const UNITS = Array.from(new Set([...MATERIAL_UNITS, ...LABOUR_UNITS]))
 
 const DEPARTMENTS = ['Operations', 'Site Works', 'Finance', 'Administration', 'HR', 'IT', 'Procurement']
+
+type LineCategory = 'material' | 'labour'
 
 let seq = 0
 const nextId = () => `line-${++seq}-${Date.now()}`
 
 interface Line {
   id: string
+  category: LineCategory
   description: string
   quantity: string
   unit: string
@@ -43,6 +50,7 @@ interface Line {
 
 const blankLine = (): Line => ({
   id: nextId(),
+  category: 'material',
   description: '',
   quantity: '1',
   unit: 'pcs',
@@ -69,6 +77,41 @@ function Label({ children, required }: { children: React.ReactNode; required?: b
 const fieldClass =
   'w-full rounded-lg border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring sm:text-sm'
 const inputClass = `${fieldClass} h-12 sm:h-11`
+
+/** Material vs. labour: what the line is being raised for. */
+function CategoryToggle({
+  value,
+  onChange,
+  compact = false,
+}: {
+  value: LineCategory
+  onChange: (category: LineCategory) => void
+  compact?: boolean
+}) {
+  const base = compact
+    ? 'inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors'
+    : 'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors'
+  return (
+    <div className={`inline-flex rounded-lg border border-input bg-muted/40 p-0.5 ${compact ? '' : 'w-full'}`}>
+      <button
+        type="button"
+        onClick={() => onChange('material')}
+        aria-pressed={value === 'material'}
+        className={`${base} ${value === 'material' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+      >
+        <Package size={compact ? 12 : 14} /> Material
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('labour')}
+        aria-pressed={value === 'labour'}
+        className={`${base} ${value === 'labour' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+      >
+        <Users size={compact ? 12 : 14} /> Labour
+      </button>
+    </div>
+  )
+}
 
 export default function RequestForm({
   requester,
@@ -104,6 +147,18 @@ export default function RequestForm({
   const updateLine = (id: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
 
+  // Switching category nudges the unit toward what that category usually
+  // needs, but only when the engineer hasn't already picked something else.
+  const setLineCategory = (id: string, category: LineCategory) =>
+    setLines((ls) =>
+      ls.map((l) => {
+        if (l.id !== id) return l
+        const defaultUnitStale = l.unit === 'pcs' || l.unit === 'man-days'
+        const unit = defaultUnitStale ? (category === 'labour' ? 'man-days' : 'pcs') : l.unit
+        return { ...l, category, unit }
+      })
+    )
+
   const addLine = () =>
     setLines((ls) => {
       // Collapsing what's already there before adding a blank one keeps the
@@ -136,7 +191,7 @@ export default function RequestForm({
 
     const payloadLines = lines.filter((l) => l.description.trim())
     if (payloadLines.length === 0) {
-      setError('Add at least one material with a description.')
+      setError('Add at least one material or labour line with a description.')
       return
     }
     if (projects.length > 0 && !projectId) {
@@ -145,7 +200,7 @@ export default function RequestForm({
     }
     const unpriced = payloadLines.find((l) => !(Number(l.quantity) > 0))
     if (unpriced) {
-      setError('Every material needs a quantity greater than zero.')
+      setError('Every line needs a quantity greater than zero.')
       return
     }
 
@@ -168,6 +223,7 @@ export default function RequestForm({
         date,
       },
       items: payloadLines.map((l) => ({
+        category: l.category,
         description: l.description.trim(),
         quantity: Number(l.quantity) || 0,
         unit: l.unit,
@@ -193,6 +249,7 @@ export default function RequestForm({
           guest_name: requester.name,
           guest_email: notifyEmail.trim() || null,
           items: payloadLines.map((l) => ({
+            category: l.category,
             description: l.description.trim(),
             quantity: Number(l.quantity) || 0,
             unit: l.unit,
@@ -267,7 +324,7 @@ export default function RequestForm({
         </p>
         <dl className="surface mt-7 space-y-3 rounded-xl p-5 text-left">
           <div className="flex justify-between gap-4">
-            <dt className="text-sm text-muted-foreground">Materials</dt>
+            <dt className="text-sm text-muted-foreground">Lines</dt>
             <dd className="text-sm font-semibold text-foreground">{submitted.lines}</dd>
           </div>
           <div className="flex justify-between gap-4">
@@ -386,7 +443,7 @@ export default function RequestForm({
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <FileText size={16} className="text-muted-foreground" />
-              Materials
+              Materials &amp; Labour
               <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
                 {filledLines}
               </span>
@@ -418,7 +475,7 @@ export default function RequestForm({
                     </span>
                     {isCollapsed && (
                       <span className="truncate text-sm text-foreground">
-                        {line.description.trim() || 'Untitled material'}
+                        {line.description.trim() || (line.category === 'labour' ? 'Untitled labour line' : 'Untitled material')}
                         <span className="ml-1.5 text-xs text-muted-foreground">
                           · {line.quantity || 0} {line.unit}
                           {Number(line.unitPrice) > 0 ? ` · ${ghs(lineTotal(line))}` : ''}
@@ -443,12 +500,18 @@ export default function RequestForm({
 
                 {!isCollapsed && (
                 <div className="space-y-4">
+                  <CategoryToggle value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
+
                   <div>
-                    <Label required>Material description</Label>
+                    <Label required>{line.category === 'labour' ? 'Labour description' : 'Material description'}</Label>
                     <textarea
                       value={line.description}
                       onChange={(e) => updateLine(line.id, { description: e.target.value })}
-                      placeholder="e.g. Iron rods 12mm, high tensile"
+                      placeholder={
+                        line.category === 'labour'
+                          ? 'e.g. Mason & 2 labourers — foundation blockwork'
+                          : 'e.g. Iron rods 12mm, high tensile'
+                      }
                       rows={2}
                       className={`${fieldClass} resize-none py-3`}
                     />
@@ -496,7 +559,7 @@ export default function RequestForm({
                   </div>
 
                   <div>
-                    <Label>Supplier (optional)</Label>
+                    <Label>{line.category === 'labour' ? 'Contractor (optional)' : 'Supplier (optional)'}</Label>
                     <SupplierPicker
                       value={line.supplierId}
                       suppliers={suppliers}
@@ -537,7 +600,8 @@ export default function RequestForm({
                 <thead className="bg-muted/50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="w-10 px-3 py-2.5 text-center">#</th>
-                    <th className="px-3 py-2.5">Material description</th>
+                    <th className="w-32 px-3 py-2.5">Type</th>
+                    <th className="px-3 py-2.5">Description</th>
                     <th className="w-20 px-3 py-2.5">Qty</th>
                     <th className="w-24 px-3 py-2.5">Unit</th>
                     <th className="w-28 px-3 py-2.5">Unit price</th>
@@ -551,10 +615,17 @@ export default function RequestForm({
                     <tr key={line.id} className="border-t border-border align-top">
                       <td className="px-3 py-2.5 text-center text-sm tabular-nums text-muted-foreground">{i + 1}</td>
                       <td className="px-2 py-2">
+                        <CategoryToggle compact value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
+                      </td>
+                      <td className="px-2 py-2">
                         <input
                           value={line.description}
                           onChange={(e) => updateLine(line.id, { description: e.target.value })}
-                          placeholder="e.g. Iron rods 12mm, high tensile"
+                          placeholder={
+                            line.category === 'labour'
+                              ? 'e.g. Mason & 2 labourers — foundation blockwork'
+                              : 'e.g. Iron rods 12mm, high tensile'
+                          }
                           className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                         <input
@@ -623,7 +694,7 @@ export default function RequestForm({
                 </tbody>
                 <tfoot>
                   <tr className="border-t border-border bg-muted/50">
-                    <td colSpan={6} className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <td colSpan={7} className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                       Total cost
                     </td>
                     <td className="px-3 py-3 text-right text-base font-semibold tabular-nums text-foreground">

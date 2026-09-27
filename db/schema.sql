@@ -349,3 +349,13 @@ ALTER TABLE public.requests ADD CONSTRAINT requests_status_check CHECK (
         'converted'
     )
 );
+
+-- ── Labour lines on a requisition ────────────────────────────────────────
+-- (mirrors db/migrations/007_labour_category.sql)
+-- Engineers can request labour (labourers/artisans for a service) alongside
+-- or instead of materials on the same requisition.
+ALTER TABLE public.request_items
+    ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'material'
+    CHECK (category IN ('material', 'labour'));
+
+CREATE INDEX IF NOT EXISTS idx_request_items_category ON public.request_items(category);

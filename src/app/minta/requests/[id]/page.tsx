@@ -5,9 +5,9 @@ import StatusBadge from '@/components/shared/StatusBadge'
 import DocumentList from '@/components/shared/DocumentList'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
 import { PageContainer, PageHeader, Panel, Field, EmptyState } from '@/components/shared/ui-kit'
-import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveAttachments } from '@/lib/resolve-file-url'
-import { FileText, Paperclip, Clock, Package } from 'lucide-react'
+import { FileText, Paperclip, Clock, Package, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
@@ -108,9 +108,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               fallbackDate={String(requestData.created_at || '')}
             />
 
-            <Panel title={`Materials${items.length ? ` (${items.length})` : ''}`} icon={<Package size={16} />}>
+            <Panel title={`Materials & Labour${items.length ? ` (${items.length})` : ''}`} icon={<Package size={16} />}>
               {items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No material lines on this request.</p>
+                <p className="text-sm text-muted-foreground">No material or labour lines on this request.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -126,7 +126,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                       {items.map((item) => (
                         <tr key={item.id} className="border-b border-border/50 last:border-0">
                           <td className="py-2.5 pr-3">
-                            <p className="font-medium text-foreground">{item.description}</p>
+                            <p className="font-medium text-foreground">
+                              {item.category === 'labour' && (
+                                <span className="mr-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-600">
+                                  Labour
+                                </span>
+                              )}
+                              {item.description}
+                            </p>
                             {item.supplier_name && (
                               <p className="mt-0.5 text-xs text-muted-foreground">{item.supplier_name}</p>
                             )}
@@ -167,6 +174,37 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                 sentBackTo={(requestData.sent_back_to as string | null) ?? null}
               />
             </Panel>
+
+            {bundle?.po && (
+              <Panel title="Purchase Order" icon={<Receipt size={16} />}>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">PO number</p>
+                      <p className="text-sm font-semibold tabular-nums text-foreground">
+                        {bundle.po.po_number || 'Not yet numbered'}
+                      </p>
+                    </div>
+                    <StatusBadge status={bundle.po.status} config={PO_STATUS_CONFIG} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="PO amount">
+                      <p className="text-sm font-semibold tabular-nums text-foreground">
+                        {formatCurrency(Number(bundle.po.total_amount) || 0)}
+                      </p>
+                    </Field>
+                    <Field label={bundle.po.status === 'paid' ? 'Paid on' : 'Payment'}>
+                      <p className="text-sm font-semibold text-foreground">
+                        {bundle.po.paid_at ? formatDate(bundle.po.paid_at) : 'Not yet paid'}
+                      </p>
+                    </Field>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Quote this PO number with Finance or Supply Chain when following up on payment.
+                  </p>
+                </div>
+              </Panel>
+            )}
 
             <Panel title={`Attachments${docs.length ? ` (${docs.length})` : ''}`} icon={<Paperclip size={16} />}>
               <DocumentList docs={docs} emptyLabel="No attachments on this request." />

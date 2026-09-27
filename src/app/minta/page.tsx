@@ -22,9 +22,19 @@ export default async function MintaPage() {
   if (user?.id) {
     try {
       myRequests = await query<Record<string, unknown>>(
-        `SELECT r.*, pr.name AS project_name
+        `SELECT r.*, pr.name AS project_name,
+                (po.id IS NOT NULL) AS has_po,
+                po.po_number,
+                po.status AS po_status
            FROM public.requests r
            LEFT JOIN public.projects pr ON pr.id = r.project_id
+           LEFT JOIN LATERAL (
+                SELECT id, po_number, status
+                  FROM public.purchase_orders
+                 WHERE request_id = r.id
+                 ORDER BY created_at DESC
+                 LIMIT 1
+           ) po ON true
           WHERE r.created_by = $1
           ORDER BY r.created_at DESC`,
         [user.id]

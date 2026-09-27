@@ -26,6 +26,7 @@ export interface RichRequisitionData {
     date: string
   }
   items: Array<{
+    category?: 'material' | 'labour'
     description: string
     quantity: number
     unit?: string
@@ -167,7 +168,14 @@ export default function RichRequisitionView({ description, fallbackDate }: RichR
               {richData.items.map((item, index) => (
                 <TableRow key={index} className="border-border hover:bg-muted/30">
                   <TableCell className="px-3 py-2.5 text-center text-xs text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell className="px-3 py-2.5 text-sm font-medium text-foreground">{item.description}</TableCell>
+                  <TableCell className="px-3 py-2.5 text-sm font-medium text-foreground">
+                    {item.category === 'labour' && (
+                      <span className="mr-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-600">
+                        Labour
+                      </span>
+                    )}
+                    {item.description}
+                  </TableCell>
                   <TableCell className="px-3 py-2.5 text-center text-xs tabular-nums">
                     {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '—'}
                   </TableCell>

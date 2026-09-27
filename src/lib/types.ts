@@ -213,7 +213,7 @@ export interface Supplier {
   updated_at: string
 }
 
-/** One material line on a requisition. `line_total` is computed by Postgres. */
+/** One material or labour line on a requisition. `line_total` is computed by Postgres. */
 export interface RequestItem {
   id: string
   request_id: string
@@ -225,6 +225,7 @@ export interface RequestItem {
   line_total: number
   supplier_id: string | null
   remarks: string | null
+  category: 'material' | 'labour'
   created_at: string
 }
 

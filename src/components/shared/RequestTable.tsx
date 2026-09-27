@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { extractRequisition } from '@/components/shared/RichRequisitionView'
-import { REQUEST_STATUS_CONFIG, formatDate } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatDate } from '@/lib/utils'
 import { ChevronRight, FileText } from 'lucide-react'
 
 interface RequestRow {
@@ -69,6 +69,8 @@ export default function RequestTable({
       cell: (r) => {
         const summary = itemSummary(r.description)
         const hasPo = r.has_po === true
+        const poNumber = typeof r.po_number === 'string' ? r.po_number : null
+        const poStatus = typeof r.po_status === 'string' ? r.po_status : null
         return (
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -78,8 +80,13 @@ export default function RequestTable({
               <p className="truncate text-sm font-medium text-foreground">{r.purpose}</p>
               {summary && <p className="truncate text-xs text-muted-foreground">{summary}</p>}
               {hasPo && (
-                <span className="rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wider">
-                  PO attached
+                <span className="mt-0.5 inline-flex items-center gap-1.5">
+                  <span className="rounded-full bg-emerald-500/20 text-emerald-600 text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wider tabular-nums">
+                    {poNumber ? poNumber : 'PO attached'}
+                  </span>
+                  {poStatus && (
+                    <StatusBadge status={poStatus} config={PO_STATUS_CONFIG} className="text-[10px] px-1.5 py-0" />
+                  )}
                 </span>
               )}
             </div>
@@ -151,6 +158,7 @@ export default function RequestTable({
   ]
 
   const statuses = Array.from(new Set(requests.map((r) => r.status))).sort()
+  const projects = Array.from(new Set(requests.map((r) => r.project_name).filter(Boolean))).sort() as string[]
   const facets: DataFacet<RequestRow>[] = [
     {
       id: 'status',
@@ -158,6 +166,16 @@ export default function RequestTable({
       options: statuses.map((s) => ({ value: s, label: REQUEST_STATUS_CONFIG[s]?.label ?? s })),
       matches: (r, value) => r.status === value,
     },
+    ...(projects.length > 0
+      ? [
+          {
+            id: 'project',
+            label: 'Project site',
+            options: projects.map((p) => ({ value: p, label: p })),
+            matches: (r, value) => r.project_name === value,
+          } satisfies DataFacet<RequestRow>,
+        ]
+      : []),
   ]
 
   return (

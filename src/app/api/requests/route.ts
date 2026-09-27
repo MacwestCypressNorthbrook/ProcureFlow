@@ -16,6 +16,7 @@ interface IncomingItem {
   unitPrice?: number | string
   supplierId?: string | null
   remarks?: string
+  category?: string
 }
 
 const MAX_ITEMS = 100
@@ -66,12 +67,13 @@ export async function POST(request: Request) {
       unitPrice: toNumber(item.unitPrice),
       supplierId: typeof item.supplierId === 'string' && item.supplierId ? item.supplierId : null,
       remarks: typeof item.remarks === 'string' && item.remarks.trim() ? item.remarks.trim() : null,
+      category: item.category === 'labour' ? 'labour' : 'material',
     }))
     .filter((item) => item.description)
 
   if (items.length === 0) {
     return NextResponse.json(
-      { error: 'At least one material line with a description is required' },
+      { error: 'At least one material or labour line with a description is required' },
       { status: 400 }
     )
   }
@@ -153,8 +155,8 @@ export async function POST(request: Request) {
     await transaction(
       items.map((item, index) => [
         `INSERT INTO public.request_items
-           (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+           (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks, category)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           data.id,
           index,
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
           item.unitPrice,
           item.supplierId,
           item.remarks,
+          item.category,
         ],
       ])
     )
