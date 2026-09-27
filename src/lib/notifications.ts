@@ -1,7 +1,10 @@
 import { query, queryOne, execute } from '@/lib/db'
-import { sendEmail, sendActionReminderEmail } from '@/lib/email/client'
+import { sendEmail, sendActionReminderEmail, sendLeadDigestEmail } from '@/lib/email/client'
 import { linkForRole, type LinkTarget } from '@/lib/links'
 import type { Notification, Reminder } from '@/lib/types'
+import { getStageQueue } from '@/lib/review'
+import { statusForStage } from '@/lib/workflow'
+import { getLeadDigestSettings, markLeadDigestSent, accraWeekday, accraDateStr } from '@/lib/settings'
 
 interface CreateNotificationParams {
   userId: string
@@ -213,6 +216,65 @@ export async function dispatchPendingReminders(): Promise<{ processed: number }>
   } catch (err) {
     console.error('Error dispatching reminders:', err)
     return { processed: 0 }
+  }
+}
+
+/**
+ * Bundles everything sitting in the Project Lead queue into one email per
+ * Lead, on whichever weekday the Super User has configured (default
+ * Thursday). Leads already got an in-app notification the instant each
+ * requisition landed; this only replaces the "one email per requisition"
+ * alert that would otherwise flood their inbox.
+ *
+ * Safe to call from a cron that fires more than once a day, or on days other
+ * than the configured one — it only ever sends once per Accra-local day,
+ * tracked in `app_settings` rather than in the cron schedule itself, so
+ * changing the day in the admin panel takes effect immediately.
+ */
+export async function dispatchLeadDigest(): Promise<{ sent: number; reason: string }> {
+  try {
+    const settings = await getLeadDigestSettings()
+    if (!settings.enabled) return { sent: 0, reason: 'digest disabled' }
+    if (accraWeekday() !== settings.dayOfWeek) return { sent: 0, reason: 'not the configured day' }
+
+    const today = accraDateStr()
+    if (settings.lastSentOn === today) return { sent: 0, reason: 'already sent today' }
+
+    const pending = await getStageQueue([statusForStage('lead')])
+    if (pending.length === 0) {
+      await markLeadDigestSent(today)
+      return { sent: 0, reason: 'no requisitions waiting' }
+    }
+
+    const leads = await query<{ id: string; email: string; name: string }>(
+      `SELECT id, email, name FROM public.users WHERE role = 'project_lead' AND is_active`
+    )
+
+    const queueUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/sam/requests`
+    let sent = 0
+    for (const lead of leads) {
+      if (!lead.email) continue
+      await sendLeadDigestEmail({
+        recipientEmail: lead.email,
+        recipientName: lead.name || 'there',
+        items: pending.map((r) => ({
+          requestId: r.id,
+          purpose: r.purpose,
+          requesterName: r.requester_name || 'Unknown',
+          projectName: r.project_name,
+          amount: r.total_amount,
+          createdAt: r.created_at,
+        })),
+        queueUrl,
+      })
+      sent++
+    }
+
+    await markLeadDigestSent(today)
+    return { sent, reason: '' }
+  } catch (err) {
+    console.error('Error dispatching the lead digest:', err)
+    return { sent: 0, reason: 'error' }
   }
 }
 

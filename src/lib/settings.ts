@@ -73,6 +73,11 @@ export function isRequestDayBlocked(settings: RequestWindowSettings, date: Date 
   return settings.blockedDays.includes(accraWeekday(date))
 }
 
+/** Today's date where the business operates, as YYYY-MM-DD — for "did this already run today" checks. */
+export function accraDateStr(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Accra' }).format(date)
+}
+
 /** "Thursdays", "Thursdays and Fridays", "Wednesdays, Thursdays and Fridays" … */
 export function blockedDaysLabel(blockedDays: number[]): string {
   const names = blockedDays.map((d) => `${WEEKDAY_LABELS[d]}s`)
@@ -80,4 +85,82 @@ export function blockedDaysLabel(blockedDays: number[]): string {
   if (names.length === 1) return names[0]
   if (names.length === 2) return `${names[0]} and ${names[1]}`
   return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+}
+
+/**
+ * How often Project Leads get a bundled email of new requisitions.
+ *
+ * A Lead still gets an in-app notification the moment a requisition lands in
+ * their queue — this setting only governs the emailed summary, which would
+ * otherwise fire once per requisition and flood their inbox. `lastSentOn` is
+ * written by the dispatcher, not the Super User, so a cron that runs more
+ * than once on the configured day doesn't send the digest twice.
+ */
+export interface LeadDigestSettings {
+  enabled: boolean
+  /** 0=Sunday … 6=Saturday, the one day per week the digest goes out. */
+  dayOfWeek: number
+  /** Accra-local date (YYYY-MM-DD) the digest last actually went out. */
+  lastSentOn: string | null
+}
+
+const LEAD_DIGEST_KEY = 'lead_email_digest'
+const DEFAULT_LEAD_DIGEST: LeadDigestSettings = { enabled: true, dayOfWeek: 4, lastSentOn: null }
+
+function sanitizeDay(day: unknown): number {
+  const n = typeof day === 'string' ? Number(day) : day
+  return Number.isInteger(n) && (n as number) >= 0 && (n as number) <= 6
+    ? (n as number)
+    : DEFAULT_LEAD_DIGEST.dayOfWeek
+}
+
+export async function getLeadDigestSettings(): Promise<LeadDigestSettings> {
+  try {
+    const row = await queryOne<{ value: { enabled?: unknown; dayOfWeek?: unknown; lastSentOn?: unknown } }>(
+      `SELECT value FROM public.app_settings WHERE key = $1 LIMIT 1`,
+      [LEAD_DIGEST_KEY]
+    )
+    if (!row) return DEFAULT_LEAD_DIGEST
+    return {
+      enabled: row.value?.enabled !== false,
+      dayOfWeek: sanitizeDay(row.value?.dayOfWeek),
+      lastSentOn: typeof row.value?.lastSentOn === 'string' ? row.value.lastSentOn : null,
+    }
+  } catch (err) {
+    console.error('Failed to load the lead email digest settings:', err)
+    return DEFAULT_LEAD_DIGEST
+  }
+}
+
+/** Super User control: whether the digest runs at all, and which weekday. */
+export async function setLeadDigestSettings(
+  input: { enabled?: unknown; dayOfWeek?: unknown },
+  userId: string
+): Promise<LeadDigestSettings> {
+  const current = await getLeadDigestSettings()
+  const next: LeadDigestSettings = {
+    enabled: input.enabled !== false,
+    dayOfWeek: sanitizeDay(input.dayOfWeek),
+    lastSentOn: current.lastSentOn,
+  }
+  await execute(
+    `INSERT INTO public.app_settings (key, value, updated_by, updated_at)
+     VALUES ($1, $2::jsonb, $3, now())
+     ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
+    [LEAD_DIGEST_KEY, JSON.stringify(next), userId]
+  )
+  return next
+}
+
+/** Dispatcher-only: records that today's digest went out, so it fires once. */
+export async function markLeadDigestSent(dateStr: string): Promise<void> {
+  const current = await getLeadDigestSettings()
+  await execute(
+    `INSERT INTO public.app_settings (key, value, updated_by, updated_at)
+     VALUES ($1, $2::jsonb, NULL, now())
+     ON CONFLICT (key) DO UPDATE
+       SET value = EXCLUDED.value, updated_at = now()`,
+    [LEAD_DIGEST_KEY, JSON.stringify({ ...current, lastSentOn: dateStr })]
+  )
 }

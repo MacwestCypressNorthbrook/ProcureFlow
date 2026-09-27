@@ -7,6 +7,7 @@ import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Paperclip, ShoppingBag } from 'lucide-react'
 import type { QueueRow } from '@/lib/review'
 import Link from 'next/link'
+import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
 /**
  * A stage's inbox.
@@ -48,6 +49,13 @@ export default function QueueTable({
           </p>
         </div>
       ),
+    },
+    {
+      id: 'type',
+      label: 'Type',
+      sortable: true,
+      sortValue: (r) => requisitionType(r.description),
+      cell: (r) => <RequisitionTypeBadge type={requisitionType(r.description)} />,
     },
     {
       id: 'project',
@@ -126,6 +134,7 @@ export default function QueueTable({
     },
   ]
 
+  const types = Array.from(new Set(rows.map((r) => requisitionType(r.description))))
   const facets = [
     {
       id: 'po_filter',
@@ -136,6 +145,16 @@ export default function QueueTable({
       ],
       matches: (r: QueueRow, value: string) => (value === 'has_po' ? Boolean(r.po_id) : !r.po_id),
     },
+    ...(types.length > 1
+      ? [
+        {
+          id: 'type',
+          label: 'Type',
+          options: types.map((t) => ({ value: t, label: REQUISITION_TYPE_CONFIG[t].label })),
+          matches: (r: QueueRow, value: string) => requisitionType(r.description) === value,
+        },
+      ]
+      : []),
   ]
 
   return (
@@ -161,6 +180,9 @@ export default function QueueTable({
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
             {r.project_name ? ` · ${r.project_name}` : ''}
           </p>
+          <div className="mt-1.5">
+            <RequisitionTypeBadge type={requisitionType(r.description)} />
+          </div>
           <div className="mt-2">
             {r.po_id ? (
               <span className="inline-flex items-center gap-1 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300">

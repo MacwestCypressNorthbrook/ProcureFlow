@@ -1,7 +1,7 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { can } from '@/lib/roles'
 import { query } from '@/lib/db'
-import { getRequestWindowSettings } from '@/lib/settings'
+import { getRequestWindowSettings, getLeadDigestSettings } from '@/lib/settings'
 import AdminClient, { type AuditEntry } from '@/components/admin/AdminClient'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
 import type {
@@ -23,7 +23,7 @@ export default async function AdminPage() {
   const maySeeAudit = can(user.role, 'admin:audit')
   const maySeePreferences = can(user.role, 'admin:preferences')
 
-  const [users, projects, suppliers, requests, pos, auditTrail, requestWindow] = await Promise.all([
+  const [users, projects, suppliers, requests, pos, auditTrail, requestWindow, leadDigest] = await Promise.all([
     maySeeUsers
       ? query<UserWithProjects>(
       `SELECT u.*,
@@ -90,6 +90,7 @@ export default async function AdminPage() {
         )
       : Promise.resolve([]),
     maySeePreferences ? getRequestWindowSettings() : Promise.resolve({ blockedDays: [] }),
+    maySeePreferences ? getLeadDigestSettings() : Promise.resolve({ enabled: true, dayOfWeek: 4, lastSentOn: null }),
   ])
 
   return (
@@ -103,6 +104,8 @@ export default async function AdminPage() {
       pos={pos}
       auditTrail={auditTrail}
       requestWindowBlockedDays={requestWindow.blockedDays}
+      leadDigestEnabled={leadDigest.enabled}
+      leadDigestDayOfWeek={leadDigest.dayOfWeek}
     />
   )
 }

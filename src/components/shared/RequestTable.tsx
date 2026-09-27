@@ -6,6 +6,7 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { extractRequisition } from '@/components/shared/RichRequisitionView'
 import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatDate } from '@/lib/utils'
 import { ChevronRight, FileText } from 'lucide-react'
+import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
 interface RequestRow {
   id: string
@@ -33,6 +34,7 @@ function itemSummary(description?: string | null): string | null {
   }
   return description
 }
+
 
 /** Prefer the stored total; fall back to qty × rate for rows predating it. */
 function estimatedTotal(req: RequestRow): number | null {
@@ -93,6 +95,13 @@ export default function RequestTable({
           </div>
         )
       },
+    },
+    {
+      id: 'type',
+      label: 'Type',
+      sortable: true,
+      sortValue: (r) => requisitionType(r.description),
+      cell: (r) => <RequisitionTypeBadge type={requisitionType(r.description)} />,
     },
     {
       id: 'project',
@@ -159,6 +168,7 @@ export default function RequestTable({
 
   const statuses = Array.from(new Set(requests.map((r) => r.status))).sort()
   const projects = Array.from(new Set(requests.map((r) => r.project_name).filter(Boolean))).sort() as string[]
+  const types = Array.from(new Set(requests.map((r) => requisitionType(r.description))))
   const facets: DataFacet<RequestRow>[] = [
     {
       id: 'status',
@@ -166,6 +176,16 @@ export default function RequestTable({
       options: statuses.map((s) => ({ value: s, label: REQUEST_STATUS_CONFIG[s]?.label ?? s })),
       matches: (r, value) => r.status === value,
     },
+    ...(types.length > 1
+      ? [
+          {
+            id: 'type',
+            label: 'Type',
+            options: types.map((t) => ({ value: t, label: REQUISITION_TYPE_CONFIG[t].label })),
+            matches: (r, value) => requisitionType(r.description) === value,
+          } satisfies DataFacet<RequestRow>,
+        ]
+      : []),
     ...(projects.length > 0
       ? [
           {
@@ -199,6 +219,9 @@ export default function RequestTable({
             <div className="flex items-start justify-between gap-3">
               <p className="line-clamp-2 text-sm font-semibold text-foreground">{r.purpose}</p>
               <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
+            </div>
+            <div className="mt-1.5">
+              <RequisitionTypeBadge type={requisitionType(r.description)} />
             </div>
             {summary && <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{summary}</p>}
             <div className="mt-auto pt-4">

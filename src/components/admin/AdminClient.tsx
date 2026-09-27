@@ -15,6 +15,7 @@ import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
 import EmailPreviewModal from './EmailPreviewModal'
 import RequestWindowPanel from './RequestWindowPanel'
+import LeadDigestPanel from './LeadDigestPanel'
 import AttachPODrawer from './AttachPODrawer'
 import ExportButton from './ExportButton'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
@@ -184,6 +185,8 @@ export default function AdminClient({
   pos,
   auditTrail,
   requestWindowBlockedDays,
+  leadDigestEnabled,
+  leadDigestDayOfWeek,
 }: {
   user: { name?: string; email: string } | null
   role: string | null
@@ -194,6 +197,8 @@ export default function AdminClient({
   pos: PurchaseOrder[]
   auditTrail: AuditEntry[]
   requestWindowBlockedDays: number[]
+  leadDigestEnabled: boolean
+  leadDigestDayOfWeek: number
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1050,6 +1055,10 @@ export default function AdminClient({
           <div className="grid gap-6 lg:grid-cols-2">
             <div className="lg:col-span-2">
               <RequestWindowPanel initialBlockedDays={requestWindowBlockedDays} />
+            </div>
+
+            <div className="lg:col-span-2">
+              <LeadDigestPanel initialEnabled={leadDigestEnabled} initialDayOfWeek={leadDigestDayOfWeek} />
             </div>
 
             <Panel title="Workspace">

@@ -194,7 +194,10 @@ export async function POST(request: Request) {
         target: { type: 'request', id: data.id },
       })
 
-      if (reviewer.email) {
+      // Project Leads get the in-app ping above instantly, but not an email
+      // per requisition — that would flood their inbox. They get one bundled
+      // email on the weekly digest instead; see getLeadDigestSettings.
+      if (reviewer.email && reviewer.role !== 'project_lead') {
         await sendRequisitionAlertEmail({
           recipientEmail: reviewer.email,
           recipientName: reviewer.name || reviewer.role,
