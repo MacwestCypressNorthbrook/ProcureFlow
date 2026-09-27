@@ -223,6 +223,8 @@ export interface StageDecision {
   created_at: string
   actor_name: string | null
   purpose: string
+  /** The requisition's stored document, so a decision can show what it was for. */
+  description: string | null
   total_amount: number | null
   project_name: string | null
   requester_name: string | null
@@ -253,6 +255,7 @@ export async function getStageDecisions(
               a.created_at,
               u.name AS actor_name,
               r.purpose,
+              r.description,
               r.total_amount,
               p.name AS project_name,
               ru.name AS requester_name,

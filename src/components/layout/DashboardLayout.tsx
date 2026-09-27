@@ -199,8 +199,11 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
   ],
   cost_control: [
     {
-      label: 'Overview',
-      items: [{ href: '/cost-control', label: 'Awaiting Review', icon: <Scale size={18} /> }],
+      label: 'Review',
+      items: [
+        { href: '/cost-control', label: 'Awaiting Review', icon: <Scale size={18} /> },
+        { href: '/cost-control/requests', label: 'All Requisitions', icon: <FileText size={18} /> },
+      ],
     },
   ],
   finance: [
@@ -217,7 +220,10 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
     },
     {
       label: 'History',
-      items: [{ href: '/finance/all', label: 'All POs', icon: <Receipt size={18} /> }],
+      items: [
+        { href: '/finance/all', label: 'All POs', icon: <Receipt size={18} /> },
+        { href: '/finance/requests', label: 'All Requisitions', icon: <FileText size={18} /> },
+      ],
     },
   ],
   // Procurement only. People, the audit trail, email templates and workspace

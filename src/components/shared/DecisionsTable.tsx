@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
+import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Check, RotateCcw, ShoppingBag, Banknote, XCircle } from 'lucide-react'
 import type { StageDecision } from '@/lib/review'
@@ -82,6 +83,13 @@ export default function DecisionsTable({
       ),
     },
     {
+      id: 'type',
+      label: 'Type',
+      sortable: true,
+      sortValue: (d) => requisitionType(d.description),
+      cell: (d) => <RequisitionTypeBadge type={requisitionType(d.description)} />,
+    },
+    {
       id: 'action',
       label: 'Decision',
       sortable: true,
@@ -157,6 +165,7 @@ export default function DecisionsTable({
     },
   ]
 
+  const types = Array.from(new Set(rows.map((r) => requisitionType(r.description))))
   const facets: DataFacet<StageDecision>[] = [
     {
       id: 'action',
@@ -167,6 +176,16 @@ export default function DecisionsTable({
       })),
       matches: (d, value) => d.action === value,
     },
+    ...(types.length > 1
+      ? [
+          {
+            id: 'type',
+            label: 'Type',
+            options: types.map((t) => ({ value: t, label: REQUISITION_TYPE_CONFIG[t].label })),
+            matches: (d, value) => requisitionType(d.description) === value,
+          } satisfies DataFacet<StageDecision>,
+        ]
+      : []),
   ]
 
   return (
@@ -176,7 +195,14 @@ export default function DecisionsTable({
       columns={columns}
       facets={facets}
       searchPlaceholder="Search what you reviewed…"
-      searchText={(d) => [d.purpose, d.requester_name, d.project_name, d.po_number, d.comment]}
+      searchText={(d) => [
+        d.purpose,
+        d.requester_name,
+        d.project_name,
+        d.po_number,
+        d.comment,
+        REQUISITION_TYPE_CONFIG[requisitionType(d.description)].label,
+      ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       onRowClick={(d) => router.push(`${hrefBase}/${d.request_id}`)}
