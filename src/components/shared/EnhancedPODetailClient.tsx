@@ -41,6 +41,18 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
   const [isCommentSubmitting, setIsCommentSubmitting] = useState(false)
   const [comments, setComments] = useState<Comment[]>(initialComments)
 
+  // `estimated_unit_rate` is only populated for a single-line requisition, so the
+  // stored total is what to show; quantity × rate covers rows that predate it.
+  const storedRequestTotal = Number(originalRequest?.total_amount)
+  const legacyRequestTotal =
+    Number(originalRequest?.estimated_quantity) * Number(originalRequest?.estimated_unit_rate)
+  const requestTotal =
+    storedRequestTotal > 0
+      ? storedRequestTotal
+      : Number.isFinite(legacyRequestTotal)
+        ? legacyRequestTotal
+        : 0
+
   const handleApprove = async () => {
     setIsSubmitting(true)
     const res = await fetch(`/api/po/${po.id}/approve`, { method: 'POST' })
@@ -120,11 +132,10 @@ export default function EnhancedPODetailClient({ po, originalRequest, auditTrail
               <Panel title="Original Request" icon={<FileText size={16} />}>
                 <div className="space-y-3">
                   <Field label="Purpose"><p className="text-sm font-semibold text-foreground">{String(originalRequest.purpose ?? '')}</p></Field>
-                  {(typeof originalRequest.estimated_quantity === 'number' || typeof originalRequest.estimated_unit_rate === 'number') && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <Field label="Est. Quantity"><p className="text-sm font-semibold tabular-nums text-foreground">{String(originalRequest.estimated_quantity ?? '—')}</p></Field>
-                      <Field label="Est. Unit Rate"><p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(Number(originalRequest.estimated_unit_rate ?? 0))}</p></Field>
-                    </div>
+                  {requestTotal > 0 && (
+                    <Field label="Requisition value">
+                      <p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(requestTotal)}</p>
+                    </Field>
                   )}
                   <p className="text-xs text-muted-foreground">Requested {formatDate(String(originalRequest.created_at ?? ''))}</p>
                 </div>

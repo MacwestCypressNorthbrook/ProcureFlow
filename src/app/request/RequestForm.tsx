@@ -89,7 +89,7 @@ function CategoryToggle({
   compact?: boolean
 }) {
   const base = compact
-    ? 'inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors'
+    ? 'inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium transition-colors'
     : 'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors'
   return (
     <div className={`inline-flex rounded-lg border border-input bg-muted/40 p-0.5 ${compact ? '' : 'w-full'}`}>
@@ -600,7 +600,7 @@ export default function RequestForm({
                 <thead className="bg-muted/50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="w-10 px-3 py-2.5 text-center">#</th>
-                    <th className="w-32 px-3 py-2.5">Type</th>
+                    <th className="w-44 px-3 py-2.5">Type</th>
                     <th className="px-3 py-2.5">Description</th>
                     <th className="w-20 px-3 py-2.5">Qty</th>
                     <th className="w-24 px-3 py-2.5">Unit</th>
@@ -797,7 +797,7 @@ export default function RequestForm({
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total cost</span>
             <span className="text-xl font-semibold tabular-nums text-foreground">{ghs(grandTotal)}</span>
             <span className="hidden text-xs text-muted-foreground sm:inline">
-              {filledLines} material{filledLines === 1 ? '' : 's'}
+              {filledLines} line{filledLines === 1 ? '' : 's'}
               {files.length > 0 ? ` · ${files.length} attachment${files.length === 1 ? '' : 's'}` : ''}
             </span>
           </div>

@@ -93,6 +93,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
 
   const reviewStage = currentStage(status, (requestData.sent_back_to as string | null) ?? null)
 
+  // `estimated_unit_rate` only holds a value when a requisition has exactly one
+  // line, so it reads zero for anything larger — the stored total is the figure
+  // that means something. Quantity × rate is the fallback for rows raised
+  // before totals were recorded.
+  const storedTotal = Number(requestData.total_amount)
+  const legacyTotal =
+    Number(requestData.estimated_quantity) * Number(requestData.estimated_unit_rate)
+  const requisitionTotal = storedTotal > 0 ? storedTotal : Number.isFinite(legacyTotal) ? legacyTotal : 0
+
   const docs = attachments
     .filter((a) => typeof a.file_url === 'string' && a.file_url)
     .map((a) => ({
@@ -256,9 +265,13 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                   <Field label="Email"><p className="text-sm font-semibold text-foreground">{String(requestData.requester_email || requestData.guest_email)}</p></Field>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Est. Cost"><p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(Number(requestData.estimated_unit_rate) || 0)}</p></Field>
-                  {typeof requestData.estimated_quantity === 'number' && requestData.estimated_quantity > 0 && (
-                    <Field label="Quantity"><p className="text-sm font-semibold tabular-nums text-foreground">{String(requestData.estimated_quantity)}</p></Field>
+                  <Field label="Total value">
+                    <p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(requisitionTotal)}</p>
+                  </Field>
+                  {items.length > 0 && (
+                    <Field label="Lines">
+                      <p className="text-sm font-semibold tabular-nums text-foreground">{items.length}</p>
+                    </Field>
                   )}
                 </div>
               </div>

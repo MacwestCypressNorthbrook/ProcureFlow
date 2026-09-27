@@ -9,7 +9,7 @@ import FileUpload, { type UploadedFile } from '@/components/shared/FileUpload'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
-import { REQUEST_STATUS_CONFIG, formatDate } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Eye, Paperclip, Upload, Send, Link2 } from 'lucide-react'
 import { can } from '@/lib/roles'
 
@@ -103,10 +103,17 @@ export default function MintahRequestDetailClient({
     setSubmittingPo(false)
   }
 
+  // The stored total is the only figure that holds for a multi-line requisition:
+  // `estimated_unit_rate` is set only when there is exactly one line. Quantity ×
+  // rate stays as the fallback for rows raised before totals were recorded.
+  const storedTotal = Number(request.total_amount)
+  const legacyTotal = Number(request.estimated_quantity) * Number(request.estimated_unit_rate)
   const estTotal =
-    request.estimated_quantity && request.estimated_unit_rate
-      ? `$${(request.estimated_quantity * request.estimated_unit_rate).toLocaleString()}`
-      : '—'
+    storedTotal > 0
+      ? formatCurrency(storedTotal)
+      : Number.isFinite(legacyTotal) && legacyTotal > 0
+        ? formatCurrency(legacyTotal)
+        : '—'
 
   return (
     <>
