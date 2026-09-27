@@ -14,6 +14,19 @@ export function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
+/** "27 Sept 2026" — the dense-table form of {@link formatDate}, same fixed zone. */
+export function formatDateShort(date: string | Date | null | undefined): string {
+  if (!date) return '—'
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'Africa/Accra',
+  })
+}
+
 /**
  * Always rendered in Accra, where the business operates.
  *

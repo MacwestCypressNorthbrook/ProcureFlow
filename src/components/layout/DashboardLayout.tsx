@@ -196,6 +196,10 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
         { href: '/mintah/requests', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
+    {
+      label: 'Reference Data',
+      items: [{ href: '/mintah/suppliers', label: 'Suppliers', icon: <Truck size={18} /> }],
+    },
   ],
   cost_control: [
     {

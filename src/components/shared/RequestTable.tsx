@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { extractRequisition } from '@/components/shared/RichRequisitionView'
-import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatDate } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatDate, formatDateShort } from '@/lib/utils'
 import { ChevronRight, FileText } from 'lucide-react'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
@@ -48,19 +48,6 @@ function estimatedTotal(req: RequestRow): number | null {
 const ghs = (n: number | null) =>
   n == null ? '—' : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
 
-/** "27 Sep 2026" — the full timestamp stays on the cell's title attribute. */
-function shortDate(value: string | Date | null | undefined): string {
-  if (!value) return '—'
-  const d = new Date(value)
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        timeZone: 'Africa/Accra',
-      })
-}
 
 export default function RequestTable({
   requests,
@@ -172,7 +159,7 @@ export default function RequestTable({
       sortValue: (r) => r.created_at,
       cell: (r) => (
         <span className="whitespace-nowrap text-xs text-muted-foreground" title={formatDate(r.created_at)}>
-          {shortDate(r.created_at)}
+          {formatDateShort(r.created_at)}
         </span>
       ),
     },
