@@ -14,14 +14,24 @@ export function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
-export function formatDate(date: string | null): string {
+/**
+ * Always rendered in Accra, where the business operates.
+ *
+ * Without a fixed zone this formats in the server's zone during SSR and the
+ * viewer's zone after hydration, so the two disagree — and a requisition raised
+ * late in the day shows a different date depending on where it is read.
+ */
+export function formatDate(date: string | Date | null): string {
   if (!date) return '—'
-  return new Date(date).toLocaleDateString('en-US', {
+  const d = new Date(date)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: 'Africa/Accra',
   })
 }
 

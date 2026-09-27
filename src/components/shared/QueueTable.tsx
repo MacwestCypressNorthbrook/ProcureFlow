@@ -14,7 +14,8 @@ import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '
  *
  * Deliberately the same columns for every stage: who raised it, the site, what
  * it is worth, how many documents came with it and whether a purchase order
- * exists yet. Oldest first — a queue is worked from the front.
+ * exists yet. Newest first, like every other list in the app; the "Longest
+ * waiting" tile above the queue is what surfaces anything ageing.
  */
 export default function QueueTable({
   rows,
@@ -34,7 +35,7 @@ export default function QueueTable({
       sortable: true,
       sortValue: (r) => r.purpose,
       cell: (r) => (
-        <div className="min-w-0">
+        <div className="min-w-0 max-w-[200px] sm:max-w-[260px] xl:max-w-[340px]">
           {/* A real anchor, not just the row's click handler — so the
               requisition can be opened in a new tab and reached by keyboard. */}
           <Link
@@ -106,7 +107,7 @@ export default function QueueTable({
       sortValue: (r) => (r.po_id ? 1 : 0),
       cell: (r) =>
         r.po_id ? (
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
+          <span className="inline-flex items-center gap-1.5 rounded-md border whitespace-nowrap border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
             <ShoppingBag size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
             <span>{r.po_number || 'PO Attached'}</span>
           </span>
@@ -130,7 +131,7 @@ export default function QueueTable({
       hideBelow: 'lg',
       sortable: true,
       sortValue: (r) => r.created_at,
-      cell: (r) => <span className="text-xs text-muted-foreground">{formatDate(r.created_at)}</span>,
+      cell: (r) => <span className="text-xs text-muted-foreground whitespace-nowrap">{formatDate(r.created_at)}</span>,
     },
   ]
 
@@ -171,7 +172,7 @@ export default function QueueTable({
         r.po_number,
         REQUISITION_TYPE_CONFIG[requisitionType(r.description)].label,
       ]}
-      defaultSort={{ id: 'created_at', dir: 'asc' }}
+      defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}
       emptyTitle="Nothing waiting"

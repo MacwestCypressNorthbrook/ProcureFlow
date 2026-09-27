@@ -507,8 +507,10 @@ export default function DashboardLayout({
     </div>
   )
 
+  // minmax(0,1fr), not 1fr: a grid track defaults to min-width:auto, so a wide
+  // table refuses to shrink and drags the whole page into horizontal scroll.
   return (
-    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[272px_1fr]">
+    <div className="min-h-screen bg-background lg:grid lg:grid-cols-[272px_minmax(0,1fr)]">
       {/* Desktop Sidebar */}
       <aside className="sticky top-0 hidden h-screen border-r border-border bg-card lg:block z-20">
         {sidebarContent()}

@@ -35,7 +35,7 @@ export default function POTable({
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
             <FileText size={15} />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 max-w-[200px] sm:max-w-[260px] xl:max-w-[340px]">
             <p className="truncate text-sm font-medium text-foreground">{p.purpose}</p>
             <p className="truncate text-xs text-muted-foreground">
               {p.po_number ?? `#${p.id.slice(0, 8)}`}

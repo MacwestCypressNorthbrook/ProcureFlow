@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore } from 'react'
 import {
   ArrowDown,
   ArrowUp,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
@@ -117,6 +118,33 @@ function parsePrefs(raw: string): Prefs {
 const controlClass =
   'h-10 rounded-lg border border-input bg-card px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring'
 
+/**
+ * Make a sort value comparable.
+ *
+ * Postgres timestamps arrive as `Date` objects, which fall through to the string
+ * comparison below and sort by the weekday their `toString()` starts with —
+ * "Fri" before "Mon" before "Sat". Dates become their epoch instead, and numeric
+ * strings become numbers so "10" sorts after "9".
+ */
+function sortable(value: string | number | Date | null | undefined): string | number | null | undefined {
+  if (value instanceof Date) return value.getTime()
+  return value
+}
+
+/** A select that reads as a dropdown: the native arrow is suppressed, so draw one. */
+function SelectShell({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`relative ${className}`}>
+      {children}
+      <ChevronDown
+        size={15}
+        aria-hidden="true"
+        className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+      />
+    </div>
+  )
+}
+
 export default function DataView<T>({
   rows,
   getRowId,
@@ -225,8 +253,8 @@ export default function DataView<T>({
       if (column?.sortValue) {
         const factor = sort.dir === 'asc' ? 1 : -1
         out = [...out].sort((a, b) => {
-          const av = column.sortValue!(a)
-          const bv = column.sortValue!(b)
+          const av = sortable(column.sortValue!(a))
+          const bv = sortable(column.sortValue!(b))
           // Nulls always sink, regardless of direction.
           if (av == null && bv == null) return 0
           if (av == null) return 1
@@ -313,41 +341,44 @@ export default function DataView<T>({
             {/* Facets: inline from lg, collapsed behind the Filters button below it */}
             <div className={`${showFilters ? 'flex' : 'hidden'} w-full flex-col gap-2 sm:flex-row lg:flex lg:w-auto`}>
               {facets.map((facet) => (
-                <select
-                  key={facet.id}
-                  value={facetValues[facet.id] ?? ''}
-                  onChange={(e) => setFacetValues({ ...facetValues, [facet.id]: e.target.value })}
-                  aria-label={facet.label}
-                  className={`${controlClass} w-full appearance-none font-medium lg:w-auto`}
-                >
-                  <option value="">{facet.label}: All</option>
-                  {facet.options.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+                <SelectShell key={facet.id} className="w-full lg:w-auto">
+                  <select
+                    value={facetValues[facet.id] ?? ''}
+                    onChange={(e) => setFacetValues({ ...facetValues, [facet.id]: e.target.value })}
+                    aria-label={facet.label}
+                    className={`${controlClass} w-full appearance-none pr-9 font-medium`}
+                  >
+                    <option value="">{facet.label}: All</option>
+                    {facet.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </SelectShell>
               ))}
 
               {/* Grid mode has no column headers to click, so sorting moves here. */}
               {view === 'grid' && sortableColumns.length > 0 && (
-                <select
-                  value={sort ? `${sort.id}:${sort.dir}` : ''}
-                  onChange={(e) => {
-                    const [id, dir] = e.target.value.split(':')
-                    setSort(id ? { id, dir: dir as SortDir } : null)
-                  }}
-                  aria-label="Sort by"
-                  className={`${controlClass} w-full appearance-none font-medium lg:w-auto`}
-                >
-                  <option value="">Sort: Default</option>
-                  {sortableColumns.map((c) => (
-                    <optgroup key={c.id} label={c.label}>
-                      <option value={`${c.id}:asc`}>{c.label} ↑</option>
-                      <option value={`${c.id}:desc`}>{c.label} ↓</option>
-                    </optgroup>
-                  ))}
-                </select>
+                <SelectShell className="w-full lg:w-auto">
+                  <select
+                    value={sort ? `${sort.id}:${sort.dir}` : ''}
+                    onChange={(e) => {
+                      const [id, dir] = e.target.value.split(':')
+                      setSort(id ? { id, dir: dir as SortDir } : null)
+                    }}
+                    aria-label="Sort by"
+                    className={`${controlClass} w-full appearance-none pr-9 font-medium`}
+                  >
+                    <option value="">Sort: Default</option>
+                    {sortableColumns.map((c) => (
+                      <optgroup key={c.id} label={c.label}>
+                        <option value={`${c.id}:asc`}>{c.label} ↑</option>
+                        <option value={`${c.id}:desc`}>{c.label} ↓</option>
+                      </optgroup>
+                    ))}
+                  </select>
+                </SelectShell>
               )}
 
               {(term || activeFacetCount > 0) && (
@@ -436,7 +467,7 @@ export default function DataView<T>({
                         key={c.id}
                         scope="col"
                         aria-sort={isSorted ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                        className={`h-10 px-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground ${
+                        className={`h-10 border-r border-border/70 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground last:border-r-0 ${
                           c.align === 'right' ? 'text-right' : 'text-left'
                         } ${c.hideBelow ? HIDE[c.hideBelow] : ''} ${c.headClassName ?? ''}`}
                       >
@@ -475,9 +506,9 @@ export default function DataView<T>({
                     {columns.map((c) => (
                       <td
                         key={c.id}
-                        className={`px-4 py-3 text-sm ${c.align === 'right' ? 'text-right' : ''} ${
-                          c.hideBelow ? HIDE[c.hideBelow] : ''
-                        }`}
+                        className={`border-r border-border/50 px-3 py-3 text-sm last:border-r-0 ${
+                          c.align === 'right' ? 'text-right' : ''
+                        } ${c.hideBelow ? HIDE[c.hideBelow] : ''}`}
                       >
                         {c.cell(row)}
                       </td>

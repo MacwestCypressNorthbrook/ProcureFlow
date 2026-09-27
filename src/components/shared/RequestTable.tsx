@@ -48,6 +48,20 @@ function estimatedTotal(req: RequestRow): number | null {
 const ghs = (n: number | null) =>
   n == null ? '—' : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
 
+/** "27 Sep 2026" — the full timestamp stays on the cell's title attribute. */
+function shortDate(value: string | Date | null | undefined): string {
+  if (!value) return '—'
+  const d = new Date(value)
+  return Number.isNaN(d.getTime())
+    ? '—'
+    : d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        timeZone: 'Africa/Accra',
+      })
+}
+
 export default function RequestTable({
   requests,
   hrefBase,
@@ -78,7 +92,10 @@ export default function RequestTable({
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
               <FileText size={15} />
             </span>
-            <div className="min-w-0">
+            {/* Bounded so `truncate` actually engages — without a max width the
+                cell grows to the longest purpose and drags the table past the
+                viewport. */}
+            <div className="min-w-0 max-w-[160px] sm:max-w-[200px] xl:max-w-[220px]">
               <p className="truncate text-sm font-medium text-foreground">{r.purpose}</p>
               {summary && <p className="truncate text-xs text-muted-foreground">{summary}</p>}
               {hasPo && (
@@ -111,7 +128,7 @@ export default function RequestTable({
       sortValue: (r) => r.project_name ?? '',
       cell: (r) =>
         r.project_name ? (
-          <span className="block max-w-[200px] truncate text-sm text-foreground" title={r.project_name}>
+          <span className="block max-w-[130px] truncate text-sm text-foreground" title={r.project_name}>
             {r.project_name}
           </span>
         ) : (
@@ -125,10 +142,10 @@ export default function RequestTable({
       sortable: true,
       sortValue: (r) => r.guest_name ?? '',
       cell: (r) => (
-        <>
+        <div className="max-w-[130px]">
           <p className="truncate text-sm text-foreground">{r.guest_name || '—'}</p>
           {r.guest_email && <p className="truncate text-xs text-muted-foreground">{r.guest_email}</p>}
-        </>
+        </div>
       ),
     },
     {
@@ -153,7 +170,11 @@ export default function RequestTable({
       hideBelow: 'sm',
       sortable: true,
       sortValue: (r) => r.created_at,
-      cell: (r) => <span className="text-xs text-muted-foreground">{formatDate(r.created_at)}</span>,
+      cell: (r) => (
+        <span className="whitespace-nowrap text-xs text-muted-foreground" title={formatDate(r.created_at)}>
+          {shortDate(r.created_at)}
+        </span>
+      ),
     },
     {
       id: 'chevron',
