@@ -5,12 +5,42 @@ import { Bell, Check, Clock, AlertTriangle, Info, CheckCircle } from 'lucide-rea
 import Link from 'next/link'
 import type { Notification } from '@/lib/types'
 
+/** "Today", "Yesterday", or a plain date — the label a notification's day groups under. */
+function dayLabel(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  const startOf = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  const diffDays = Math.round((startOf(now) - startOf(date)) / 86_400_000)
+
+  if (diffDays === 0) return 'Today'
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString('en-US', { weekday: 'long' })
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() === now.getFullYear() ? undefined : 'numeric' })
+}
+
+/** Notifications already arrive newest-first from the API; this only buckets them by day. */
+function groupByDay(notifications: Notification[]): Array<{ label: string; items: Notification[] }> {
+  const groups: Array<{ label: string; items: Notification[] }> = []
+  for (const n of notifications) {
+    const label = dayLabel(n.created_at)
+    const current = groups[groups.length - 1]
+    if (current && current.label === label) {
+      current.items.push(n)
+    } else {
+      groups.push({ label, items: [n] })
+    }
+  }
+  return groups
+}
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
     let isMounted = true
+    let interval: ReturnType<typeof setInterval> | null = null
+
     const fetchNotifications = async () => {
       try {
         const res = await fetch('/api/notifications')
@@ -23,11 +53,37 @@ export default function NotificationBell() {
       }
     }
 
+    const startPolling = () => {
+      if (interval) return
+      interval = setInterval(fetchNotifications, 30000)
+    }
+    const stopPolling = () => {
+      if (interval) {
+        clearInterval(interval)
+        interval = null
+      }
+    }
+
+    // A backgrounded tab has no business hitting the API every 30s for hours
+    // on end — pause entirely while hidden, and catch up the moment it's
+    // visible again instead of waiting out whatever was left of the interval.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchNotifications()
+        startPolling()
+      } else {
+        stopPolling()
+      }
+    }
+
     fetchNotifications()
-    const interval = setInterval(fetchNotifications, 20000)
+    if (document.visibilityState === 'visible') startPolling()
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
       isMounted = false
-      clearInterval(interval)
+      stopPolling()
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [])
 
@@ -115,52 +171,61 @@ export default function NotificationBell() {
               )}
             </div>
 
-            <div className="max-h-[360px] overflow-y-auto divide-y divide-border/50">
+            <div className="max-h-[360px] overflow-y-auto">
               {notifications.length === 0 ? (
                 <div className="p-6 text-center text-xs text-muted-foreground">
                   No notifications yet
                 </div>
               ) : (
-                notifications.map((n) => (
-                  <div
-                    key={n.id}
-                    className={`flex items-start gap-3 p-3.5 transition-colors hover:bg-muted/40 ${
-                      !n.is_read ? 'bg-primary/5' : ''
-                    }`}
-                  >
-                    <span className="mt-0.5 shrink-0 rounded-lg p-1.5 bg-muted">
-                      {getIcon(n.type)}
-                    </span>
-                    <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between gap-1">
-                        <p className="truncate text-xs font-semibold text-foreground">
-                          {n.title}
-                        </p>
-                        {!n.is_read && (
-                          <button
-                            onClick={() => markAsRead(n.id)}
-                            className="text-[10px] text-muted-foreground hover:text-primary shrink-0"
-                            title="Mark as read"
-                          >
-                            <Check size={12} />
-                          </button>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">
-                        {n.message}
-                      </p>
-                      {n.link && (
-                        <Link
-                          href={n.link}
-                          onClick={() => {
-                            markAsRead(n.id)
-                            setIsOpen(false)
-                          }}
-                          className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
+                groupByDay(notifications).map((group) => (
+                  <div key={group.label}>
+                    <p className="sticky top-0 bg-card/95 backdrop-blur-md px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {group.label}
+                    </p>
+                    <div className="divide-y divide-border/50">
+                      {group.items.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`flex items-start gap-3 p-3.5 transition-colors hover:bg-muted/40 ${
+                            !n.is_read ? 'bg-primary/5' : ''
+                          }`}
                         >
-                          View Details &rarr;
-                        </Link>
-                      )}
+                          <span className="mt-0.5 shrink-0 rounded-lg p-1.5 bg-muted">
+                            {getIcon(n.type)}
+                          </span>
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="truncate text-xs font-semibold text-foreground">
+                                {n.title}
+                              </p>
+                              {!n.is_read && (
+                                <button
+                                  onClick={() => markAsRead(n.id)}
+                                  className="text-[10px] text-muted-foreground hover:text-primary shrink-0"
+                                  title="Mark as read"
+                                >
+                                  <Check size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2">
+                              {n.message}
+                            </p>
+                            {n.link && (
+                              <Link
+                                href={n.link}
+                                onClick={() => {
+                                  markAsRead(n.id)
+                                  setIsOpen(false)
+                                }}
+                                className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
+                              >
+                                View Details &rarr;
+                              </Link>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))

@@ -35,7 +35,11 @@ export default async function MintahPage() {
           ORDER BY r.created_at DESC LIMIT 8`
       ),
       query<Record<string, unknown>>(
-        `SELECT * FROM public.purchase_orders WHERE created_by = $1 ORDER BY created_at DESC`,
+        `SELECT po.*, r.description AS request_description
+           FROM public.purchase_orders po
+           LEFT JOIN public.requests r ON r.id = po.request_id
+          WHERE po.created_by = $1
+          ORDER BY po.created_at DESC`,
         [user?.id || '']
       ),
     ])

@@ -205,7 +205,13 @@ export default function RequestTable({
       columns={columns}
       facets={facets}
       searchPlaceholder="Search requests…"
-      searchText={(r) => [r.purpose, r.guest_name, r.guest_email, itemSummary(r.description)]}
+      searchText={(r) => [
+        r.purpose,
+        r.guest_name,
+        r.guest_email,
+        itemSummary(r.description),
+        REQUISITION_TYPE_CONFIG[requisitionType(r.description)].label,
+      ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       compact={compact}

@@ -164,7 +164,13 @@ export default function QueueTable({
       columns={columns}
       facets={facets}
       searchPlaceholder="Search requisitions…"
-      searchText={(r) => [r.purpose, r.requester_name, r.project_name, r.po_number]}
+      searchText={(r) => [
+        r.purpose,
+        r.requester_name,
+        r.project_name,
+        r.po_number,
+        REQUISITION_TYPE_CONFIG[requisitionType(r.description)].label,
+      ]}
       defaultSort={{ id: 'created_at', dir: 'asc' }}
       storageKey={storageKey}
       onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}

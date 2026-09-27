@@ -10,7 +10,7 @@ import {
   statusForStage,
   type Stage,
 } from '@/lib/workflow'
-import { createNotification } from '@/lib/notifications'
+import { createNotification, enqueueStageDigest } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
@@ -23,13 +23,29 @@ interface RequestRow extends DbRequest {
   return_to_stage: string | null
 }
 
-/** Notify everyone who can act at a stage, plus record it in-app and by email. */
+/**
+ * Notify everyone who can act at a stage.
+ *
+ * In-app always lands immediately. The email is either sent at once, or — for
+ * a forward approval — queued so everything the reviewer approves in one
+ * sitting arrives as a single email rather than one per requisition. Only
+ * approved items are ever queued, so what the next stage receives is exactly
+ * what is now waiting on them.
+ */
 async function notifyStage(
   stage: Stage,
   requestId: string,
   title: string,
   message: string,
-  type: 'info' | 'approval' | 'reminder' | 'warning' | 'success' = 'approval'
+  {
+    type = 'approval',
+    email = 'instant',
+    approvedBy,
+  }: {
+    type?: 'info' | 'approval' | 'reminder' | 'warning' | 'success'
+    email?: 'instant' | 'bundled'
+    approvedBy?: string
+  } = {}
 ) {
   const holders = await query<{ id: string }>(
     `SELECT id FROM public.users
@@ -47,10 +63,15 @@ async function notifyStage(
         message,
         type,
         link: STAGES[stage].route(requestId),
-        sendEmailAlert: true,
+        sendEmailAlert: email === 'instant',
       })
     )
   )
+
+  if (email === 'bundled') {
+    await enqueueStageDigest(stage, requestId, approvedBy ?? null)
+  }
+
   return holders.length
 }
 
@@ -204,11 +225,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       [id, po?.id ?? null, stage, user.id, comment]
     )
 
+    // Forward approvals are the high-volume path — a reviewer clearing their
+    // queue would otherwise send the next stage one email per requisition.
     const notified = await notifyStage(
       onward,
       id,
       `Requisition awaiting ${STAGES[onward].label}`,
-      `"${existing.purpose}" was approved by ${STAGES[stage].label} (${requesterName}) and is now with you.${comment ? ` Note: ${comment}` : ''}`
+      `"${existing.purpose}" was approved by ${STAGES[stage].label} (${requesterName}) and is now with you.${comment ? ` Note: ${comment}` : ''}`,
+      { email: 'bundled', approvedBy: user.id }
     )
 
     if (existing.created_by) {
@@ -306,7 +330,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       id,
       `Sent back by ${STAGES[stage].label}`,
       `"${existing.purpose}" was returned to you by ${requesterName}.${comment ? ` Reason: ${comment}` : ''}`,
-      'warning'
+      // A send-back is a correction someone is waiting on — emailed at once,
+      // never bundled.
+      { type: 'warning' }
     )
 
     return NextResponse.json({ success: true, status: 'sent_back', stage: back, notified })

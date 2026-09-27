@@ -10,12 +10,12 @@ import { resolveAttachments } from '@/lib/resolve-file-url'
 import { FileText, Paperclip, Clock, Package, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
-import ApprovalPanel from '@/components/shared/ApprovalPanel'
+import ApprovalPanel, { type ApprovalEntry } from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
 import RemindButton from '@/components/shared/RemindButton'
-import { getReviewBundle } from '@/lib/review'
 import { currentStage } from '@/lib/workflow'
+import type { PurchaseOrder } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,6 +26,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   let requestData: Record<string, unknown> | null = null
   let attachments: Record<string, unknown>[] = []
   let items: Awaited<ReturnType<typeof getRequestItems>> = []
+  let po: PurchaseOrder | null = null
+  let approvalHistory: ApprovalEntry[] = []
 
   try {
     requestData = await queryOne<Record<string, unknown>>(
@@ -37,12 +39,32 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       [id]
     )
     if (requestData) {
-      const attData = await query<Record<string, unknown>>(
-        `SELECT * FROM public.request_attachments WHERE request_id = $1 ORDER BY created_at ASC`,
-        [id]
-      )
+      // Independent lookups, fired together — one network round trip instead
+      // of four serial ones (this used to also re-fetch the request row,
+      // items and attachments a second time via getReviewBundle).
+      const [attData, itemRows, poRow, historyRows] = await Promise.all([
+        query<Record<string, unknown>>(
+          `SELECT * FROM public.request_attachments WHERE request_id = $1 ORDER BY created_at ASC`,
+          [id]
+        ),
+        getRequestItems(id),
+        queryOne<PurchaseOrder>(
+          `SELECT * FROM public.purchase_orders WHERE request_id = $1 ORDER BY created_at DESC LIMIT 1`,
+          [id]
+        ),
+        query<ApprovalEntry>(
+          `SELECT a.id, a.stage, a.action, a.comment, a.created_at, u.name AS performer_name
+             FROM public.request_approvals a
+             LEFT JOIN public.users u ON u.id = a.performed_by
+            WHERE a.request_id = $1
+            ORDER BY a.created_at DESC`,
+          [id]
+        ),
+      ])
       attachments = await resolveAttachments(attData)
-      items = await getRequestItems(id)
+      items = itemRows
+      po = poRow
+      approvalHistory = historyRows
     }
   } catch (err) {
     console.error('Failed to load request detail from Neon:', err)
@@ -69,8 +91,6 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const canDelete = status === 'draft' || status === 'pending_lead'
   const isOwner = requestData.created_by === user?.id
 
-  const bundle = await getReviewBundle(id)
-  const approvalHistory = bundle?.history ?? []
   const reviewStage = currentStage(status, (requestData.sent_back_to as string | null) ?? null)
 
   const docs = attachments
@@ -175,27 +195,27 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               />
             </Panel>
 
-            {bundle?.po && (
+            {po && (
               <Panel title="Purchase Order" icon={<Receipt size={16} />}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">PO number</p>
                       <p className="text-sm font-semibold tabular-nums text-foreground">
-                        {bundle.po.po_number || 'Not yet numbered'}
+                        {po.po_number || 'Not yet numbered'}
                       </p>
                     </div>
-                    <StatusBadge status={bundle.po.status} config={PO_STATUS_CONFIG} />
+                    <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="PO amount">
                       <p className="text-sm font-semibold tabular-nums text-foreground">
-                        {formatCurrency(Number(bundle.po.total_amount) || 0)}
+                        {formatCurrency(Number(po.total_amount) || 0)}
                       </p>
                     </Field>
-                    <Field label={bundle.po.status === 'paid' ? 'Paid on' : 'Payment'}>
+                    <Field label={po.status === 'paid' ? 'Paid on' : 'Payment'}>
                       <p className="text-sm font-semibold text-foreground">
-                        {bundle.po.paid_at ? formatDate(bundle.po.paid_at) : 'Not yet paid'}
+                        {po.paid_at ? formatDate(po.paid_at) : 'Not yet paid'}
                       </p>
                     </Field>
                   </div>

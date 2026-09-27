@@ -359,3 +359,27 @@ ALTER TABLE public.request_items
     CHECK (category IN ('material', 'labour'));
 
 CREATE INDEX IF NOT EXISTS idx_request_items_category ON public.request_items(category);
+
+-- ── Notification & decision-log performance indexes ─────────────────────────
+-- (mirrors db/migrations/008_notification_perf_indexes.sql)
+-- The notifications endpoint is polled by every open session, making
+-- "WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50" the single most
+-- frequently executed query in the app — a composite index lets Postgres walk
+-- straight to a user's newest rows instead of filtering then sorting.
+CREATE INDEX IF NOT EXISTS idx_notifications_user_created ON public.notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_request_approvals_stage_created ON public.request_approvals(stage, created_at DESC);
+
+-- ── Stage digest queue ───────────────────────────────────────────────────────
+-- (mirrors db/migrations/009_stage_digest_queue.sql)
+-- Requisitions that just cleared a stage, waiting to be bundled into one email
+-- to the next stage instead of one email per approval. See dispatchStageDigests.
+CREATE TABLE IF NOT EXISTS public.stage_digest_queue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    stage TEXT NOT NULL,
+    request_id UUID NOT NULL REFERENCES public.requests(id) ON DELETE CASCADE,
+    approved_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    queued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (stage, request_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_stage_digest_queue_stage ON public.stage_digest_queue(stage, queued_at);

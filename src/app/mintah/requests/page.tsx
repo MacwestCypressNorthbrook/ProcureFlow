@@ -4,47 +4,46 @@ import RequestTable from '@/components/shared/RequestTable'
 import { monthSplit } from '@/components/shared/stat-presets'
 import { PageContainer, SectionHeader, StatGrid, EmptyState } from '@/components/shared/ui-kit'
 import { CalendarCheck, Clock, Eye, FileText } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
 export default async function MintahRequestsPage() {
-  const user = await requirePageCapability('request:review')
+  await requirePageCapability('request:review')
 
-  let newRequests: Record<string, unknown>[] = []
-  let reviewingRequests: Record<string, unknown>[] = []
+  let allRequests: Record<string, unknown>[] = []
 
   try {
-    const [newRes, reviewingRes] = await Promise.all([
-      query<Record<string, unknown>>(
-        `SELECT r.*,
-          pr.name AS project_name, 
-          CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
-          po.po_number,
-          po.status AS po_status
+    // Every requisition, at whatever stage — this page exists for visibility
+    // across the whole pipeline. What Supply Chain can actually act on lives
+    // in /mintah/queue; the two are deliberately separate so an approved,
+    // actionable requisition is never confused with one merely passing by.
+    // Capped because the table paginates client-side and nobody scrolls past
+    // a few hundred rows.
+    allRequests = await query<Record<string, unknown>>(
+      `SELECT r.*,
+              pr.name AS project_name,
+              (po.id IS NOT NULL) AS has_po,
+              po.po_number,
+              po.status AS po_status
          FROM public.requests r
-         LEFT JOIN public.purchase_orders po ON po.request_id = r.id
          LEFT JOIN public.projects pr ON pr.id = r.project_id
-         WHERE r.status IN ('pending_lead') ORDER BY r.created_at DESC`
-      ),
-      query<Record<string, unknown>>(
-        `SELECT r.*,
-          pr.name AS project_name, 
-          CASE WHEN po.id IS NOT NULL THEN true ELSE false END AS has_po,
-          po.po_number,
-          po.status AS po_status
-         FROM public.requests r
-         LEFT JOIN public.purchase_orders po ON po.request_id = r.id
-         LEFT JOIN public.projects pr ON pr.id = r.project_id
-         WHERE r.status IN ('pending_supply_chain') ORDER BY r.created_at DESC`
-      ),
-    ])
-    newRequests = newRes
-    reviewingRequests = reviewingRes
+         LEFT JOIN LATERAL (
+              SELECT id, po_number, status
+                FROM public.purchase_orders
+               WHERE request_id = r.id
+               ORDER BY created_at DESC
+               LIMIT 1
+         ) po ON true
+        ORDER BY r.created_at DESC
+        LIMIT 500`
+    )
   } catch (err) {
     console.error('Failed to load requests from Neon:', err)
   }
 
-  const allRequests = [...newRequests, ...reviewingRequests]
+  const awaitingMe = allRequests.filter((r) => r.status === 'pending_supply_chain')
+  const upstream = allRequests.filter((r) => r.status === 'pending_lead')
   const month = monthSplit(allRequests.map((r) => (r.created_at as string | null) ?? null))
   const oldestRaised = allRequests
     .map((r) => new Date((r.created_at as string) ?? '').getTime())
@@ -60,20 +59,20 @@ export default async function MintahRequestsPage() {
         <StatGrid
           stats={[
             {
-              label: 'New requests',
-              value: newRequests.length,
-              icon: <FileText size={18} />,
-              tone: 'blue',
-              badge: newRequests.length > 0 ? 'Needs action' : undefined,
-              compare: 'Nobody has picked these up yet',
-            },
-            {
-              label: 'Under review',
-              value: reviewingRequests.length,
+              label: 'Awaiting your action',
+              value: awaitingMe.length,
               icon: <Eye size={18} />,
               tone: 'amber',
-              compare: 'Being specced out by procurement',
-              href: '/mintah/reviewing',
+              badge: awaitingMe.length > 0 ? 'Approved — needs you' : undefined,
+              compare: 'Approved by the Project Lead',
+              href: '/mintah/queue',
+            },
+            {
+              label: 'Still with the Lead',
+              value: upstream.length,
+              icon: <FileText size={18} />,
+              tone: 'blue',
+              compare: 'Not approved yet — view only',
             },
             {
               label: 'Raised this month',
@@ -94,11 +93,22 @@ export default async function MintahRequestsPage() {
         />
 
         <section>
-          <SectionHeader title="All Incoming Requests" count={allRequests.length} />
+          <SectionHeader title="All Requisitions — every stage" count={allRequests.length} />
+          <p className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            <Eye size={14} className="mt-0.5 shrink-0" />
+            <span>
+              Visibility across the whole pipeline, at every stage — including requisitions that are not yours to act on.
+              The ones the Project Lead has approved and handed to you are in{' '}
+              <Link href="/mintah/queue" className="font-medium text-primary hover:underline">
+                Awaiting Review
+              </Link>
+              . Filter by <span className="font-medium text-foreground">Status</span> to narrow this list.
+            </span>
+          </p>
           {allRequests.length > 0 ? (
             <RequestTable requests={allRequests as never} hrefBase="/mintah/requests" storageKey="mintah-requests" />
           ) : (
-            <EmptyState icon={<FileText size={20} />} title="No incoming requests" description="New requisitions will appear here." />
+            <EmptyState icon={<FileText size={20} />} title="No requisitions yet" description="Requisitions will appear here once they are raised." />
           )}
         </section>
       </PageContainer>

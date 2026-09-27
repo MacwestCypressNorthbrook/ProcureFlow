@@ -6,6 +6,7 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { ChevronRight, FileText, AlertTriangle } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
+import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
 export default function POTable({
   pos,
@@ -51,9 +52,16 @@ export default function POTable({
       ),
     },
     {
+      id: 'type',
+      label: 'Type',
+      sortable: true,
+      sortValue: (p) => requisitionType(p.request_description),
+      cell: (p) => <RequisitionTypeBadge type={requisitionType(p.request_description)} />,
+    },
+    {
       id: 'amount',
       label: 'Amount',
-      align: 'right',
+      align: 'left',
       sortable: true,
       sortValue: (p) => p.total_amount,
       cell: (p) => (
@@ -63,10 +71,10 @@ export default function POTable({
     {
       id: 'breakdown',
       label: 'Qty × Rate',
-      align: 'right',
+      align: 'left',
       hideBelow: 'md',
       cell: (p) => (
-        <span className="text-xs tabular-nums text-muted-foreground">
+        <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">
           {p.quantity && p.unit_rate ? `${p.quantity} × ${formatCurrency(p.unit_rate)}` : '—'}
         </span>
       ),
@@ -98,6 +106,7 @@ export default function POTable({
   ]
 
   const statuses = Array.from(new Set(pos.map((p) => p.status))).sort()
+  const types = Array.from(new Set(pos.map((p) => requisitionType(p.request_description))))
   const facets: DataFacet<PurchaseOrder>[] = [
     {
       id: 'status',
@@ -105,6 +114,16 @@ export default function POTable({
       options: statuses.map((s) => ({ value: s, label: PO_STATUS_CONFIG[s]?.label ?? s })),
       matches: (p, value) => p.status === value,
     },
+    ...(types.length > 1
+      ? [
+        {
+          id: 'type',
+          label: 'Type',
+          options: types.map((t) => ({ value: t, label: REQUISITION_TYPE_CONFIG[t].label })),
+          matches: (p, value) => requisitionType(p.request_description) === value,
+        } satisfies DataFacet<PurchaseOrder>,
+      ]
+      : []),
   ]
 
   return (
@@ -114,7 +133,14 @@ export default function POTable({
       columns={columns}
       facets={facets}
       searchPlaceholder="Search purchase orders…"
-      searchText={(p) => [p.purpose, p.po_number, p.description, p.vendor_name, p.file_name]}
+      searchText={(p) => [
+        p.purpose,
+        p.po_number,
+        p.description,
+        p.vendor_name,
+        p.file_name,
+        REQUISITION_TYPE_CONFIG[requisitionType(p.request_description)].label,
+      ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       compact={compact}
@@ -131,6 +157,10 @@ export default function POTable({
               </p>
             </div>
             <StatusBadge status={p.status} config={PO_STATUS_CONFIG} />
+          </div>
+
+          <div className="mt-1.5">
+            <RequisitionTypeBadge type={requisitionType(p.request_description)} />
           </div>
 
           {showRejection && p.sam_rejection_reason && (

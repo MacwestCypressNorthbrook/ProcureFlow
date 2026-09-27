@@ -1,5 +1,5 @@
 import { query, queryOne, execute } from '@/lib/db'
-import { sendEmail, sendActionReminderEmail, sendLeadDigestEmail } from '@/lib/email/client'
+import { sendEmail, sendActionReminderEmail, sendLeadDigestEmail, sendStageDigestEmail } from '@/lib/email/client'
 import { linkForRole, type LinkTarget } from '@/lib/links'
 import type { Notification, Reminder } from '@/lib/types'
 import { getStageQueue } from '@/lib/review'
@@ -276,6 +276,154 @@ export async function dispatchLeadDigest(): Promise<{ sent: number; reason: stri
     console.error('Error dispatching the lead digest:', err)
     return { sent: 0, reason: 'error' }
   }
+}
+
+/* ============================================================
+   Stage digests — one email per review session, not per approval.
+
+   When a reviewer clears a requisition it moves to the next stage, and that
+   stage's holders get an in-app notification immediately. The *email* is
+   deferred here instead: each approval queues a row, and the dispatcher sends
+   one bundled email per stage once the approvals stop coming. A Lead working
+   through fifteen requisitions therefore sends Supply Chain one email, not
+   fifteen.
+   ============================================================ */
+
+/** Stages that receive bundled emails. The Lead's inbound batch is the weekly digest instead. */
+const DIGEST_STAGES = ['supply_chain', 'admin', 'cost_control', 'finance'] as const
+
+/** Where each stage works its queue — the digest's call to action. */
+const STAGE_QUEUE_PATH: Record<string, string> = {
+  lead: '/sam/requests',
+  supply_chain: '/mintah/queue',
+  admin: '/admin/requests',
+  cost_control: '/cost-control',
+  finance: '/finance/queue',
+}
+
+/** Send once nothing new has arrived for this long — the "they've finished reviewing" signal. */
+const DIGEST_QUIET_MINUTES = 10
+/** …but never sit on a batch longer than this, however steadily approvals trickle in. */
+const DIGEST_MAX_WAIT_MINUTES = 30
+
+/** Queue a requisition for its new stage's next bundled email. */
+export async function enqueueStageDigest(
+  stage: string,
+  requestId: string,
+  approvedBy: string | null
+): Promise<void> {
+  try {
+    await execute(
+      `INSERT INTO public.stage_digest_queue (stage, request_id, approved_by)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (stage, request_id)
+         DO UPDATE SET queued_at = now(), approved_by = EXCLUDED.approved_by`,
+      [stage, requestId, approvedBy]
+    )
+  } catch (err) {
+    console.error('Failed to queue a stage digest:', err)
+  }
+}
+
+/**
+ * Send each stage's pending batch, where the batch has settled.
+ *
+ * Runs off the same cron as reminders, so how soon a batch goes out after a
+ * reviewer finishes is bounded by how often that cron fires.
+ */
+export async function dispatchStageDigests(): Promise<{ sent: Record<string, number> }> {
+  const sent: Record<string, number> = {}
+  const { STAGES } = await import('@/lib/workflow')
+
+  for (const stage of DIGEST_STAGES) {
+    try {
+      const window = await queryOne<{ oldest: string | null; newest: string | null; count: number }>(
+        `SELECT MIN(queued_at) AS oldest, MAX(queued_at) AS newest, COUNT(*)::int AS count
+           FROM public.stage_digest_queue
+          WHERE stage = $1`,
+        [stage]
+      )
+      if (!window || !window.count || !window.newest || !window.oldest) continue
+
+      const quietFor = (Date.now() - new Date(window.newest).getTime()) / 60_000
+      const waitingFor = (Date.now() - new Date(window.oldest).getTime()) / 60_000
+      // Still mid-session: give the reviewer a chance to add to the batch.
+      if (quietFor < DIGEST_QUIET_MINUTES && waitingFor < DIGEST_MAX_WAIT_MINUTES) continue
+
+      const queued = await query<{ request_id: string }>(
+        `SELECT request_id FROM public.stage_digest_queue WHERE stage = $1`,
+        [stage]
+      )
+      const requestIds = queued.map((q) => q.request_id)
+      if (requestIds.length === 0) continue
+
+      // Only requisitions still sitting at this stage belong in the email — one
+      // that has already moved on (or been sent back) would be noise.
+      const items = await query<{
+        id: string
+        purpose: string
+        requester_name: string | null
+        project_name: string | null
+        total_amount: number | null
+      }>(
+        `SELECT r.id, r.purpose, u.name AS requester_name, p.name AS project_name, r.total_amount
+           FROM public.requests r
+           LEFT JOIN public.users u ON u.id = r.created_by
+           LEFT JOIN public.projects p ON p.id = r.project_id
+          WHERE r.id = ANY($1::uuid[])
+            AND r.status = $2
+          ORDER BY r.created_at ASC`,
+        [requestIds, STAGES[stage].status]
+      )
+
+      // Clear the batch either way: what is no longer here is not coming back.
+      await execute(`DELETE FROM public.stage_digest_queue WHERE stage = $1`, [stage])
+      if (items.length === 0) continue
+
+      const holders = await query<{ id: string; email: string; name: string }>(
+        `SELECT id, email, name FROM public.users
+          WHERE role = ANY($1::text[])
+            AND COALESCE(is_active, true)
+            AND auth_id NOT LIKE 'pending:%'`,
+        [STAGES[stage].roles]
+      )
+
+      const previous = STAGE_ORDER_BEFORE(stage)
+      const queueUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}${STAGE_QUEUE_PATH[stage] ?? '/'}`
+
+      let count = 0
+      for (const holder of holders) {
+        if (!holder.email) continue
+        await sendStageDigestEmail({
+          recipientEmail: holder.email,
+          recipientName: holder.name || 'there',
+          stageLabel: STAGES[stage].label,
+          fromStageLabel: previous ? STAGES[previous].label : 'The previous stage',
+          items: items.map((r) => ({
+            requestId: r.id,
+            purpose: r.purpose,
+            requesterName: r.requester_name || 'Unknown',
+            projectName: r.project_name,
+            amount: r.total_amount,
+          })),
+          queueUrl,
+        })
+        count++
+      }
+      sent[stage] = count
+    } catch (err) {
+      console.error(`Failed to dispatch the ${stage} digest:`, err)
+    }
+  }
+
+  return { sent }
+}
+
+/** The stage that hands work to this one, for the digest's "approved by" line. */
+function STAGE_ORDER_BEFORE(stage: string): 'requester' | 'lead' | 'supply_chain' | 'admin' | 'cost_control' | null {
+  const order = ['requester', 'lead', 'supply_chain', 'admin', 'cost_control', 'finance'] as const
+  const i = order.indexOf(stage as (typeof order)[number])
+  return i > 0 ? (order[i - 1] as 'requester' | 'lead' | 'supply_chain' | 'admin' | 'cost_control') : null
 }
 
 /** Notify everyone who can act at a stage, plus record it in-app and by email. */

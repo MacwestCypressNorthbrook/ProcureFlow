@@ -14,7 +14,10 @@ export default async function SamAllPage() {
 
   try {
     pos = await query<PurchaseOrder>(
-      `SELECT * FROM public.purchase_orders ORDER BY created_at DESC`
+      `SELECT po.*, r.description AS request_description
+         FROM public.purchase_orders po
+         LEFT JOIN public.requests r ON r.id = po.request_id
+        ORDER BY po.created_at DESC`
     )
   } catch (err) {
     console.error('Failed to load all POs from Neon:', err)

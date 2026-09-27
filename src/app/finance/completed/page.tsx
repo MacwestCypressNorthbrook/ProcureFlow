@@ -14,9 +14,11 @@ export default async function FinanceCompletedPage() {
 
   try {
     pos = await query<PurchaseOrder>(
-      `SELECT * FROM public.purchase_orders
-       WHERE status IN ('paid')
-       ORDER BY paid_at DESC, created_at DESC`
+      `SELECT po.*, r.description AS request_description
+         FROM public.purchase_orders po
+         LEFT JOIN public.requests r ON r.id = po.request_id
+        WHERE po.status IN ('paid')
+        ORDER BY po.paid_at DESC, po.created_at DESC`
     )
   } catch (err) {
     console.error('Failed to query completed POs from Neon:', err)

@@ -106,6 +106,12 @@ export interface PurchaseOrder {
   notes?: string | null
   created_at: string
   updated_at: string
+  /**
+   * The originating requisition's `description` (rich JSON), joined in where
+   * a page needs to tell a labour PO from a materials one — see
+   * `requisitionType` in `@/components/shared/requisition-type`.
+   */
+  request_description?: string | null
 }
 
 export interface PoAuditTrail {

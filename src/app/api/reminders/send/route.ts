@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { dispatchPendingReminders, dispatchLeadDigest } from '@/lib/notifications'
+import { dispatchPendingReminders, dispatchLeadDigest, dispatchStageDigests } from '@/lib/notifications'
 import { pruneRateLimits } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
@@ -25,9 +25,19 @@ export async function POST(request: Request) {
   // the one configured in the admin panel, and at most once per day even then.
   const digest = await dispatchLeadDigest()
 
+  // Each downstream stage's approved batch, sent once the approvals settle.
+  // How soon that is after a reviewer finishes is bounded by this cron's own
+  // interval, so it wants to run every few minutes.
+  const stageDigests = await dispatchStageDigests()
+
   // Housekeeping rides along with the cron that already runs: rate-limit
   // counters are only meaningful for an hour, so anything older is dead weight.
   await pruneRateLimits()
 
-  return NextResponse.json({ success: true, processed: result.processed, leadDigest: digest })
+  return NextResponse.json({
+    success: true,
+    processed: result.processed,
+    leadDigest: digest,
+    stageDigests: stageDigests.sent,
+  })
 }

@@ -233,6 +233,81 @@ export async function sendLeadDigestEmail({
 }
 
 /**
+ * Template: the batch of requisitions a stage just received.
+ *
+ * Sent once per review session rather than once per approval — the stage's
+ * holders already got an in-app notification per item the moment it landed.
+ */
+export async function sendStageDigestEmail({
+  recipientEmail,
+  recipientName,
+  stageLabel,
+  fromStageLabel,
+  items,
+  queueUrl,
+}: {
+  recipientEmail: string
+  recipientName: string
+  /** The stage receiving the batch, e.g. "Supply Chain". */
+  stageLabel: string
+  /** The stage that approved them, e.g. "Project Lead". */
+  fromStageLabel: string
+  items: Array<{
+    requestId: string
+    purpose: string
+    requesterName: string
+    projectName?: string | null
+    amount?: number | null
+  }>
+  queueUrl: string
+}) {
+  const ghs = (n?: number | null) =>
+    n == null ? '—' : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
+
+  const rows = items
+    .map(
+      (item) => `
+        <tr>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a;">${item.purpose}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${item.requesterName}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${item.projectName || '—'}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right;">${ghs(item.amount)}</td>
+        </tr>`
+    )
+    .join('')
+
+  const count = items.length
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #1e293b;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">${count} requisition${count === 1 ? '' : 's'} now with ${stageLabel}</h2>
+      <p style="color: #334155; font-size: 14px;">Hello ${recipientName || 'there'},</p>
+      <p style="color: #64748b; font-size: 14px;">
+        ${fromStageLabel} approved the following and ${count === 1 ? 'it is' : 'they are'} now awaiting your action.
+      </p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+        <thead>
+          <tr style="background-color: #f8fafc;">
+            <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Requisition</th>
+            <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Requester</th>
+            <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Site</th>
+            <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: #64748b;">Value</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="margin-top: 24px;">
+        <a href="${queueUrl}" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; display: inline-block;">Open your queue</a>
+      </p>
+    </div>
+  `
+  return sendEmail({
+    to: recipientEmail,
+    subject: `[ProcureFlow] ${count} requisition${count === 1 ? '' : 's'} awaiting ${stageLabel}`,
+    html,
+  })
+}
+
+/**
  * Template: Reminder for pending approval or action
  */
 export async function sendActionReminderEmail({
