@@ -1,4 +1,4 @@
-import { requirePageRole } from '@/lib/auth-guard'
+import { requirePageRole, isElevated } from '@/lib/auth-guard'
 import { query, queryOne } from '@/lib/db'
 import { getRequestItems } from '@/lib/requests'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -90,7 +90,11 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   // picks it up, or once a reviewer has sent it back.
   const canEdit = status === 'draft' || status === 'pending_lead' || status === 'sent_back'
   const canDelete = status === 'draft' || status === 'pending_lead'
-  const isOwner = requestData.created_by === user?.id
+  const isOwner =
+    (requestData.created_by
+      ? requestData.created_by === user?.id
+      : requestData.guest_email === user?.email || user?.role === 'engineer') ||
+    isElevated(user?.role)
 
   const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
   const poPayments = po ? await listPayments(po.id) : []

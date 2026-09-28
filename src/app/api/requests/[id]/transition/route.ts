@@ -132,7 +132,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   // engineer; every other stage is held by its role.
   const isHolder =
     stage === 'requester'
-      ? existing.created_by === user.id || isElevated(user.role)
+      ? (existing.created_by
+          ? existing.created_by === user.id
+          : user.role === 'engineer' || existing.guest_email === user.email) || isElevated(user.role)
       : canActAt(user.role, stage)
 
   if (!isHolder) {
