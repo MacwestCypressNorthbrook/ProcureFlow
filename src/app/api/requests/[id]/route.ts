@@ -4,7 +4,7 @@ import { requireCapability } from '@/lib/auth-guard'
 import { isElevated, normalizeRole } from '@/lib/roles'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest } from '@/lib/types'
-import { extractRequisition } from '@/components/shared/RichRequisitionView'
+import { extractRequisition } from '@/lib/requisitions'
 
 export async function GET(
   request: Request,

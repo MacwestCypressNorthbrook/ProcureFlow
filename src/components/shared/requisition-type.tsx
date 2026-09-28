@@ -1,4 +1,4 @@
-import { extractRequisition } from '@/components/shared/RichRequisitionView'
+import { extractRequisition } from '@/lib/requisitions'
 import { Package, Users, Receipt, Layers } from 'lucide-react'
 
 export type RequisitionType = 'material' | 'labour' | 'other' | 'mixed'
