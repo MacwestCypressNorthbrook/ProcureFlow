@@ -4,7 +4,7 @@ import QueueTable from '@/components/shared/QueueTable'
 import DecisionsTable from '@/components/shared/DecisionsTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats, monthSplit, statMoney } from '@/components/shared/stat-presets'
-import { getStageQueue, getStageDecisions } from '@/lib/review'
+import { getStageInbox, getStageQueue, getStageDecisions } from '@/lib/review'
 import { statusForStage } from '@/lib/workflow'
 import { Scale, Check, RotateCcw, CalendarCheck } from 'lucide-react'
 
@@ -30,7 +30,7 @@ export default async function CostControlPage({
   const view: View = rawView === 'reviewed' ? 'reviewed' : 'pending'
 
   const [pending, decisions] = await Promise.all([
-    getStageQueue([statusForStage('cost_control')]),
+    getStageInbox('cost_control'),
     getStageDecisions('cost_control'),
   ])
 

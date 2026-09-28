@@ -9,7 +9,7 @@ import {
   EmptyState,
 } from '@/components/shared/ui-kit'
 import { monthSplit, statMoney } from '@/components/shared/stat-presets'
-import { getStageQueue } from '@/lib/review'
+import { getStageInbox, getStageQueue } from '@/lib/review'
 import { statusForStage } from '@/lib/workflow'
 import { ClipboardCheck, CheckCircle, Clock, Wallet, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
@@ -29,7 +29,7 @@ export default async function SamPage() {
   // The Project Lead is the first review in the chain; everything downstream is
   // shown only as context for what they have already cleared.
   const [waiting, downstream] = await Promise.all([
-    getStageQueue([statusForStage('lead')]),
+    getStageInbox('lead'),
     getStageQueue([
       statusForStage('supply_chain'),
       statusForStage('admin'),

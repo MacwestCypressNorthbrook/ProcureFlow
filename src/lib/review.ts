@@ -1,5 +1,5 @@
 import { query, queryOne } from '@/lib/db'
-import type { Stage, RequestStatus } from '@/lib/workflow'
+import { statusForStage, type Stage, type RequestStatus } from '@/lib/workflow'
 import type { PurchaseOrder, Request as DbRequest } from '@/lib/types'
 import type { ApprovalEntry, ReviewDocument } from '@/components/shared/ApprovalPanel'
 import { documentHref } from '@/lib/resolve-file-url'
@@ -54,6 +54,49 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
     )
   } catch (err) {
     console.error('Failed to load the stage queue from Neon:', err)
+    return []
+  }
+}
+
+/**
+ * What a stage is actually holding — its queue.
+ *
+ * Two things sit with a stage: requisitions at its own status, and ones another
+ * stage sent BACK to it, which carry `status = 'sent_back'` and name their
+ * holder in `sent_back_to`. `currentStage()` has always treated both as held by
+ * that stage; the queue used to filter on status alone, so a sent-back
+ * requisition vanished from the queue it had been returned to and only showed
+ * under All Requisitions.
+ */
+export async function getStageInbox(stage: Stage): Promise<QueueRow[]> {
+  try {
+    return await query<QueueRow>(
+      `SELECT r.*,
+              p.name AS project_name,
+              u.name AS requester_name,
+              (SELECT COUNT(*)::int FROM public.request_items ri WHERE ri.request_id = r.id) AS item_count,
+              (SELECT COUNT(*)::int FROM public.request_attachments ra WHERE ra.request_id = r.id) AS document_count,
+              po.id AS po_id,
+              po.po_number,
+              po.status AS po_status,
+              (po.id IS NOT NULL) AS has_po
+         FROM public.requests r
+         LEFT JOIN public.projects p ON p.id = r.project_id
+         LEFT JOIN public.users u ON u.id = r.created_by
+         LEFT JOIN LATERAL (
+              SELECT id, po_number, status
+                FROM public.purchase_orders
+               WHERE request_id = r.id
+               ORDER BY created_at DESC
+               LIMIT 1
+         ) po ON true
+        WHERE r.status = $1
+           OR (r.status = 'sent_back' AND r.sent_back_to = $2)
+        ORDER BY r.created_at DESC`,
+      [statusForStage(stage), stage]
+    )
+  } catch (err) {
+    console.error('Failed to load the stage inbox from Neon:', err)
     return []
   }
 }

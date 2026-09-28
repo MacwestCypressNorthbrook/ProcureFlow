@@ -2,8 +2,7 @@ import { query, queryOne, execute } from '@/lib/db'
 import { sendEmail, sendActionReminderEmail, sendLeadDigestEmail, sendStageDigestEmail } from '@/lib/email/client'
 import { linkForRole, type LinkTarget } from '@/lib/links'
 import type { Notification, Reminder } from '@/lib/types'
-import { getStageQueue } from '@/lib/review'
-import { statusForStage } from '@/lib/workflow'
+import { getStageInbox } from '@/lib/review'
 import { getLeadDigestSettings, markLeadDigestSent, accraWeekday, accraDateStr } from '@/lib/settings'
 
 interface CreateNotificationParams {
@@ -240,7 +239,7 @@ export async function dispatchLeadDigest(): Promise<{ sent: number; reason: stri
     const today = accraDateStr()
     if (settings.lastSentOn === today) return { sent: 0, reason: 'already sent today' }
 
-    const pending = await getStageQueue([statusForStage('lead')])
+    const pending = await getStageInbox('lead')
     if (pending.length === 0) {
       await markLeadDigestSent(today)
       return { sent: 0, reason: 'no requisitions waiting' }
