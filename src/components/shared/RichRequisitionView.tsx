@@ -26,7 +26,8 @@ export interface RichRequisitionData {
     date: string
   }
   items: Array<{
-    category?: 'material' | 'labour'
+    category?: 'material' | 'labour' | 'other'
+    isSubcontractor?: boolean
     description: string
     quantity: number
     unit?: string
@@ -170,8 +171,13 @@ export default function RichRequisitionView({ description, fallbackDate }: RichR
                   <TableCell className="px-3 py-2.5 text-center text-xs text-muted-foreground">{index + 1}</TableCell>
                   <TableCell className="px-3 py-2.5 text-sm font-medium text-foreground">
                     {item.category === 'labour' && (
-                      <span className="mr-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-600">
-                        Labour
+                      <span className="mr-1.5 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                        {item.isSubcontractor ? 'Sub-contractor' : 'Labour'}
+                      </span>
+                    )}
+                    {item.category === 'other' && (
+                      <span className="mr-1.5 rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                        Expense
                       </span>
                     )}
                     {item.description}

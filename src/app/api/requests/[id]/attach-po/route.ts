@@ -243,7 +243,14 @@ startxref
     return NextResponse.json({ error: 'Failed to create or update purchase order' }, { status: 500 })
   }
 
-  // Record attachment in po_attachments
+  // The same file is deliberately recorded twice, and both sides are load-bearing:
+  //   purchase_orders.file_path  — the PO's own document. The attach drawer's
+  //     "you cannot approve without a document" guard and /api/documents/po-file-*
+  //     read this one.
+  //   po_attachments             — the list the PO detail pages render, and what
+  //     lets a purchase order carry more than one file.
+  // Any view that merges the two must therefore de-duplicate on file_url, the way
+  // getReviewBundle does; listing both is what made every PO appear twice.
   if (fileName && fileUrl) {
     await execute(
       `INSERT INTO public.po_attachments (po_id, file_name, file_url, file_size, file_type, uploaded_by)

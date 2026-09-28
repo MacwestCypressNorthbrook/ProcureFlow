@@ -78,6 +78,9 @@ export async function POST(
     [id, po.id, guard.user.id, typeof body.comment === 'string' ? body.comment.trim() || null : null]
   )
 
+  // Mirrors attach-po: the file is recorded both on the purchase order itself
+  // and in po_attachments, because different screens read different ones. A view
+  // that shows both must de-duplicate on file_url.
   if (fileName && fileUrl) {
     await execute(
       `INSERT INTO public.po_attachments (po_id, file_name, file_url, uploaded_by)

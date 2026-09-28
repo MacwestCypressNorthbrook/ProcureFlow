@@ -228,7 +228,10 @@ export default function ApprovalPanel({
                 {[...requestDocs, ...poDocs].map((doc) => (
                   <li key={doc.id}>
                     <div className="flex items-center justify-between gap-2.5 rounded-lg border border-border bg-background/40 px-3 py-2.5 transition-colors hover:border-ring">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      {/* Wraps: the badge is shrink-0, so in a narrow panel it
+                          used to overflow the filename and sit on top of the
+                          Preview button. */}
+                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2.5 gap-y-1">
                         <FileText
                           size={15}
                           className={`shrink-0 ${doc.source === 'po' ? 'text-violet-500' : 'text-muted-foreground'}`}
@@ -237,11 +240,10 @@ export default function ApprovalPanel({
                           {doc.file_name}
                         </span>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${
-                            doc.source === 'po'
-                              ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold'
-                              : 'bg-muted text-muted-foreground'
-                          }`}
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${doc.source === 'po'
+                            ? 'bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold'
+                            : 'bg-muted text-muted-foreground'
+                            }`}
                         >
                           {doc.source === 'po' ? 'Purchase order' : 'Requisition'}
                         </span>
@@ -535,9 +537,8 @@ export default function ApprovalPanel({
               {history.map((entry) => (
                 <li key={entry.id} className="flex gap-3">
                   <span
-                    className={`mt-0.5 h-fit shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                      ACTION_TONE[entry.action] ?? 'bg-muted text-muted-foreground'
-                    }`}
+                    className={`mt-0.5 h-fit shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${ACTION_TONE[entry.action] ?? 'bg-muted text-muted-foreground'
+                      }`}
                   >
                     {ACTION_LABEL[entry.action] ?? entry.action}
                   </span>

@@ -16,6 +16,7 @@ import {
   Loader2,
   Package,
   Paperclip,
+  Receipt,
   Plus,
   Send,
   Trash2,
@@ -32,7 +33,7 @@ const UNITS = Array.from(new Set([...MATERIAL_UNITS, ...LABOUR_UNITS]))
 
 const DEPARTMENTS = ['Operations', 'Site Works', 'Finance', 'Administration', 'HR', 'IT', 'Procurement']
 
-type LineCategory = 'material' | 'labour'
+type LineCategory = 'material' | 'labour' | 'other'
 
 let seq = 0
 const nextId = () => `line-${++seq}-${Date.now()}`
@@ -40,6 +41,10 @@ const nextId = () => `line-${++seq}-${Date.now()}`
 interface Line {
   id: string
   category: LineCategory
+  /** Labour rendered by a sub-contractor: a lump-sum service, not qty x rate. */
+  isSubcontractor: boolean
+  /** What the sub-contractor delivered. Optional. */
+  subcontractorNote: string
   description: string
   quantity: string
   unit: string
@@ -51,6 +56,8 @@ interface Line {
 const blankLine = (): Line => ({
   id: nextId(),
   category: 'material',
+  isSubcontractor: false,
+  subcontractorNote: '',
   description: '',
   quantity: '1',
   unit: 'pcs',
@@ -59,7 +66,11 @@ const blankLine = (): Line => ({
   remarks: '',
 })
 
-const lineTotal = (l: Line) => (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0)
+/** Sub-contracted services and other expenses are a single agreed amount. */
+const isLumpSum = (l: Line) => l.category === 'other' || (l.category === 'labour' && l.isSubcontractor)
+
+const lineTotal = (l: Line) =>
+  isLumpSum(l) ? Number(l.unitPrice) || 0 : (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0)
 
 /* ── Small field primitives, sized for thumbs ───────────────────────────── */
 
@@ -78,7 +89,7 @@ const fieldClass =
   'w-full rounded-lg border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring sm:text-sm'
 const inputClass = `${fieldClass} h-12 sm:h-11`
 
-/** Material vs. labour: what the line is being raised for. */
+/** What the line is being raised for. */
 function CategoryToggle({
   value,
   onChange,
@@ -91,24 +102,24 @@ function CategoryToggle({
   const base = compact
     ? 'inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium transition-colors'
     : 'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors'
+  const options: Array<{ id: LineCategory; label: string; Icon: typeof Package }> = [
+    { id: 'material', label: 'Material', Icon: Package },
+    { id: 'labour', label: 'Labour', Icon: Users },
+    { id: 'other', label: 'Other', Icon: Receipt },
+  ]
   return (
     <div className={`inline-flex rounded-lg border border-input bg-muted/40 p-0.5 ${compact ? '' : 'w-full'}`}>
-      <button
-        type="button"
-        onClick={() => onChange('material')}
-        aria-pressed={value === 'material'}
-        className={`${base} ${value === 'material' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
-      >
-        <Package size={compact ? 12 : 14} /> Material
-      </button>
-      <button
-        type="button"
-        onClick={() => onChange('labour')}
-        aria-pressed={value === 'labour'}
-        className={`${base} ${value === 'labour' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
-      >
-        <Users size={compact ? 12 : 14} /> Labour
-      </button>
+      {options.map(({ id, label, Icon }) => (
+        <button
+          key={id}
+          type="button"
+          onClick={() => onChange(id)}
+          aria-pressed={value === id}
+          className={`${base} ${value === id ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
+        >
+          <Icon size={compact ? 12 : 14} /> {label}
+        </button>
+      ))}
     </div>
   )
 }
@@ -153,10 +164,30 @@ export default function RequestForm({
     setLines((ls) =>
       ls.map((l) => {
         if (l.id !== id) return l
-        const defaultUnitStale = l.unit === 'pcs' || l.unit === 'man-days'
-        const unit = defaultUnitStale ? (category === 'labour' ? 'man-days' : 'pcs') : l.unit
-        return { ...l, category, unit }
+        const next = { ...l, category }
+        // An expense is one amount, so it stops carrying a meaningful quantity.
+        if (category === 'other') return { ...next, isSubcontractor: false, quantity: '1', unit: 'lumpsum' }
+        if (category === 'material') next.isSubcontractor = false
+        const defaultUnitStale = l.unit === 'pcs' || l.unit === 'man-days' || l.unit === 'lumpsum'
+        if (defaultUnitStale) next.unit = category === 'labour' ? 'man-days' : 'pcs'
+        return next
       })
+    )
+
+  /** Sub-contracted labour switches the same line to a single agreed amount. */
+  const setSubcontractor = (id: string, on: boolean) =>
+    setLines((ls) =>
+      ls.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              isSubcontractor: on,
+              quantity: on ? '1' : l.quantity,
+              unit: on ? 'lumpsum' : l.unit === 'lumpsum' ? 'man-days' : l.unit,
+              subcontractorNote: on ? l.subcontractorNote : '',
+            }
+          : l
+      )
     )
 
   const addLine = () =>
@@ -198,9 +229,14 @@ export default function RequestForm({
       setError('Select the project site this requisition is for.')
       return
     }
-    const unpriced = payloadLines.find((l) => !(Number(l.quantity) > 0))
-    if (unpriced) {
-      setError('Every line needs a quantity greater than zero.')
+    const noQty = payloadLines.find((l) => !isLumpSum(l) && !(Number(l.quantity) > 0))
+    if (noQty) {
+      setError('Every material and labour line needs a quantity greater than zero.')
+      return
+    }
+    const noAmount = payloadLines.find((l) => isLumpSum(l) && !(Number(l.unitPrice) > 0))
+    if (noAmount) {
+      setError('Every expense and sub-contractor line needs an amount greater than zero.')
       return
     }
 
@@ -224,6 +260,7 @@ export default function RequestForm({
       },
       items: payloadLines.map((l) => ({
         category: l.category,
+        isSubcontractor: l.isSubcontractor,
         description: l.description.trim(),
         quantity: Number(l.quantity) || 0,
         unit: l.unit,
@@ -250,12 +287,14 @@ export default function RequestForm({
           guest_email: notifyEmail.trim() || null,
           items: payloadLines.map((l) => ({
             category: l.category,
+            isSubcontractor: l.isSubcontractor,
             description: l.description.trim(),
-            quantity: Number(l.quantity) || 0,
-            unit: l.unit,
+            // A lump-sum line carries its whole value in unitPrice.
+            quantity: isLumpSum(l) ? 1 : Number(l.quantity) || 0,
+            unit: isLumpSum(l) ? 'lumpsum' : l.unit,
             unitPrice: Number(l.unitPrice) || 0,
             supplierId: l.supplierId,
-            remarks: l.remarks.trim(),
+            remarks: [l.remarks.trim(), l.subcontractorNote.trim()].filter(Boolean).join(' — '),
           })),
         }),
       })
@@ -502,21 +541,51 @@ export default function RequestForm({
                 <div className="space-y-4">
                   <CategoryToggle value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
 
+                  {line.category === 'labour' && (
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-input bg-muted/30 px-3.5 py-3 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={line.isSubcontractor}
+                        onChange={(e) => setSubcontractor(line.id, e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+                      />
+                      <span className="font-medium text-foreground">
+                        Rendered by a sub-contractor
+                        <span className="block text-xs font-normal text-muted-foreground">
+                          Charged as one agreed amount rather than a daily rate.
+                        </span>
+                      </span>
+                    </label>
+                  )}
+
                   <div>
-                    <Label required>{line.category === 'labour' ? 'Labour description' : 'Material description'}</Label>
+                    <Label required>
+                      {line.category === 'other'
+                        ? 'Expense description'
+                        : line.category === 'labour'
+                          ? line.isSubcontractor
+                            ? 'Service rendered'
+                            : 'Labour description'
+                          : 'Material description'}
+                    </Label>
                     <textarea
                       value={line.description}
                       onChange={(e) => updateLine(line.id, { description: e.target.value })}
                       placeholder={
-                        line.category === 'labour'
-                          ? 'e.g. Mason & 2 labourers — foundation blockwork'
-                          : 'e.g. Iron rods 12mm, high tensile'
+                        line.category === 'other'
+                          ? 'e.g. Site permit fees — district assembly'
+                          : line.category === 'labour'
+                            ? line.isSubcontractor
+                              ? 'e.g. Electrical first fix — Block B, per signed scope'
+                              : 'e.g. Mason & 2 labourers — foundation blockwork'
+                            : 'e.g. Iron rods 12mm, high tensile'
                       }
                       rows={2}
                       className={`${fieldClass} resize-none py-3`}
                     />
                   </div>
 
+                  {!isLumpSum(line) && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <Label required>Quantity</Label>
@@ -544,22 +613,50 @@ export default function RequestForm({
                     </div>
                   </div>
 
+                  )}
+
                   <div>
-                    <Label>Unit price (GHS)</Label>
+                    <Label required={isLumpSum(line)}>
+                      {isLumpSum(line) ? 'Amount (GHS)' : 'Unit price (GHS)'}
+                    </Label>
                     <input
                       type="number"
                       inputMode="decimal"
                       min="0"
                       step="0.01"
-                      placeholder="0.00 (optional)"
+                      placeholder={isLumpSum(line) ? '0.00' : '0.00 (optional)'}
                       value={line.unitPrice}
                       onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
                       className={inputClass}
                     />
                   </div>
 
+                  {line.isSubcontractor && (
+                    <div>
+                      <Label>Scope / supporting detail (optional)</Label>
+                      <textarea
+                        value={line.subcontractorNote}
+                        onChange={(e) => updateLine(line.id, { subcontractorNote: e.target.value })}
+                        placeholder="What the sub-contractor delivered, and anything the reviewers should know."
+                        rows={2}
+                        className={`${fieldClass} resize-none py-3`}
+                      />
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Attach the signed scope, quotation or completion certificate under Supporting documents below.
+                      </p>
+                    </div>
+                  )}
+
                   <div>
-                    <Label>{line.category === 'labour' ? 'Contractor (optional)' : 'Supplier (optional)'}</Label>
+                    <Label>
+                      {line.category === 'other'
+                        ? 'Paid to (optional)'
+                        : line.isSubcontractor
+                          ? 'Sub-contractor (optional)'
+                          : line.category === 'labour'
+                            ? 'Contractor (optional)'
+                            : 'Supplier (optional)'}
+                    </Label>
                     <SupplierPicker
                       value={line.supplierId}
                       suppliers={suppliers}
@@ -600,11 +697,11 @@ export default function RequestForm({
                 <thead className="bg-muted/50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="w-10 px-3 py-2.5 text-center">#</th>
-                    <th className="w-44 px-3 py-2.5">Type</th>
+                    <th className="w-36 px-3 py-2.5">Type</th>
                     <th className="px-3 py-2.5">Description</th>
                     <th className="w-20 px-3 py-2.5">Qty</th>
                     <th className="w-24 px-3 py-2.5">Unit</th>
-                    <th className="w-28 px-3 py-2.5">Unit price</th>
+                    <th className="w-28 px-3 py-2.5">Unit price / amount</th>
                     <th className="w-44 px-3 py-2.5">Supplier</th>
                     <th className="w-32 px-3 py-2.5 text-right">Total</th>
                     <th className="w-12 px-2 py-2.5" />
@@ -615,16 +712,49 @@ export default function RequestForm({
                     <tr key={line.id} className="border-t border-border align-top">
                       <td className="px-3 py-2.5 text-center text-sm tabular-nums text-muted-foreground">{i + 1}</td>
                       <td className="px-2 py-2">
-                        <CategoryToggle compact value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
+                        {/* A select, not the segmented toggle: three options do not
+                            fit a dense grid column without clipping their labels. */}
+                        <div className="relative">
+                          <select
+                            value={line.category}
+                            onChange={(e) => setLineCategory(line.id, e.target.value as LineCategory)}
+                            aria-label={`Line ${i + 1} type`}
+                            className="h-10 w-full appearance-none rounded-lg border border-input bg-card pl-2.5 pr-7 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            <option value="material">Material</option>
+                            <option value="labour">Labour</option>
+                            <option value="other">Other</option>
+                          </select>
+                          <ChevronDown
+                            size={14}
+                            aria-hidden="true"
+                            className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          />
+                        </div>
+                        {line.category === 'labour' && (
+                          <label className="mt-1.5 flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={line.isSubcontractor}
+                              onChange={(e) => setSubcontractor(line.id, e.target.checked)}
+                              className="h-3.5 w-3.5 rounded border-input accent-primary"
+                            />
+                            Sub-contractor
+                          </label>
+                        )}
                       </td>
                       <td className="px-2 py-2">
                         <input
                           value={line.description}
                           onChange={(e) => updateLine(line.id, { description: e.target.value })}
                           placeholder={
-                            line.category === 'labour'
-                              ? 'e.g. Mason & 2 labourers — foundation blockwork'
-                              : 'e.g. Iron rods 12mm, high tensile'
+                            line.category === 'other'
+                              ? 'e.g. Site permit fees — district assembly'
+                              : line.category === 'labour'
+                                ? line.isSubcontractor
+                                  ? 'e.g. Electrical first fix — Block B, per signed scope'
+                                  : 'e.g. Mason & 2 labourers — foundation blockwork'
+                                : 'e.g. Iron rods 12mm, high tensile'
                           }
                           className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
@@ -635,27 +765,35 @@ export default function RequestForm({
                           className="mt-1.5 h-9 w-full rounded-lg border border-transparent bg-transparent px-3 text-xs text-muted-foreground placeholder:text-muted-foreground/70 hover:border-input focus:border-input focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </td>
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="any"
-                          value={line.quantity}
-                          onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
-                          className="h-10 w-full rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        />
+                      <td className="px-2 py-2" colSpan={isLumpSum(line) ? 2 : 1}>
+                        {isLumpSum(line) ? (
+                          <span className="inline-flex h-10 items-center text-xs text-muted-foreground">
+                            Lump sum
+                          </span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={line.quantity}
+                            onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
+                            className="h-10 w-full rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          />
+                        )}
                       </td>
-                      <td className="px-2 py-2">
-                        <select
-                          value={line.unit}
-                          onChange={(e) => updateLine(line.id, { unit: e.target.value })}
-                          className="h-10 w-full appearance-none rounded-lg border border-input bg-card px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                        >
-                          {UNITS.map((u) => (
-                            <option key={u} value={u}>{u}</option>
-                          ))}
-                        </select>
-                      </td>
+                      {!isLumpSum(line) && (
+                        <td className="px-2 py-2">
+                          <select
+                            value={line.unit}
+                            onChange={(e) => updateLine(line.id, { unit: e.target.value })}
+                            className="h-10 w-full appearance-none rounded-lg border border-input bg-card px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          >
+                            {UNITS.map((u) => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                        </td>
+                      )}
                       <td className="px-2 py-2">
                         <input
                           type="number"

@@ -96,7 +96,8 @@ export interface RequestItemRow {
   supplier_id: string | null
   supplier_name: string | null
   remarks: string | null
-  category: 'material' | 'labour'
+  category: 'material' | 'labour' | 'other'
+  is_subcontractor: boolean
 }
 
 export interface ReviewBundle {
@@ -136,7 +137,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
     const [items, po, requestDocs, history] = await Promise.all([
       query<RequestItemRow>(
         `SELECT ri.id, ri.position, ri.description, ri.quantity, ri.unit,
-                ri.unit_price, ri.line_total, ri.remarks, ri.category,
+                ri.unit_price, ri.line_total, ri.remarks, ri.category, ri.is_subcontractor,
                 ri.supplier_id, s.name AS supplier_name
            FROM public.request_items ri
            LEFT JOIN public.suppliers s ON s.id = ri.supplier_id
@@ -196,9 +197,12 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
           source: 'po',
         })
       }
-      // The PO's own uploaded file, when it was attached directly rather than
-      // through the attachments table.
-      if (po.file_path) {
+      // The PO's own uploaded file, for orders attached before po_attachments
+      // existed. Attaching one today writes BOTH `purchase_orders.file_path`
+      // and an attachments row for the same physical file, so listing it here
+      // unconditionally showed every purchase order twice.
+      const alreadyListed = poDocs.some((d) => d.file_url === po.file_path)
+      if (po.file_path && !alreadyListed) {
         documents.push({
           id: `po-file-${po.id}`,
           file_name: po.file_name ?? 'Purchase order',

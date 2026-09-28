@@ -11,6 +11,7 @@ import {
   type Stage,
 } from '@/lib/workflow'
 import { createNotification, enqueueStageDigest } from '@/lib/notifications'
+import { getPaymentPosition, recordPayment } from '@/lib/payments'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
@@ -152,6 +153,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
     }
 
+    // Supply Chain's whole job is putting a price against each line. Pricing is
+    // saved by its own button, so approving without pressing it used to advance
+    // the requisition with zeros and silently discard what was typed — the next
+    // stage then had nothing to raise a purchase order from.
+    if (stage === 'supply_chain') {
+      const unpriced = await queryOne<{ count: number }>(
+        `SELECT COUNT(*)::int AS count
+           FROM public.request_items
+          WHERE request_id = $1
+            AND COALESCE(unit_price, 0) <= 0`,
+        [id]
+      )
+      if ((unpriced?.count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error: `${unpriced!.count} line${unpriced!.count === 1 ? ' has' : 's have'} no unit price. Enter the prices and press Save pricing before approving.`,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // The Administrator's approval *is* the purchase order — there is nothing
     // for Cost Control to review without one.
     if (stage === 'admin' && !po) {
@@ -163,21 +186,28 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const onward = nextStage(stage)
     if (!onward) {
-      // Finance is the last stage; approval there means paid and closed.
+      // Finance is the last stage; approving here settles the balance in full.
+      // It goes through the same ledger as a part payment so every disbursement
+      // is recorded, and a part-paid order only closes once nothing is left.
+      if (po) {
+        const total = Number(po.total_amount) || 0
+        const position = await getPaymentPosition(po.id, total)
+        if (position.outstanding > 0) {
+          const paid = await recordPayment(po.id, total, user.id, position.outstanding, {
+            note: comment || 'Settled in full at the Finance stage.',
+          })
+          if (!paid.ok) {
+            return NextResponse.json({ error: paid.error }, { status: paid.status })
+          }
+        }
+      }
+
       await execute(
         `UPDATE public.requests
             SET status = 'completed', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
           WHERE id = $1`,
         [id]
       )
-      if (po) {
-        await execute(
-          `UPDATE public.purchase_orders
-              SET status = 'paid', paid_by = $2, paid_at = now(), updated_at = now()
-            WHERE id = $1`,
-          [po.id, user.id]
-        )
-      }
       await execute(
         `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
          VALUES ($1, $2, $3, 'paid', $4, $5)`,

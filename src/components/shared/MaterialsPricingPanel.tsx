@@ -236,9 +236,15 @@ export default function MaterialsPricingPanel({
               <span className="flex items-center gap-1.5 font-medium text-destructive">
                 <AlertCircle size={13} /> {error}
               </span>
+            ) : dirty ? (
+              // Approving is a separate button, and it does not carry anything
+              // typed here — so say plainly that these edits are not saved yet.
+              <span className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
+                <AlertCircle size={13} /> Unsaved changes — press Save pricing, or they will be lost.
+              </span>
             ) : missingPrices ? (
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <AlertCircle size={13} className="text-amber-500" /> Some materials still have no unit price.
+              <span className="flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400">
+                <AlertCircle size={13} /> Some lines still have no unit price. You cannot approve until they do.
               </span>
             ) : saved && !dirty ? (
               <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">

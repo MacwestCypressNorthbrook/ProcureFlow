@@ -16,6 +16,7 @@ import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
 import RemindButton from '@/components/shared/RemindButton'
 import { currentStage } from '@/lib/workflow'
 import type { PurchaseOrder } from '@/lib/types'
+import { getPaymentPosition, listPayments } from '@/lib/payments'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +91,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const canEdit = status === 'draft' || status === 'pending_lead' || status === 'sent_back'
   const canDelete = status === 'draft' || status === 'pending_lead'
   const isOwner = requestData.created_by === user?.id
+
+  const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
+  const poPayments = po ? await listPayments(po.id) : []
 
   const reviewStage = currentStage(status, (requestData.sent_back_to as string | null) ?? null)
 
@@ -222,12 +226,47 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                         {formatCurrency(Number(po.total_amount) || 0)}
                       </p>
                     </Field>
-                    <Field label={po.status === 'paid' ? 'Paid on' : 'Payment'}>
-                      <p className="text-sm font-semibold text-foreground">
-                        {po.paid_at ? formatDate(po.paid_at) : 'Not yet paid'}
+                    <Field label={payment && payment.paid > 0 && !payment.settled ? 'Outstanding' : 'Payment'}>
+                      <p className="text-sm font-semibold tabular-nums text-foreground">
+                        {payment && payment.settled
+                          ? formatDate(po.paid_at)
+                          : payment && payment.paid > 0
+                            ? formatCurrency(payment.outstanding)
+                            : 'Not yet paid'}
                       </p>
                     </Field>
                   </div>
+
+                  {payment && payment.paid > 0 && !payment.settled && (
+                    <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2.5">
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                        Part payment received
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {formatCurrency(payment.paid)} of {formatCurrency(payment.total)} paid.{' '}
+                        {formatCurrency(payment.outstanding)} is still with Finance.
+                      </p>
+                    </div>
+                  )}
+
+                  {poPayments.length > 0 && (
+                    <div className="border-t border-border pt-3">
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Payments
+                      </p>
+                      <ul className="space-y-1">
+                        {poPayments.map((p) => (
+                          <li key={p.id} className="flex items-baseline justify-between gap-3 text-xs">
+                            <span className="font-semibold tabular-nums text-foreground">
+                              {formatCurrency(Number(p.amount))}
+                            </span>
+                            <span className="text-muted-foreground">{formatDate(p.paid_at)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground">
                     Quote this PO number with Finance or Supply Chain when following up on payment.
                   </p>

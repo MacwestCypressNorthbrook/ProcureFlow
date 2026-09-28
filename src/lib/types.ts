@@ -231,7 +231,21 @@ export interface RequestItem {
   line_total: number
   supplier_id: string | null
   remarks: string | null
-  category: 'material' | 'labour'
+  category: 'material' | 'labour' | 'other'
+  /** Labour rendered by a sub-contractor: a lump-sum service, not qty x rate. */
+  is_subcontractor: boolean
+  created_at: string
+}
+
+/** One disbursement against a purchase order. A PO may take several. */
+export interface PoPayment {
+  id: string
+  po_id: string
+  amount: number
+  reference: string | null
+  note: string | null
+  paid_by: string | null
+  paid_at: string
   created_at: string
 }
 

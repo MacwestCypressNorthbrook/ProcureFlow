@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
+import RecordPaymentPanel from '@/components/shared/RecordPaymentPanel'
+import { getPaymentPosition, listPayments } from '@/lib/payments'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
 import PoDocumentActions from '@/components/shared/PoDocumentActions'
@@ -56,6 +58,12 @@ export default async function StageReview({
           ORDER BY name ASC`
       )
     : []
+
+  // Once a purchase order exists, every stage from here on can see how much of
+  // it has actually been disbursed — Finance is the only one that can add to it.
+  const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
+  const payments = po ? await listPayments(po.id) : []
+  const canPay = stage === 'finance' && holdsStage
 
   const subtotal = items.reduce((sum, i) => sum + (Number(i.line_total) || 0), 0)
   const discountAmount = Number(request.discount_amount) || 0
@@ -196,6 +204,24 @@ export default async function StageReview({
           </div>
 
           <div className="space-y-6">
+            {po && payment && (
+              <RecordPaymentPanel
+                poId={po.id}
+                total={payment.total}
+                paid={payment.paid}
+                outstanding={payment.outstanding}
+                payments={payments.map((p) => ({
+                  id: p.id,
+                  amount: Number(p.amount),
+                  reference: p.reference,
+                  note: p.note,
+                  paid_at: String(p.paid_at),
+                  paid_by_name: p.paid_by_name,
+                }))}
+                canPay={canPay}
+              />
+            )}
+
             <ApprovalPanel
               requestId={request.id}
               stage={stage}

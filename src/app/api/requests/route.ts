@@ -17,6 +17,7 @@ interface IncomingItem {
   supplierId?: string | null
   remarks?: string
   category?: string
+  isSubcontractor?: boolean
 }
 
 const MAX_ITEMS = 100
@@ -67,7 +68,10 @@ export async function POST(request: Request) {
       unitPrice: toNumber(item.unitPrice),
       supplierId: typeof item.supplierId === 'string' && item.supplierId ? item.supplierId : null,
       remarks: typeof item.remarks === 'string' && item.remarks.trim() ? item.remarks.trim() : null,
-      category: item.category === 'labour' ? 'labour' : 'material',
+      category:
+        item.category === 'labour' ? 'labour' : item.category === 'other' ? 'other' : 'material',
+      // Only labour can be sub-contracted; anything else ignores the flag.
+      isSubcontractor: item.category === 'labour' && item.isSubcontractor === true,
     }))
     .filter((item) => item.description)
 
@@ -155,8 +159,8 @@ export async function POST(request: Request) {
     await transaction(
       items.map((item, index) => [
         `INSERT INTO public.request_items
-           (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks, category)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks, category, is_subcontractor)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           data.id,
           index,
@@ -167,6 +171,7 @@ export async function POST(request: Request) {
           item.supplierId,
           item.remarks,
           item.category,
+          item.isSubcontractor,
         ],
       ])
     )
