@@ -1,0 +1,1273 @@
+{
+ "plan": [
+  {
+   "row": 2,
+   "date": "2026-08-18",
+   "site": "Anlo SHS-Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 2,
+   "value": 67080,
+   "stated": 67080,
+   "stage": {
+    "status": "pending_finance",
+    "po": "partially_paid",
+    "why": "Payment made = \"part payment\""
+   }
+  },
+  {
+   "row": 7,
+   "date": "2026-08-18",
+   "site": "Anlo SHS -Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 5,
+   "value": 25900,
+   "stated": 25900,
+   "stage": {
+    "status": "pending_finance",
+    "po": "partially_paid",
+    "why": "Payment made = \"part payment\""
+   }
+  },
+  {
+   "row": 15,
+   "date": "2026-08-18",
+   "site": "Anlo SHS-Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 2,
+   "value": 6600,
+   "stated": 6600,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"not done\")"
+   }
+  },
+  {
+   "row": 20,
+   "date": "2026-08-18",
+   "site": "Anlo SHS-Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 35000,
+   "stated": 35000,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 24,
+   "date": "2026-08-18",
+   "site": "Anlo SHS Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 2,
+   "value": 17500,
+   "stated": 17500,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 29,
+   "date": "2026-08-18",
+   "site": "Anlo SHS Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 6500,
+   "stated": 6500,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"not done\")"
+   }
+  },
+  {
+   "row": 33,
+   "date": "2026-08-18",
+   "site": "Anlo SHS-Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 7700,
+   "stated": 7700,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 37,
+   "date": "2026-08-18",
+   "site": "Anlo SHS Project",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 5,
+   "value": 3560,
+   "stated": 3560,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 45,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 5,
+   "value": 4080,
+   "stated": 4080,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 53,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 22500,
+   "stated": 22500,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 57,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 6000,
+   "stated": 6000,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 61,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 4,
+   "value": 93300,
+   "stated": 93300,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"2 tone payment done, remaining 1.5 tone\")"
+   }
+  },
+  {
+   "row": 68,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 11,
+   "value": 1839,
+   "stated": 1839,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 82,
+   "date": "2026-08-21",
+   "site": "Anlo SHS -Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 6,
+   "value": 4455,
+   "stated": 4455,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 91,
+   "date": "2026-08-21",
+   "site": "Anlo SHS -Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 20,
+   "value": 2550.5,
+   "stated": 2550.5,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 114,
+   "date": "2026-08-21",
+   "site": "Anlo SHS Project - Science Lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 5,
+   "value": 5100,
+   "stated": 5100,
+   "stage": {
+    "status": "completed",
+    "po": "paid",
+    "why": "Payment made = \"Done\""
+   }
+  },
+  {
+   "row": 122,
+   "date": "2026-08-21",
+   "site": "Anlo SHS -Staff -Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 2,
+   "value": 18700,
+   "stated": 18700,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"not done\")"
+   }
+  },
+  {
+   "row": 127,
+   "date": "2026-08-25",
+   "site": "MDF Salaga",
+   "project": "MDF Salaga",
+   "engineer": "P. M. Barnes",
+   "user": "prince.barnes@macwest.com.gh",
+   "lines": 5,
+   "value": 128500,
+   "stated": 128500,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 135,
+   "date": "2026-08-21",
+   "site": "Conference center -Eastern Region",
+   "project": "CONFERENCE HALL",
+   "engineer": "Engr. Mandela Aduko Akuriba",
+   "user": "mandela.aduko@macwest.com.gh",
+   "lines": 4,
+   "value": 3882,
+   "stated": 3882,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"Not done\")"
+   }
+  },
+  {
+   "row": 142,
+   "date": "2026-03-09",
+   "site": "24 hour market",
+   "project": "24 HR Market",
+   "engineer": "Eric Adoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 7,
+   "value": 146900,
+   "stated": 0,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"Not done yet\")"
+   }
+  },
+  {
+   "row": 152,
+   "date": "2026-09-15",
+   "site": "ADA SHS, 2 Storey Domitory block (ground beams)",
+   "project": "ADA 2 - SHS -32 - Two Storey Dormitory block & 3 number 4 unit two bedroom teachers bungalow",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 3,
+   "value": 33223,
+   "stated": 0,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 158,
+   "date": "2026-09-15",
+   "site": "ADA SHS, 4 Unit 2 bedroom bungalow (ground beams unit 1 & 2)",
+   "project": "ADA 2 - SHS -32 - Two Storey Dormitory block & 3 number 4 unit two bedroom teachers bungalow",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 3,
+   "value": 21178,
+   "stated": 0,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 164,
+   "date": "2026-09-15",
+   "site": "ADA SHTS, 12 unit 2 Storey classroom block (unit 1 ground beams)",
+   "project": "ADA 3 - SHTS -33 - Two number two storey 12 Unit Classroom & 2KM fence wall",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 3,
+   "value": 37583,
+   "stated": 0,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 170,
+   "date": "2026-09-15",
+   "site": "ADA SHTS, 12 unit 2 Storey classroom block (unit 2 starter columns)",
+   "project": "ADA 3 - SHTS -33 - Two number two storey 12 Unit Classroom & 2KM fence wall",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 4,
+   "value": 38499,
+   "stated": 0,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 177,
+   "date": "2026-09-16",
+   "site": "Anlo SHS -Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 5,
+   "value": 37450,
+   "stated": 37450,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"#VALUE!\")"
+   }
+  },
+  {
+   "row": 185,
+   "date": "2026-09-16",
+   "site": "Anlo SHS -Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 2,
+   "value": 1390,
+   "stated": 1390,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"Picture\")"
+   }
+  },
+  {
+   "row": 190,
+   "date": "2026-09-17",
+   "site": "ADA SHS",
+   "project": "ADA 1 - SHS - 31- 3 storey 18 Unit Classroom & Rehabilation of Science lab - Lot 31",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 1,
+   "value": 34500,
+   "stated": 34500,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 194,
+   "date": "2026-09-17",
+   "site": "ADA SHTS",
+   "project": "ADA 3 - SHTS -33 - Two number two storey 12 Unit Classroom & 2KM fence wall",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 2,
+   "value": 41500,
+   "stated": 41500,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 199,
+   "date": "2026-09-17",
+   "site": "Conference center - Eastern region",
+   "project": "CONFERENCE HALL",
+   "engineer": "Engr Mandela Aduko Akuriba",
+   "user": "mandela.aduko@macwest.com.gh",
+   "lines": 10,
+   "value": 10975,
+   "stated": 10975,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"#VALUE!\")"
+   }
+  },
+  {
+   "row": 212,
+   "date": "2026-09-17",
+   "site": "Conference center",
+   "project": "CONFERENCE HALL",
+   "engineer": "Engr Mandela Aduko Akuriba",
+   "user": "mandela.aduko@macwest.com.gh",
+   "lines": 7,
+   "value": 108355,
+   "stated": 108355,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"#VALUE!\")"
+   }
+  },
+  {
+   "row": 222,
+   "date": "2026-09-17",
+   "site": "Anlo- Staff Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 7,
+   "value": 80550,
+   "stated": 200,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 235,
+   "date": "2026-09-17",
+   "site": "Anlo SHS Science lab",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 1,
+   "value": 1500,
+   "stated": 1500,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 239,
+   "date": "2026-09-17",
+   "site": "Anlo- Staff Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Aflo Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 14,
+   "value": 1292,
+   "stated": 1292,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"#VALUE!\")"
+   }
+  },
+  {
+   "row": 255,
+   "date": "2026-09-17",
+   "site": "24 Hour market Lockable Shops plumbing first fix",
+   "project": "24 HR Market",
+   "engineer": "Eric Andoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 15,
+   "value": 6580,
+   "stated": 6580,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 273,
+   "date": "2026-09-17",
+   "site": "24 hour market commercial building",
+   "project": "24 HR Market",
+   "engineer": "Eric Andoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 2,
+   "value": 11450,
+   "stated": 11450,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 278,
+   "date": "2026-09-17",
+   "site": "Tano South MDF Project",
+   "project": "MDF Tano South",
+   "engineer": "Vincent Mewen",
+   "user": "vincent.mewen@macwest.com.gh",
+   "lines": 1,
+   "value": 36000,
+   "stated": 36000,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 282,
+   "date": "2026-09-17",
+   "site": "MDF - SALAGA",
+   "project": "MDF Salaga",
+   "engineer": "P. M. Barnes",
+   "user": "prince.barnes@macwest.com.gh",
+   "lines": 9,
+   "value": 78680,
+   "stated": 78680,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 294,
+   "date": "2026-09-17",
+   "site": "24 Hour market Commercial Building",
+   "project": "24 HR Market",
+   "engineer": "Eric Andoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 3,
+   "value": 117810,
+   "stated": 117810,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 300,
+   "date": "2026-09-17",
+   "site": "MDF Ellembelle",
+   "project": "MDF Ellembelle",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 2,
+   "value": 3500,
+   "stated": 3500,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 305,
+   "date": "2026-09-17",
+   "site": "Renovation of 4 bedroom - Ayinase",
+   "project": "RENOVATION WORKS",
+   "engineer": "Samuel Nketia",
+   "user": "samuel.nketiah@macwest.com.gh",
+   "lines": 1,
+   "value": 1000,
+   "stated": 1000,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 309,
+   "date": "2026-09-18",
+   "site": "24 Hour market lockable shops oversite concrete material",
+   "project": "24 HR Market",
+   "engineer": "Eric Andoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 7,
+   "value": 0,
+   "stated": 0,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 319,
+   "date": "2026-09-18",
+   "site": "MDF Ellembelle",
+   "project": "MDF Ellembelle",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 4,
+   "value": 2400,
+   "stated": 2400,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 326,
+   "date": "2026-09-18",
+   "site": "Ho MDF Project",
+   "project": "MDF Ho",
+   "engineer": "Vincent Mewen",
+   "user": "vincent.mewen@macwest.com.gh",
+   "lines": 7,
+   "value": 43034,
+   "stated": 43034,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 336,
+   "date": "2026-09-18",
+   "site": "Tano South MDF Project",
+   "project": "MDF Tano South",
+   "engineer": "Vincent Mewen",
+   "user": "vincent.mewen@macwest.com.gh",
+   "lines": 3,
+   "value": 22550,
+   "stated": 22550,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 342,
+   "date": "2026-09-18",
+   "site": "SHEARFARM",
+   "project": "SHEAR FARM",
+   "engineer": "Richard Agyei",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 4642.5,
+   "stated": 4642.5,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 346,
+   "date": "2026-09-18",
+   "site": "MDF BOLE-BAMBOI; KULFUO PROJECT",
+   "project": "Kulfuo Project - 3 no 12 unit WC blocks",
+   "engineer": "Abdulai",
+   "user": "abdulai.zulkifulu@macwest.com.gh",
+   "lines": 21,
+   "value": 6248,
+   "stated": 6248,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 378,
+   "date": "2026-09-18",
+   "site": "AdA SHTS",
+   "project": "ADA 3 - SHTS -33 - Two number two storey 12 Unit Classroom & 2KM fence wall",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 1,
+   "value": 13950,
+   "stated": 13950,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 382,
+   "date": "2026-09-18",
+   "site": "Tano South MDF Project",
+   "project": "MDF Tano South",
+   "engineer": "Vincent Mewen",
+   "user": "vincent.mewen@macwest.com.gh",
+   "lines": 2,
+   "value": 46500,
+   "stated": 46500,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 387,
+   "date": "2026-09-18",
+   "site": "AdA SHTS ( Services Equipment Use)",
+   "project": "ADA 3 - SHTS -33 - Two number two storey 12 Unit Classroom & 2KM fence wall",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 7,
+   "value": 8510,
+   "stated": 8510,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 397,
+   "date": "2026-09-18",
+   "site": "AdA SHS ( Services Equipment Use)",
+   "project": "ADA 1 - SHS - 31- 3 storey 18 Unit Classroom & Rehabilation of Science lab - Lot 31",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 4,
+   "value": 2565,
+   "stated": 2565,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"approved\""
+   }
+  },
+  {
+   "row": 408,
+   "date": "2026-09-21",
+   "site": "MDF - KULFUO",
+   "project": "Kulfuo Project - 3 no 12 unit WC blocks",
+   "engineer": "Abdulai Zulifulu",
+   "user": "abdulai.zulkifulu@macwest.com.gh",
+   "lines": 4,
+   "value": 3648,
+   "stated": 3648,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Paid\""
+   }
+  },
+  {
+   "row": 414,
+   "date": "2026-09-21",
+   "site": "Conference Hall - Eastern region Project",
+   "project": "CONFERENCE HALL",
+   "engineer": "Engr. Mandela Aduko Akuriba",
+   "user": "mandela.aduko@macwest.com.gh",
+   "lines": 7,
+   "value": 116192,
+   "stated": null,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 428,
+   "date": "2026-09-22",
+   "site": "Nkroful Renovation",
+   "project": "Construction of 6- unit classroom block for Nkroful Agricultural Secondary School - NASS SCHOOL",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 3,
+   "value": 38565,
+   "stated": null,
+   "stage": {
+    "status": "pending_admin",
+    "po": null,
+    "why": "Procurement Status = \"Approved\""
+   }
+  },
+  {
+   "row": 432,
+   "date": "2026-09-22",
+   "site": "Esiama Market",
+   "project": "ESIAMAH MARKET",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 20,
+   "value": 26200,
+   "stated": null,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 455,
+   "date": "2026-09-22",
+   "site": "Esiama Market",
+   "project": "ESIAMAH MARKET",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 9,
+   "value": 0,
+   "stated": null,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 465,
+   "date": "2026-09-24",
+   "site": "Esiama Market",
+   "project": "ESIAMAH MARKET",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 11,
+   "value": 0,
+   "stated": null,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 478,
+   "date": "2026-09-24",
+   "site": "Anlo - Staff Bungalow",
+   "project": "ANLOGA (Science block & Staff bungalow constructions",
+   "engineer": "Timothy",
+   "user": "timothy.aflo@macwest.com.gh",
+   "lines": 20,
+   "value": 134142.4,
+   "stated": null,
+   "stage": {
+    "status": "pending_finance",
+    "po": "partially_paid",
+    "why": "Payment made = \"part payment of 25800\""
+   }
+  },
+  {
+   "row": 508,
+   "date": "2026-09-24",
+   "site": "Conference center - Eastern region",
+   "project": "CONFERENCE HALL",
+   "engineer": "Akuriba Mandela Aduko",
+   "user": "mandela.aduko@macwest.com.gh",
+   "lines": 1,
+   "value": 1210,
+   "stated": null,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 510,
+   "date": "2026-09-24",
+   "site": "MDF - KULFUO",
+   "project": "Kulfuo Project - 3 no 12 unit WC blocks",
+   "engineer": "Abdulai Zulifulu",
+   "user": "abdulai.zulkifulu@macwest.com.gh",
+   "lines": 9,
+   "value": 8360,
+   "stated": 8360,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 521,
+   "date": "2026-09-24",
+   "site": "MDF - BOLE",
+   "project": "MDF Bolebamboi",
+   "engineer": "Abdulai Zulifulu",
+   "user": "abdulai.zulkifulu@macwest.com.gh",
+   "lines": 1,
+   "value": 6750,
+   "stated": 6750,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 525,
+   "date": "2026-09-24",
+   "site": "ADA SHS",
+   "project": "ADA 1 - SHS - 31- 3 storey 18 Unit Classroom & Rehabilation of Science lab - Lot 31",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 3,
+   "value": 439321.54,
+   "stated": 439321.54,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 531,
+   "date": "2026-09-24",
+   "site": "ADA SHS",
+   "project": "ADA 1 - SHS - 31- 3 storey 18 Unit Classroom & Rehabilation of Science lab - Lot 31",
+   "engineer": "Stephen Selasi Dogbe",
+   "user": "stephen.dogbe@macwest.com.gh",
+   "lines": 1,
+   "value": 112442.2,
+   "stated": null,
+   "stage": {
+    "status": "pending_supply_chain",
+    "po": null,
+    "why": "Team Lead = \"Approved\""
+   }
+  },
+  {
+   "row": 534,
+   "date": "2026-09-25",
+   "site": "SHEA FARM",
+   "project": "SHEAR FARM",
+   "engineer": "Richard Agyei",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 1020,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 535,
+   "date": "2026-09-25",
+   "site": "SHEA FARM",
+   "project": "SHEAR FARM",
+   "engineer": "Richard Agyei",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 5000,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 536,
+   "date": "2026-09-25",
+   "site": "SHEA FARM",
+   "project": "SHEAR FARM",
+   "engineer": "Richard Agyei",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 3000,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 538,
+   "date": "2026-09-25",
+   "site": "24 Hour market - Lockable shops first fix plumbing items (PPR Pipes)",
+   "project": "24 HR Market",
+   "engineer": "Eric Andoh",
+   "user": "eric.andoh@macwest.com.gh",
+   "lines": 1,
+   "value": 0,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 543,
+   "date": "2026-09-03",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 4,
+   "value": 20400,
+   "stated": 20400,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 549,
+   "date": "2026-09-06",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 2,
+   "value": 83300,
+   "stated": 83300,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 553,
+   "date": "2026-09-06",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 2,
+   "value": 42500,
+   "stated": 42500,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 557,
+   "date": "2026-09-16",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 5,
+   "value": 7250,
+   "stated": 7250,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 564,
+   "date": "2026-09-16",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 1,
+   "value": 7600,
+   "stated": 7600,
+   "stage": {
+    "status": "pending_finance",
+    "po": "pending_finance",
+    "why": "Payment column filled (\"Collected\")"
+   }
+  },
+  {
+   "row": 567,
+   "date": "2026-09-22",
+   "site": "MDF AJUMAKO OCHISO",
+   "project": "MDF Ajumako Ochiso",
+   "engineer": "Charles H. W. Derby",
+   "user": "derbycharlies7@gmail.com",
+   "lines": 3,
+   "value": 33168,
+   "stated": 33168,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 571,
+   "date": "2026-09-27",
+   "site": "Nkroful Renovation Project",
+   "project": "Construction of 6- unit classroom block for Nkroful Agricultural Secondary School - NASS SCHOOL",
+   "engineer": "Agyei Richard",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 2000,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 572,
+   "date": "2026-09-27",
+   "site": "SHEAFARM",
+   "project": "SHEAR FARM",
+   "engineer": "Agyei Richard",
+   "user": "richard.agyei@macwest.com.gh",
+   "lines": 1,
+   "value": 6000,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 574,
+   "date": "2026-09-27",
+   "site": "Nkroful Renovation Project",
+   "project": "Construction of 6- unit classroom block for Nkroful Agricultural Secondary School - NASS SCHOOL",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 1,
+   "value": 540,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 576,
+   "date": "2026-09-27",
+   "site": "MDF Ellembelle",
+   "project": "MDF Ellembelle",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 1,
+   "value": 48000,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  },
+  {
+   "row": 578,
+   "date": "2026-09-27",
+   "site": "Esiama Market",
+   "project": "ESIAMAH MARKET",
+   "engineer": "Allotey",
+   "user": "akwei.allotey@macwest.com.gh",
+   "lines": 4,
+   "value": 0,
+   "stated": null,
+   "stage": {
+    "status": "pending_lead",
+    "po": null,
+    "why": "no approvals recorded"
+   }
+  }
+ ],
+ "problems": [
+  {
+   "row": 142,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=146900.00 vs sheet total=0.00"
+  },
+  {
+   "row": 152,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=33223.00 vs sheet total=0.00"
+  },
+  {
+   "row": 158,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=21178.00 vs sheet total=0.00"
+  },
+  {
+   "row": 164,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=37583.00 vs sheet total=0.00"
+  },
+  {
+   "row": 170,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=38499.00 vs sheet total=0.00"
+  },
+  {
+   "row": 222,
+   "kind": "TOTAL MISMATCH",
+   "detail": "lines=80550.00 vs sheet total=200.00"
+  },
+  {
+   "row": 370,
+   "kind": "PARKED",
+   "detail": "AdA SHS & SHTS — awaiting Stephen's allocation"
+  }
+ ]
+}

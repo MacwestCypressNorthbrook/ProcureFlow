@@ -1,0 +1,4092 @@
+[
+ {
+  "row": 2,
+  "date": "2026-08-18",
+  "site": "Anlo SHS-Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "part payment",
+  "finance_notes": "",
+  "stated_total": 67080,
+  "items": [
+   {
+    "desc": "Wawa Board",
+    "qty": 260,
+    "unit": 250,
+    "total": 65000,
+    "unitLabel": null,
+    "supplier": "Uncle Jah Ent"
+   },
+   {
+    "desc": "Transport",
+    "qty": 260,
+    "unit": 8,
+    "total": 2080,
+    "unitLabel": null,
+    "supplier": "Uncle Jah Ent"
+   }
+  ]
+ },
+ {
+  "row": 7,
+  "date": "2026-08-18",
+  "site": "Anlo SHS -Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "part payment",
+  "finance_notes": "",
+  "stated_total": 25900,
+  "items": [
+   {
+    "desc": "Timber 2 x 4",
+    "qty": 200,
+    "unit": 110,
+    "total": 22000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Normal Nail 3\"",
+    "qty": 20,
+    "unit": 50,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Normal Nail 4\"",
+    "qty": 20,
+    "unit": 50,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Concrete Nail 3\"",
+    "qty": 10,
+    "unit": 50,
+    "total": 500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Transport",
+    "qty": 200,
+    "unit": 7,
+    "total": 1400,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 15,
+  "date": "2026-08-18",
+  "site": "Anlo SHS-Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "not done",
+  "finance_notes": "",
+  "stated_total": 6600,
+  "items": [
+   {
+    "desc": "Bamboo",
+    "qty": 450,
+    "unit": 12,
+    "total": 5400,
+    "unitLabel": null,
+    "supplier": "Wilago Motors"
+   },
+   {
+    "desc": "Transport",
+    "qty": 1,
+    "unit": 1200,
+    "total": 1200,
+    "unitLabel": null,
+    "supplier": "Wilago Motors"
+   }
+  ]
+ },
+ {
+  "row": 20,
+  "date": "2026-08-18",
+  "site": "Anlo SHS-Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 35000,
+  "items": [
+   {
+    "desc": "Laterite for science lab ardcore filling",
+    "qty": 14,
+    "unit": 2500,
+    "total": 35000,
+    "unitLabel": null,
+    "supplier": "Isaac Sablah"
+   }
+  ]
+ },
+ {
+  "row": 24,
+  "date": "2026-08-18",
+  "site": "Anlo SHS Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "`",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 17500,
+  "items": [
+   {
+    "desc": "Machine - Payloader for Science lab backfilling",
+    "qty": 2,
+    "unit": 8000,
+    "total": 16000,
+    "unitLabel": null,
+    "supplier": "Ernest Ahadzi or Evergreen Ent."
+   },
+   {
+    "desc": "Trekking Fuel - Transport",
+    "qty": 1,
+    "unit": 1500,
+    "total": 1500,
+    "unitLabel": null,
+    "supplier": "Ernest Ahadzi or Evergreen Ent."
+   }
+  ]
+ },
+ {
+  "row": 29,
+  "date": "2026-08-18",
+  "site": "Anlo SHS Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "not done",
+  "finance_notes": "",
+  "stated_total": 6500,
+  "items": [
+   {
+    "desc": "Coarse aggregate (chippings)3/4\" for starter column and ground beam",
+    "qty": 1,
+    "unit": 6500,
+    "total": 6500,
+    "unitLabel": null,
+    "supplier": "Osman 477 Ent."
+   }
+  ]
+ },
+ {
+  "row": 33,
+  "date": "2026-08-18",
+  "site": "Anlo SHS-Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 7700,
+  "items": [
+   {
+    "desc": "150mm Sandcrate blocks",
+    "qty": 700,
+    "unit": 11,
+    "total": 7700,
+    "unitLabel": null,
+    "supplier": "Crystal Vent West Ent."
+   }
+  ]
+ },
+ {
+  "row": 37,
+  "date": "2026-08-18",
+  "site": "Anlo SHS Project",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 3560,
+  "items": [
+   {
+    "desc": "PPE",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "First Aid Box",
+    "qty": 1,
+    "unit": 450,
+    "total": 450,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Reflector Vest",
+    "qty": 30,
+    "unit": 50,
+    "total": 1500,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Safety Boot",
+    "qty": 1,
+    "unit": 360,
+    "total": 360,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Helmet",
+    "qty": 25,
+    "unit": 50,
+    "total": 1250,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   }
+  ]
+ },
+ {
+  "row": 45,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 4080,
+  "items": [
+   {
+    "desc": "Science Lab Compaction",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Compactor",
+    "qty": 4,
+    "unit": 600,
+    "total": 2400,
+    "unitLabel": null,
+    "supplier": "Kportufe Waltrude Kwaku"
+   },
+   {
+    "desc": "Operator",
+    "qty": 4,
+    "unit": 250,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Kportufe Waltrude Kwaku"
+   },
+   {
+    "desc": "Fuel",
+    "qty": 4,
+    "unit": 70,
+    "total": 280,
+    "unitLabel": null,
+    "supplier": "Kportufe Waltrude Kwaku"
+   },
+   {
+    "desc": "Transport",
+    "qty": 1,
+    "unit": 400,
+    "total": 400,
+    "unitLabel": null,
+    "supplier": "Kportufe Waltrude Kwaku"
+   }
+  ]
+ },
+ {
+  "row": 53,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 22500,
+  "items": [
+   {
+    "desc": "Laterite for science lab ardcore filling",
+    "qty": 9,
+    "unit": 2500,
+    "total": 22500,
+    "unitLabel": null,
+    "supplier": "Isaac Sablah"
+   }
+  ]
+ },
+ {
+  "row": 57,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 6000,
+  "items": [
+   {
+    "desc": "DPC",
+    "qty": 10,
+    "unit": 600,
+    "total": 6000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 61,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "#VALUE!",
+  "po_number": "",
+  "payment": "2 tone payment done, remaining 1.5 tone",
+  "finance_notes": "",
+  "stated_total": 93300,
+  "items": [
+   {
+    "desc": "BS Mesh - Mild Steel 10mm",
+    "qty": "3.5 tone",
+    "unit": 6500,
+    "total": 22750,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Binding wire",
+    "qty": 10,
+    "unit": 55,
+    "total": 550,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Coarse aggregate - chippings 3/4",
+    "qty": 8,
+    "unit": 6500,
+    "total": 52000,
+    "unitLabel": null,
+    "supplier": "Crystal Vent West Ent."
+   },
+   {
+    "desc": "River sand",
+    "qty": 6,
+    "unit": 3000,
+    "total": 18000,
+    "unitLabel": null,
+    "supplier": "Crystal Vent West Ent."
+   }
+  ]
+ },
+ {
+  "row": 68,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 1839,
+  "items": [
+   {
+    "desc": "G. F Plumbing",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4\" Pressure pipe Class B",
+    "qty": 2,
+    "unit": 320,
+    "total": 640,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4\" Bend",
+    "qty": 10,
+    "unit": 15,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4\" 45",
+    "qty": 4,
+    "unit": 35,
+    "total": 140,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4'' Y",
+    "qty": 5,
+    "unit": 35,
+    "total": 175,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4\" Swept Tee",
+    "qty": 4,
+    "unit": 25,
+    "total": 100,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "4\" End cap",
+    "qty": 8,
+    "unit": 10,
+    "total": 80,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2\" Pressure pipe Class B",
+    "qty": 2,
+    "unit": 130,
+    "total": 260,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2\" Swept Tee",
+    "qty": 2,
+    "unit": 12,
+    "total": 24,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2\" End cup",
+    "qty": 2,
+    "unit": 5,
+    "total": 10,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Era glue",
+    "qty": 4,
+    "unit": 65,
+    "total": 260,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   }
+  ]
+ },
+ {
+  "row": 82,
+  "date": "2026-08-21",
+  "site": "Anlo SHS -Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 4455,
+  "items": [
+   {
+    "desc": "G. F Electrical work -internal",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3/3 Conduit box plastic",
+    "qty": 55,
+    "unit": 5,
+    "total": 275,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "3/6 Conduit box platic",
+    "qty": 38,
+    "unit": 10,
+    "total": 380,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "PVC Pipe Interplast 20mm",
+    "qty": 80,
+    "unit": 10,
+    "total": 800,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "8-way Hevells MCB - Distribution board, single-phase",
+    "qty": 2,
+    "unit": 1000,
+    "total": 2000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Daimond Cutting DIcs",
+    "qty": 10,
+    "unit": 100,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 91,
+  "date": "2026-08-21",
+  "site": "Anlo SHS -Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 2550.5,
+  "items": [
+   {
+    "desc": "G.F Plumbing materials Internal",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm PPR Prac",
+    "qty": 15,
+    "unit": 30,
+    "total": 450,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm elbow",
+    "qty": 40,
+    "unit": 2,
+    "total": 80,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm tee",
+    "qty": 20,
+    "unit": 2,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2omm couplin",
+    "qty": 10,
+    "unit": 1.5,
+    "total": 15,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm pluck",
+    "qty": 15,
+    "unit": 1.5,
+    "total": 22.5,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm K 17",
+    "qty": 2,
+    "unit": 15,
+    "total": 30,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm K 28",
+    "qty": 15,
+    "unit": 12,
+    "total": 180,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm valve socket",
+    "qty": 6,
+    "unit": 15,
+    "total": 90,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "A.T. A stock cork",
+    "qty": 2,
+    "unit": 75,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "20mm stop cork",
+    "qty": 6,
+    "unit": 53,
+    "total": 318,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "3\" & 2\" busing",
+    "qty": 4,
+    "unit": 12,
+    "total": 48,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "3\" couplin",
+    "qty": 4,
+    "unit": 12,
+    "total": 48,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "3\" 4s \" bend",
+    "qty": 4,
+    "unit": 8,
+    "total": 32,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2\" PVC pipe",
+    "qty": 1,
+    "unit": 35,
+    "total": 35,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "2\" eblow",
+    "qty": 8,
+    "unit": 8,
+    "total": 64,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Diamond cutting disc 9\"",
+    "qty": 5,
+    "unit": 130,
+    "total": 650,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Era glue",
+    "qty": 2,
+    "unit": 65,
+    "total": 130,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "25mm PPR pipe",
+    "qty": 4,
+    "unit": 40,
+    "total": 160,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "25mm end cup",
+    "qty": 4,
+    "unit": 2,
+    "total": 8,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   }
+  ]
+ },
+ {
+  "row": 114,
+  "date": "2026-08-21",
+  "site": "Anlo SHS Project - Science Lab",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Done",
+  "finance_notes": "",
+  "stated_total": 5100,
+  "items": [
+   {
+    "desc": "Science lab oversight concrete",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Mixer Machine",
+    "qty": 4,
+    "unit": 700,
+    "total": 2800,
+    "unitLabel": null,
+    "supplier": "Joseph Ddzraku"
+   },
+   {
+    "desc": "Fuel",
+    "qty": 4,
+    "unit": 150,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": "Joseph Ddzraku"
+   },
+   {
+    "desc": "Operator",
+    "qty": 4,
+    "unit": 300,
+    "total": 1200,
+    "unitLabel": null,
+    "supplier": "Joseph Ddzraku"
+   },
+   {
+    "desc": "Transport",
+    "qty": 2,
+    "unit": 250,
+    "total": 500,
+    "unitLabel": null,
+    "supplier": "Joseph Ddzraku"
+   }
+  ]
+ },
+ {
+  "row": 122,
+  "date": "2026-08-21",
+  "site": "Anlo SHS -Staff -Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "not done",
+  "finance_notes": "",
+  "stated_total": 18700,
+  "items": [
+   {
+    "desc": "G.F door and window frame",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 x 6",
+    "qty": 110,
+    "unit": 170,
+    "total": 18700,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 127,
+  "date": "2026-08-25",
+  "site": "MDF Salaga",
+  "eng": "P. M. Barnes",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 128500,
+  "items": [
+   {
+    "desc": "8mm Rod (ton)",
+    "qty": 3.5,
+    "unit": 6500,
+    "total": 22750,
+    "unitLabel": null,
+    "supplier": "Omoot Enterprise"
+   },
+   {
+    "desc": "Damp Proof Rubber",
+    "qty": 15,
+    "unit": 650,
+    "total": 9750,
+    "unitLabel": null,
+    "supplier": "Omoot Enterprise"
+   },
+   {
+    "desc": "Transport",
+    "qty": null,
+    "unit": null,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Omoot Enterprise"
+   },
+   {
+    "desc": "Chippings (20 cubic)",
+    "qty": 7,
+    "unit": 13000,
+    "total": 91000,
+    "unitLabel": null,
+    "supplier": "Muslene Enterprise"
+   },
+   {
+    "desc": "Sand (20 cubic)",
+    "qty": 2,
+    "unit": 2000,
+    "total": 4000,
+    "unitLabel": null,
+    "supplier": "Muslene Enterprise"
+   }
+  ]
+ },
+ {
+  "row": 135,
+  "date": "2026-08-21",
+  "site": "Conference center -Eastern Region",
+  "eng": "Engr. Mandela Aduko Akuriba",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Not done",
+  "finance_notes": "",
+  "stated_total": 3882,
+  "items": [
+   {
+    "desc": "12mm diameter High tensile reinforcement for the remaining ground beams",
+    "qty": "30 pieces",
+    "unit": 114.2,
+    "total": 3426,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "Concrete nails 3''",
+    "qty": "5 boxes ",
+    "unit": 30,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Concrete nails 4''",
+    "qty": "5 boxes ",
+    "unit": 30,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Normal nails 3''",
+    "qty": "2 boxes ",
+    "unit": 78,
+    "total": 156,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   }
+  ]
+ },
+ {
+  "row": 142,
+  "date": "2026-03-09",
+  "site": "24 hour market",
+  "eng": "Eric Adoh",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Not done yet",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "12 mm high tensile rods for commercial building ground beam",
+    "qty": "3 tons ",
+    "unit": "1 ton = 11500",
+    "total": "Ghc 34,500",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "10mm high tensile reinforcements for commercial building ground beams",
+    "qty": "2 tons ",
+    "unit": "Ghc 11,500",
+    "total": "Ghc 23,000",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "Welded Mesh type A 124, BS4483 for commercial building",
+    "qty": "12 bundles ",
+    "unit": "Ghc 2950",
+    "total": "Ghc 35400",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "Welded Mesh type A 124, BS4483 for Lockable Shops",
+    "qty": "8 bundles ",
+    "unit": "Ghc 2950",
+    "total": "Ghc 23,600",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "1x12 inches board for commercial building ground beam formworks",
+    "qty": "150 pieces  ",
+    "unit": "Ghc 110",
+    "total": "Ghc 16,500",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "Sand for commercial building ground beam casting",
+    "qty": "20m3 - 1 trip ",
+    "unit": "Ghc 1900",
+    "total": "Ghc 1900",
+    "unitLabel": null,
+    "supplier": "Nat"
+   },
+   {
+    "desc": "Chippings for commercial building ground beam casting",
+    "qty": "40m3- 2 trips ",
+    "unit": "Ghc 6000",
+    "total": "Ghc 12000",
+    "unitLabel": null,
+    "supplier": "a"
+   }
+  ]
+ },
+ {
+  "row": 152,
+  "date": "2026-09-15",
+  "site": "ADA SHS, 2 Storey Domitory block (ground beams)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "16mm mild steel rebar",
+    "qty": "171 no.",
+    "unit": "Ghc 113",
+    "total": "Ghc 19323",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "10mm mild steel rebar",
+    "qty": "340 no.",
+    "unit": "Ghc 40",
+    "total": "Ghc 13600",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "5 no",
+    "unit": "Ghc 60",
+    "total": "Ghc 300",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   }
+  ]
+ },
+ {
+  "row": 158,
+  "date": "2026-09-15",
+  "site": "ADA SHS, 4 Unit 2 bedroom bungalow (ground beams unit 1 & 2)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "12mm mild steel rebar",
+    "qty": 219,
+    "unit": "Ghc 62",
+    "total": "Ghc 13578",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "10mm mild steel rebar",
+    "qty": "181 no.",
+    "unit": "Ghc 40",
+    "total": "Ghc 7240",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "6 no",
+    "unit": "Ghc 60",
+    "total": "Ghc 360",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   }
+  ]
+ },
+ {
+  "row": 164,
+  "date": "2026-09-15",
+  "site": "ADA SHTS, 12 unit 2 Storey classroom block (unit 1 ground beams)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "16mm mild steel rebar",
+    "qty": "201 no.",
+    "unit": "Ghc 113",
+    "total": "Ghc 22703",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "10mm mild steel rebar",
+    "qty": "363 no.",
+    "unit": "Ghc 40",
+    "total": "Ghc 14520",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "6 no",
+    "unit": "Ghc 60",
+    "total": "Ghc 360",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   }
+  ]
+ },
+ {
+  "row": 170,
+  "date": "2026-09-15",
+  "site": "ADA SHTS, 12 unit 2 Storey classroom block (unit 2 starter columns)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "16mm mild steel rebar",
+    "qty": "173 no.",
+    "unit": "Ghc 113",
+    "total": "Ghc 19549",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "10mm mild steel rebar",
+    "qty": "88 no.",
+    "unit": "Ghc 40",
+    "total": "Ghc 3520",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "5 no",
+    "unit": "Ghc 60",
+    "total": "Ghc 300",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   },
+   {
+    "desc": "20mm mild steel rebar",
+    "qty": "89 no.",
+    "unit": "Ghc 170",
+    "total": "Ghc 15130",
+    "unitLabel": null,
+    "supplier": "ANNA OCANSAY (CHRISKOKU COMPANY LIMITED)"
+   }
+  ]
+ },
+ {
+  "row": 177,
+  "date": "2026-09-16",
+  "site": "Anlo SHS -Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "#VALUE!",
+  "finance_notes": "",
+  "stated_total": 37450,
+  "items": [
+   {
+    "desc": "20mm mild steel rebar",
+    "qty": "2 tons ",
+    "unit": 7700,
+    "total": 15400,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "16mm mild steel rebar",
+    "qty": "1 ton",
+    "unit": 7500,
+    "total": 7500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "12mm mild steel rebar",
+    "qty": "1 ton",
+    "unit": 7500,
+    "total": 7500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "10mm mild steel rebar",
+    "qty": "1 ton",
+    "unit": 6500,
+    "total": 6500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "10 no",
+    "unit": 55,
+    "total": 550,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 185,
+  "date": "2026-09-16",
+  "site": "Anlo SHS -Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Picture",
+  "finance_notes": "",
+  "stated_total": 1390,
+  "items": [
+   {
+    "desc": "Ingco Rotary Hammer",
+    "qty": 1,
+    "unit": 1200,
+    "total": 1200,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Spirit level ingco",
+    "qty": 2,
+    "unit": 95,
+    "total": 190,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   }
+  ]
+ },
+ {
+  "row": 190,
+  "date": "2026-09-17",
+  "site": "ADA SHS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 34500,
+  "items": [
+   {
+    "desc": "CEMENT (Dangote 42.5R)",
+    "qty": 300,
+    "unit": "GHC 115.00",
+    "total": 34500,
+    "unitLabel": null,
+    "supplier": "Gertrude Ocansay"
+   }
+  ]
+ },
+ {
+  "row": 194,
+  "date": "2026-09-17",
+  "site": "ADA SHTS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "P02827",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 41500,
+  "items": [
+   {
+    "desc": "CEMENT (Dangote 42.5R)",
+    "qty": 100,
+    "unit": "GHC 115.01",
+    "total": 11500,
+    "unitLabel": null,
+    "supplier": "Gertrude Ocansay"
+   },
+   {
+    "desc": "V.G.L Tricycle - for getting water for works and moving materials to and around the site at ADA SHTS.",
+    "qty": 1,
+    "unit": "GHC 30000",
+    "total": 30000,
+    "unitLabel": null,
+    "supplier": "V&C Ventures"
+   }
+  ]
+ },
+ {
+  "row": 199,
+  "date": "2026-09-17",
+  "site": "Conference center - Eastern region",
+  "eng": "Engr Mandela Aduko Akuriba",
+  "lead": "appproved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "#VALUE!",
+  "finance_notes": "",
+  "stated_total": 10975,
+  "items": [
+   {
+    "desc": "wawa boards for conference steps area risers",
+    "qty": "40 Pcs",
+    "unit": 240,
+    "total": 9600,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Cutting",
+    "qty": "40 Pcs",
+    "unit": 3,
+    "total": 120,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Transport",
+    "qty": null,
+    "unit": null,
+    "total": 400,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Normal nails 3''",
+    "qty": "5 boxes ",
+    "unit": 78,
+    "total": 390,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "pinch bar",
+    "qty": "1 No",
+    "unit": 65,
+    "total": 65,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "saw",
+    "qty": "1 No",
+    "unit": 55,
+    "total": 55,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Cutter",
+    "qty": "1 No",
+    "unit": 40,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Mason Chisel",
+    "qty": "5 No",
+    "unit": 35,
+    "total": 175,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Mason Line",
+    "qty": "5 No",
+    "unit": 8,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   },
+   {
+    "desc": "Cutlass",
+    "qty": "2 No",
+    "unit": 45,
+    "total": 90,
+    "unitLabel": null,
+    "supplier": "TT future help Enterprise - Pokrom Eastern region"
+   }
+  ]
+ },
+ {
+  "row": 212,
+  "date": "2026-09-17",
+  "site": "Conference center",
+  "eng": "Engr Mandela Aduko Akuriba",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "P02829",
+  "payment": "#VALUE!",
+  "finance_notes": "",
+  "stated_total": 108355,
+  "items": [
+   {
+    "desc": "Cement(Super strong 42.5R)",
+    "qty": "500 bags",
+    "unit": 120,
+    "total": 60000,
+    "unitLabel": null,
+    "supplier": "Chafal Communication"
+   },
+   {
+    "desc": "High tensile Reinforcement for continuous columns",
+    "qty": "16mm - 2tons",
+    "unit": 10300,
+    "total": 20600,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "12mm",
+    "qty": "1 ton",
+    "unit": 10300,
+    "total": 10300,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "10mm",
+    "qty": "1ton",
+    "unit": 10300,
+    "total": 10300,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "Binding wires",
+    "qty": "15 rolls",
+    "unit": 45,
+    "total": 675,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "BRC mesh",
+    "qty": "16 PCs ",
+    "unit": 280,
+    "total": 4480,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   },
+   {
+    "desc": "Transportation",
+    "qty": null,
+    "unit": null,
+    "total": 2000,
+    "unitLabel": null,
+    "supplier": "K. Ofori Limited at Oyarifa branch"
+   }
+  ]
+ },
+ {
+  "row": 222,
+  "date": "2026-09-17",
+  "site": "Anlo- Staff Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 200,
+  "items": [
+   {
+    "desc": "Second-floor slab mild steel steel",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "10mm",
+    "qty": "1 ton",
+    "unit": 6500,
+    "total": 6500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "12mm",
+    "qty": "5.5 ton",
+    "unit": 7500,
+    "total": 41250,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "16mm",
+    "qty": "4  ton",
+    "unit": 7500,
+    "total": 30000,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Binding wire",
+    "qty": "20 no ",
+    "unit": 55,
+    "total": 1100,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Bamboo",
+    "qty": 100,
+    "unit": 15,
+    "total": 1500,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   },
+   {
+    "desc": "Transport",
+    "qty": 1,
+    "unit": 200,
+    "total": 200,
+    "unitLabel": null,
+    "supplier": "Joyce Prestige or Daniel Yormenu"
+   }
+  ]
+ },
+ {
+  "row": 235,
+  "date": "2026-09-17",
+  "site": "Anlo SHS Science lab",
+  "eng": "Aflo Timothy",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 1500,
+  "items": [
+   {
+    "desc": "Transporting 600 bags of cement to the science lab ( site expenses )",
+    "qty": 600,
+    "unit": 2.5,
+    "total": 1500,
+    "unitLabel": null,
+    "supplier": "Aflo Timothy"
+   }
+  ]
+ },
+ {
+  "row": 239,
+  "date": "2026-09-17",
+  "site": "Anlo- Staff Bungalow",
+  "eng": "Aflo Timothy",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "#VALUE!",
+  "finance_notes": "",
+  "stated_total": 1292,
+  "items": [
+   {
+    "desc": "Site expense",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Alumminum tube 40 x 80",
+    "qty": 1,
+    "unit": 400,
+    "total": 400,
+    "unitLabel": null,
+    "supplier": "Aflo Timothy"
+   },
+   {
+    "desc": "Alumminum tube 40 x 80",
+    "qty": 1,
+    "unit": 310,
+    "total": 310,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Iron cutting Disc",
+    "qty": 2,
+    "unit": 20,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Hack saw blade",
+    "qty": 1,
+    "unit": 15,
+    "total": 15,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Steel pipe",
+    "qty": 1,
+    "unit": 60,
+    "total": 60,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Drinking water",
+    "qty": 13,
+    "unit": 12,
+    "total": 156,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Bottle water",
+    "qty": 2,
+    "unit": 40,
+    "total": 80,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Spirit level",
+    "qty": 1,
+    "unit": 80,
+    "total": 80,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Treaad tape",
+    "qty": 2,
+    "unit": 10,
+    "total": 20,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" bend",
+    "qty": 5,
+    "unit": 8,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" tee",
+    "qty": 2,
+    "unit": 8,
+    "total": 16,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 x 3 bushing",
+    "qty": 1,
+    "unit": 15,
+    "total": 15,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "transport",
+    "qty": 1,
+    "unit": 60,
+    "total": 60,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 255,
+  "date": "2026-09-17",
+  "site": "24 Hour market Lockable Shops plumbing first fix",
+  "eng": "Eric Andoh",
+  "lead": "approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 6580,
+  "items": [
+   {
+    "desc": "4 inches pressure pipe",
+    "qty": 6,
+    "unit": 400,
+    "total": 2400,
+    "unitLabel": null,
+    "supplier": "Josmagsons Enterprise"
+   },
+   {
+    "desc": "4 inches slow bend",
+    "qty": 16,
+    "unit": 35,
+    "total": 560,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "4 inches end cap",
+    "qty": 16,
+    "unit": 15,
+    "total": 240,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3 inches pressure pipe",
+    "qty": 5,
+    "unit": 280,
+    "total": 1400,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3 inches slow bend",
+    "qty": 6,
+    "unit": 25,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3 inches swerve tee",
+    "qty": 3,
+    "unit": 25,
+    "total": 75,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3 inches end cap",
+    "qty": 12,
+    "unit": 10,
+    "total": 120,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches pressure pipe",
+    "qty": 5,
+    "unit": 180,
+    "total": 900,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches elbow",
+    "qty": 26,
+    "unit": 10,
+    "total": 260,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches swerve tee",
+    "qty": 6,
+    "unit": 15,
+    "total": 90,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches 45 bend",
+    "qty": 4,
+    "unit": 10,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches end cap",
+    "qty": 37,
+    "unit": 5,
+    "total": 185,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "4 inches coupling",
+    "qty": 2,
+    "unit": 35,
+    "total": 70,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3 inches coupling",
+    "qty": 2,
+    "unit": 30,
+    "total": 60,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches coupling",
+    "qty": 2,
+    "unit": 15,
+    "total": 30,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 273,
+  "date": "2026-09-17",
+  "site": "24 hour market commercial building",
+  "eng": "Eric Andoh",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 11450,
+  "items": [
+   {
+    "desc": "Labor request for commercial building substructure back filling",
+    "qty": "Engaging 6 helpers for 6 days @ GHC150/ person ",
+    "unit": null,
+    "total": 5400,
+    "unitLabel": null,
+    "supplier": "O555956358 - Anita Sekyim"
+   },
+   {
+    "desc": "Labor request for cutting, bending and fixing of ground beam reinforcements",
+    "qty": "5.5 tons ",
+    "unit": "GHC 1100",
+    "total": 6050,
+    "unitLabel": null,
+    "supplier": "054 294 6072 - Sualisu"
+   }
+  ]
+ },
+ {
+  "row": 278,
+  "date": "2026-09-17",
+  "site": "Tano South MDF Project",
+  "eng": "Vincent Mewen",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 36000,
+  "items": [
+   {
+    "desc": "6 inch block",
+    "qty": 3000,
+    "unit": 12,
+    "total": 36000,
+    "unitLabel": null,
+    "supplier": "Alhaji Korkor"
+   }
+  ]
+ },
+ {
+  "row": 282,
+  "date": "2026-09-17",
+  "site": "MDF - SALAGA",
+  "eng": "P. M. Barnes",
+  "lead": "Appoved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "P02843",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 78680,
+  "items": [
+   {
+    "desc": "6 \" solid block",
+    "qty": 5000,
+    "unit": 13.5,
+    "total": 67500,
+    "unitLabel": null,
+    "supplier": "0542055613 - Parity Investment"
+   },
+   {
+    "desc": "Sand",
+    "qty": 3,
+    "unit": 2000,
+    "total": 6000,
+    "unitLabel": null,
+    "supplier": "0552222413 - Mustapha Nafiu"
+   },
+   {
+    "desc": "Blockwork(washroom)",
+    "qty": 105,
+    "unit": 30,
+    "total": 3150,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Formwork to columns",
+    "qty": 30,
+    "unit": 40,
+    "total": 1200,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Water",
+    "qty": 1,
+    "unit": 400,
+    "total": 400,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Circuit box",
+    "qty": 1,
+    "unit": 180,
+    "total": 180,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Electrician",
+    "qty": null,
+    "unit": null,
+    "total": 100,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Rubber bucket",
+    "qty": 2,
+    "unit": 50,
+    "total": 100,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   },
+   {
+    "desc": "Transport",
+    "qty": null,
+    "unit": null,
+    "total": 50,
+    "unitLabel": null,
+    "supplier": "0246895172- Kornutsey ricky(J'melo)"
+   }
+  ]
+ },
+ {
+  "row": 294,
+  "date": "2026-09-17",
+  "site": "24 Hour market Commercial Building",
+  "eng": "Eric Andoh",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 117810,
+  "items": [
+   {
+    "desc": "Laterite for Hardcore filling",
+    "qty": 85,
+    "unit": "Ghc 800",
+    "total": 68000,
+    "unitLabel": null,
+    "supplier": "0594498012 - son of inshallahu ventures"
+   },
+   {
+    "desc": "Rental of backhoe for HCF",
+    "qty": "5 days ",
+    "unit": "Ghc 5000",
+    "total": 25000,
+    "unitLabel": null,
+    "supplier": "0594498012 - son of inshallahu ventures"
+   },
+   {
+    "desc": "Labor request for the installation of substructure column and ground beams formworks",
+    "qty": "827m2",
+    "unit": "Ghc 30",
+    "total": 24810,
+    "unitLabel": null,
+    "supplier": "054 913 6337 - Ishmael Antwi"
+   }
+  ]
+ },
+ {
+  "row": 300,
+  "date": "2026-09-17",
+  "site": "MDF Ellembelle",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 3500,
+  "items": [
+   {
+    "desc": "Hiring of concrete mixer for casting foundation concrete",
+    "qty": "100bags ",
+    "unit": 14,
+    "total": 1400,
+    "unitLabel": null,
+    "supplier": "0532447652 - Daniel Zoe"
+   },
+   {
+    "desc": "Workers for casting foundation concrete",
+    "qty": "100 bags",
+    "unit": 21,
+    "total": 2100,
+    "unitLabel": null,
+    "supplier": "0244923254 - Isaac Nortei"
+   }
+  ]
+ },
+ {
+  "row": 305,
+  "date": "2026-09-17",
+  "site": "Renovation of 4 bedroom - Ayinase",
+  "eng": "Samuel Nketia",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 1000,
+  "items": [
+   {
+    "desc": "Labour cost fot welding and spraying works",
+    "qty": 1,
+    "unit": 1000,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "0548143121 - Alfred Akpor"
+   }
+  ]
+ },
+ {
+  "row": 309,
+  "date": "2026-09-18",
+  "site": "24 Hour market lockable shops oversite concrete material",
+  "eng": "Eric Andoh",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 0,
+  "items": [
+   {
+    "desc": "Rough sand for oversite concrete",
+    "qty": "4 trips ",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Chippings for oversite concrete",
+    "qty": "8 trips ",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Cement for oversite concrete",
+    "qty": 1000,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Wheelbarrow",
+    "qty": 15,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Loading shovel",
+    "qty": 5,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Diamond shovel",
+    "qty": 5,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Flat shovel",
+    "qty": 5,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 319,
+  "date": "2026-09-18",
+  "site": "MDF Ellembelle",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 2400,
+  "items": [
+   {
+    "desc": "Engaging 6 workers for casting blinding at GHC 200.00 each for 2 days. (6xGHC 200.00 = GHC 1,200 a day)",
+    "qty": 2,
+    "unit": 1200,
+    "total": 2400,
+    "unitLabel": null,
+    "supplier": "0257703623 - Godfred Adusei"
+   },
+   {
+    "desc": "Cement for works",
+    "qty": "500 bags",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": "Macwest Cement Team"
+   },
+   {
+    "desc": "Wheelbarrows",
+    "qty": 10,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Engaging 4 helpers @ GHC 150.00 each and 2 artisans @ GHC 200.00 each for column setting",
+    "qty": 1000,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": "0257703623 - Godfred Adusei"
+   }
+  ]
+ },
+ {
+  "row": 326,
+  "date": "2026-09-18",
+  "site": "Ho MDF Project",
+  "eng": "Vincent Mewen",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 43034,
+  "items": [
+   {
+    "desc": "Excavation works",
+    "qty": 60.6,
+    "unit": 90,
+    "total": 5454,
+    "unitLabel": null,
+    "supplier": "Cephas Saka 0599575112"
+   },
+   {
+    "desc": "columns excavation",
+    "qty": 36,
+    "unit": 30,
+    "total": 1080,
+    "unitLabel": null,
+    "supplier": "Cephas Saka 0599575112"
+   },
+   {
+    "desc": "12mm iron rod",
+    "qty": "3 tons",
+    "unit": 7300,
+    "total": 21900,
+    "unitLabel": null,
+    "supplier": "DONWILL"
+   },
+   {
+    "desc": "10mm iron rod",
+    "qty": "1 ton",
+    "unit": 6950,
+    "total": 6950,
+    "unitLabel": null,
+    "supplier": "DONWILL"
+   },
+   {
+    "desc": "Binding wire",
+    "qty": "10 coils",
+    "unit": 65,
+    "total": 650,
+    "unitLabel": null,
+    "supplier": "DONWILL"
+   },
+   {
+    "desc": "Chippings",
+    "qty": "4 trips ",
+    "unit": 6500,
+    "total": 2600,
+    "unitLabel": null,
+    "supplier": "Samgbor Elijah"
+   },
+   {
+    "desc": "sand",
+    "qty": "2 trips",
+    "unit": 2200,
+    "total": 4400,
+    "unitLabel": null,
+    "supplier": "Samgbor Elijah"
+   }
+  ]
+ },
+ {
+  "row": 336,
+  "date": "2026-09-18",
+  "site": "Tano South MDF Project",
+  "eng": "Vincent Mewen",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 22550,
+  "items": [
+   {
+    "desc": "12mm iron rod",
+    "qty": "2 ton",
+    "unit": 7300,
+    "total": 14600,
+    "unitLabel": null,
+    "supplier": "Suro Nyame 0541431811"
+   },
+   {
+    "desc": "10mm iron rod",
+    "qty": "1ton",
+    "unit": 7300,
+    "total": 7300,
+    "unitLabel": null,
+    "supplier": "Suro Nyame 0541431811"
+   },
+   {
+    "desc": "Binding wire",
+    "qty": "10 coils ",
+    "unit": 65,
+    "total": 650,
+    "unitLabel": null,
+    "supplier": "Suro Nyame 0541431811"
+   }
+  ]
+ },
+ {
+  "row": 342,
+  "date": "2026-09-18",
+  "site": "SHEARFARM",
+  "eng": "Richard Agyei",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 4642.5,
+  "items": [
+   {
+    "desc": "Labour Payment for blockwork",
+    "qty": 185.7,
+    "unit": 25,
+    "total": 4642.5,
+    "unitLabel": null,
+    "supplier": "Henry Boateng (0548212488)"
+   }
+  ]
+ },
+ {
+  "row": 346,
+  "date": "2026-09-18",
+  "site": "MDF BOLE-BAMBOI; KULFUO PROJECT",
+  "eng": "Abdulai",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 6248,
+  "items": [
+   {
+    "desc": "\u00bd wall tap",
+    "qty": 6,
+    "unit": 60,
+    "total": 360,
+    "unitLabel": null,
+    "supplier": "Tumu Market Square - 0208424981 / 0248149042"
+   },
+   {
+    "desc": "1\u00bc PVC pipe",
+    "qty": 5,
+    "unit": 75,
+    "total": 375,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" x 1\u00bd reducer",
+    "qty": 10,
+    "unit": 10,
+    "total": 100,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" PVC pipe",
+    "qty": 12,
+    "unit": 70,
+    "total": 840,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" bend",
+    "qty": 44,
+    "unit": 10,
+    "total": 440,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" tee",
+    "qty": 16,
+    "unit": 10,
+    "total": 160,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2\" clips",
+    "qty": 59,
+    "unit": 10,
+    "total": 590,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00be pipe",
+    "qty": 16,
+    "unit": 40,
+    "total": 640,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00be bend",
+    "qty": 18,
+    "unit": 4,
+    "total": 72,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00be tee",
+    "qty": 8,
+    "unit": 4,
+    "total": 32,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "S100 glue",
+    "qty": 5,
+    "unit": 45,
+    "total": 225,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" air valve PVC",
+    "qty": 15,
+    "unit": 30,
+    "total": 450,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" valve socket",
+    "qty": 10,
+    "unit": 5,
+    "total": 50,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" bend",
+    "qty": 30,
+    "unit": 5,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" union",
+    "qty": 6,
+    "unit": null,
+    "total": 80,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" x \u00be reducer",
+    "qty": 10,
+    "unit": 14,
+    "total": 140,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00be tap head",
+    "qty": 3,
+    "unit": 75,
+    "total": 225,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00be faucet bend",
+    "qty": 3,
+    "unit": 10,
+    "total": 30,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" tee",
+    "qty": 9,
+    "unit": 5,
+    "total": 45,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "\u00bd angle valve",
+    "qty": 9,
+    "unit": 40,
+    "total": 360,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1\" PVC pipe",
+    "qty": 17,
+    "unit": 52,
+    "total": 884,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 370,
+  "date": "2026-09-18",
+  "site": "AdA SHS & SHTS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 16440,
+  "items": [
+   {
+    "desc": "4\" Nail",
+    "qty": 15,
+    "unit": 60,
+    "total": 900,
+    "unitLabel": null,
+    "supplier": "Chriskoku Ventures"
+   },
+   {
+    "desc": "3\" Nail",
+    "qty": 10,
+    "unit": 60,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": "Chriskoku Ventures"
+   },
+   {
+    "desc": "Binding wire",
+    "qty": 5,
+    "unit": 60,
+    "total": 300,
+    "unitLabel": null,
+    "supplier": "Chriskoku Ventures"
+   },
+   {
+    "desc": "Polytank 4000 Lts",
+    "qty": 1,
+    "unit": 6825,
+    "total": 6825,
+    "unitLabel": null,
+    "supplier": "Uprising El-Shaddai Trading Agency (0592845870)"
+   },
+   {
+    "desc": "Polytank 5000 Lts",
+    "qty": 1,
+    "unit": 7815,
+    "total": 7815,
+    "unitLabel": null,
+    "supplier": "Uprising El-Shaddai Trading Agency (0592845870)"
+   }
+  ]
+ },
+ {
+  "row": 378,
+  "date": "2026-09-18",
+  "site": "AdA SHTS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 13950,
+  "items": [
+   {
+    "desc": "Polytank 10000 Lts",
+    "qty": 1,
+    "unit": 13950,
+    "total": 13950,
+    "unitLabel": null,
+    "supplier": "Uprising El-Shaddai Trading Agency (0592845870)"
+   }
+  ]
+ },
+ {
+  "row": 382,
+  "date": "2026-09-18",
+  "site": "Tano South MDF Project",
+  "eng": "Vincent Mewen",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 46500,
+  "items": [
+   {
+    "desc": "42.5R cement",
+    "qty": 200,
+    "unit": 105,
+    "total": 21000,
+    "unitLabel": null,
+    "supplier": "Salomey Asantewaa Prempeh"
+   },
+   {
+    "desc": "32.5R cement",
+    "qty": 300,
+    "unit": 85,
+    "total": 25500,
+    "unitLabel": null,
+    "supplier": "Salomey Asantewaa Prempeh"
+   }
+  ]
+ },
+ {
+  "row": 387,
+  "date": "2026-09-18",
+  "site": "AdA SHTS ( Services Equipment Use)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 8510,
+  "items": [
+   {
+    "desc": "ABOBOYAA",
+    "qty": 6,
+    "unit": 800,
+    "total": 4800,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "PADLOCK",
+    "qty": 1,
+    "unit": 60,
+    "total": 60,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "WATER (DRINKING)",
+    "qty": 40,
+    "unit": 15,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "FUEL",
+    "qty": 5,
+    "unit": 90,
+    "total": 450,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "TRANSPORT",
+    "qty": 4,
+    "unit": 150,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "CONCRETE MIXER + OPERATORS",
+    "qty": 2,
+    "unit": 950,
+    "total": 1900,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "WATER (CONCRETE)",
+    "qty": 1,
+    "unit": 100,
+    "total": 100,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 397,
+  "date": "2026-09-18",
+  "site": "AdA SHS ( Services Equipment Use)",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 2565,
+  "items": [
+   {
+    "desc": "ABOBOYAA",
+    "qty": 2,
+    "unit": 800,
+    "total": 1600,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "WATER (CONCRETE)",
+    "qty": 2,
+    "unit": 100,
+    "total": 200,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "WATER (DRINKING)",
+    "qty": 31,
+    "unit": 15,
+    "total": 465,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "TRANSACTION CHARGES",
+    "qty": 1,
+    "unit": 300,
+    "total": 300,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 408,
+  "date": "2026-09-21",
+  "site": "MDF - KULFUO",
+  "eng": "Abdulai Zulifulu",
+  "lead": "Approved",
+  "procurement": "Paid",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 3648,
+  "items": [
+   {
+    "desc": "Labour payment for external works and installation of poly tank stand (4 labourers \u00d7 4 days)",
+    "qty": 16,
+    "unit": 150,
+    "total": 2400,
+    "unitLabel": null,
+    "supplier": "Aziz Bojo - MoMo 0597916116"
+   },
+   {
+    "desc": "Water for works",
+    "qty": 32,
+    "unit": 15,
+    "total": 480,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Drinking water",
+    "qty": 14,
+    "unit": 12,
+    "total": 168,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Renting of motor king to supply materials from warehouse to the various sites (1 week)",
+    "qty": 1,
+    "unit": 600,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 414,
+  "date": "2026-09-21",
+  "site": "Conference Hall - Eastern region Project",
+  "eng": "Engr. Mandela Aduko Akuriba",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Final works for terminated subcontractor",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Formwork for oversite concrete",
+    "qty": 230,
+    "unit": 16.5,
+    "total": 3795,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Reinforced insitu concrete for oversite",
+    "qty": 102,
+    "unit": 300,
+    "total": 30600,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Fixing of BRC mesh",
+    "qty": 686,
+    "unit": 10,
+    "total": 6860,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Spreading of Damproof membrane",
+    "qty": 686,
+    "unit": 1,
+    "total": 686,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "All builders , floor drains and pipe works",
+    "qty": null,
+    "unit": null,
+    "total": 15000,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Total Amount",
+    "qty": null,
+    "unit": null,
+    "total": 59251,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 428,
+  "date": "2026-09-22",
+  "site": "Nkroful Renovation",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Labour payment for laying of pavement (Overnight work)",
+    "qty": "258 sqm",
+    "unit": 40,
+    "total": 10320,
+    "unitLabel": null,
+    "supplier": "0257446920 - NEMS CONSTRUCTION SOLUTIONS"
+   },
+   {
+    "desc": "Labour payment for laying pavement ( Ceremonial Grounds)",
+    "qty": "702 sqm",
+    "unit": 35,
+    "total": 24570,
+    "unitLabel": null,
+    "supplier": "0244923254 - Isaac Nortei"
+   },
+   {
+    "desc": "Labour payment for laying pavement (Around stream)",
+    "qty": "105 sqm",
+    "unit": 35,
+    "total": 3675,
+    "unitLabel": null,
+    "supplier": "0244923254 - Isaac Nortei"
+   }
+  ]
+ },
+ {
+  "row": 432,
+  "date": "2026-09-22",
+  "site": "Esiama Market",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Electrical Items Required to complete Project.",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Double Socket",
+    "qty": 80,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "1 gang switch",
+    "qty": 89,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 gang switch",
+    "qty": 13,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Outside Light (Binoka LED flood light 30W)",
+    "qty": 15,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Panel Lights (25watts)",
+    "qty": 254,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Ceiling Fans",
+    "qty": 59,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "RCB Single pole breaker",
+    "qty": 25,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Earth Rod (6ft copper)",
+    "qty": 36,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Distribution board",
+    "qty": 3,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Photo Cell",
+    "qty": 3,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Meter Board (Big)",
+    "qty": 40,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Tapping Screws",
+    "qty": "3 box",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Meter Board (Small)",
+    "qty": 7,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "4way Main Switch (metal)",
+    "qty": 18,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Flexible tube",
+    "qty": "30 yards",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "16mm Cable",
+    "qty": "5 coils",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Industrial Salt for earthing",
+    "qty": 180,
+    "unit": 100,
+    "total": 18000,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Charcoal",
+    "qty": 20,
+    "unit": 160,
+    "total": 3200,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Bell Copper Cable",
+    "qty": 2,
+    "unit": 2500,
+    "total": 5000,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 455,
+  "date": "2026-09-22",
+  "site": "Esiama Market",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "3 blade louvre frame",
+    "qty": 40,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "8 blade louvre frame",
+    "qty": 12,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Louvre glass (long)",
+    "qty": "250 pcs",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Oil Paint  (Golden Brown)",
+    "qty": 10,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Mesh Tape",
+    "qty": 5,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Home Charm",
+    "qty": 3,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Layland Paint (off white 20ltrs)",
+    "qty": 10,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Glue",
+    "qty": 3,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Panel lights (24 watts)",
+    "qty": 45,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 465,
+  "date": "2026-09-24",
+  "site": "Esiama Market",
+  "eng": "Allotey",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Half inch K 1",
+    "qty": 100,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Half inch K55",
+    "qty": 300,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Half inch hose tap",
+    "qty": 2,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Shower with pole",
+    "qty": 2,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches floor drain",
+    "qty": 2,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "2 inches clips",
+    "qty": 200,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3/4 K 55",
+    "qty": 200,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Era Glue",
+    "qty": 50,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "One and half concrete nails",
+    "qty": "3 boxes",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Black mosquitoe net",
+    "qty": "10 rolls",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Wooden battens",
+    "qty": "100 pcs",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 478,
+  "date": "2026-09-24",
+  "site": "Anlo - Staff Bungalow",
+  "eng": "Timothy",
+  "lead": "Approved",
+  "procurement": "Approved",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "part payment of 25800",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Door and window frame",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Machine cutting and hole drilling",
+    "qty": 110,
+    "unit": 22.54,
+    "total": 2479.4,
+    "unitLabel": null,
+    "supplier": "Uncle Jah Ent"
+   },
+   {
+    "desc": "Transport",
+    "qty": null,
+    "unit": null,
+    "total": 800,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Sand Paper",
+    "qty": 1,
+    "unit": 30,
+    "total": 30,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Wawa board",
+    "qty": 260,
+    "unit": 250,
+    "total": 65000,
+    "unitLabel": null,
+    "supplier": "Uncle Jah Ent"
+   },
+   {
+    "desc": "Transport",
+    "qty": 260,
+    "unit": 10,
+    "total": 2600,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "machine cutting",
+    "qty": 1,
+    "unit": 30,
+    "total": 30,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "oil paint for windows and doors frame",
+    "qty": 3,
+    "unit": 200,
+    "total": 600,
+    "unitLabel": null,
+    "supplier": "Paques Store"
+   },
+   {
+    "desc": "Thinner",
+    "qty": 2,
+    "unit": 130,
+    "total": 260,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "S roller",
+    "qty": 1,
+    "unit": 15,
+    "total": 15,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "3\" brush",
+    "qty": 1,
+    "unit": 20,
+    "total": 20,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "conduct pipe",
+    "qty": 50,
+    "unit": 10,
+    "total": 500,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Wheel barrow  2 days",
+    "qty": 8,
+    "unit": 30,
+    "total": 240,
+    "unitLabel": null,
+    "supplier": "Timothy"
+   },
+   {
+    "desc": "Drum  2 days",
+    "qty": 2,
+    "unit": 30,
+    "total": 60,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Padlock",
+    "qty": 1,
+    "unit": 40,
+    "total": 40,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Sachet water",
+    "qty": 39,
+    "unit": 12,
+    "total": 468,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Transport",
+    "qty": null,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Coarse aggregate",
+    "qty": 1,
+    "unit": 6500,
+    "total": 6500,
+    "unitLabel": null,
+    "supplier": "osman 477 enterprise"
+   },
+   {
+    "desc": "Corase aggregate",
+    "qty": 1,
+    "unit": 6500,
+    "total": 6500,
+    "unitLabel": null,
+    "supplier": "Crystal Vent West Ent."
+   },
+   {
+    "desc": "150mm solid blocks",
+    "qty": 4000,
+    "unit": 12,
+    "total": 48000,
+    "unitLabel": null,
+    "supplier": "Crystal Vent West Ent."
+   }
+  ]
+ },
+ {
+  "row": 508,
+  "date": "2026-09-24",
+  "site": "Conference center - Eastern region",
+  "eng": "Akuriba Mandela Aduko",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Cutting Machine for steel bending works",
+    "qty": "1 No",
+    "unit": null,
+    "total": 1210,
+    "unitLabel": null,
+    "supplier": "TT Future help Enterprise - Pokrom"
+   }
+  ]
+ },
+ {
+  "row": 510,
+  "date": "2026-09-24",
+  "site": "MDF - KULFUO",
+  "eng": "Abdulai Zulifulu",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 8360,
+  "items": [
+   {
+    "desc": "Workmanship for landscaping & leveling (leveling; laying of DPM & spreading of stones)",
+    "qty": null,
+    "unit": null,
+    "total": 3600,
+    "unitLabel": null,
+    "supplier": "Foster Adotey - MoMo 0541584816"
+   },
+   {
+    "desc": "Poly tank stand - 3\" G.R.P pipe",
+    "qty": 3,
+    "unit": null,
+    "total": 1050,
+    "unitLabel": null,
+    "supplier": "Abubukari Awudu - MoMo 0540534143"
+   },
+   {
+    "desc": "Poly tank stand - 1\u00bd\" G.R.P pipe",
+    "qty": 9,
+    "unit": 100,
+    "total": 900,
+    "unitLabel": null,
+    "supplier": "Abubukari Awudu - MoMo 0540534143"
+   },
+   {
+    "desc": "Poly tank stand - fabrication workmanship",
+    "qty": null,
+    "unit": null,
+    "total": 1000,
+    "unitLabel": null,
+    "supplier": "Abubukari Awudu - MoMo 0540534143"
+   },
+   {
+    "desc": "1x12 Wawa boards",
+    "qty": 6,
+    "unit": 240,
+    "total": 1440,
+    "unitLabel": null,
+    "supplier": "Haruna Bobilisung, Yohudaana Ent. - MoMo 0241155664"
+   },
+   {
+    "desc": "Nails (box)",
+    "qty": 1,
+    "unit": 50,
+    "total": 50,
+    "unitLabel": null,
+    "supplier": "Haruna Bobilisung, Yohudaana Ent. - MoMo 0241155664"
+   },
+   {
+    "desc": "Transportation",
+    "qty": null,
+    "unit": null,
+    "total": 150,
+    "unitLabel": null,
+    "supplier": "Haruna Bobilisung, Yohudaana Ent. - MoMo 0241155664"
+   },
+   {
+    "desc": "Workmanship",
+    "qty": null,
+    "unit": null,
+    "total": 120,
+    "unitLabel": null,
+    "supplier": "Haruna Bobilisung, Yohudaana Ent. - MoMo 0241155664"
+   },
+   {
+    "desc": "Stoppers",
+    "qty": null,
+    "unit": null,
+    "total": 50,
+    "unitLabel": null,
+    "supplier": "Haruna Bobilisung, Yohudaana Ent. - MoMo 0241155664"
+   }
+  ]
+ },
+ {
+  "row": 521,
+  "date": "2026-09-24",
+  "site": "MDF - BOLE",
+  "eng": "Abdulai Zulifulu",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 6750,
+  "items": [
+   {
+    "desc": "Laterite for filling",
+    "qty": 15,
+    "unit": 450,
+    "total": 6750,
+    "unitLabel": null,
+    "supplier": "Sulemana Abdul Gafaru - MoMo 0543179795"
+   }
+  ]
+ },
+ {
+  "row": 525,
+  "date": "2026-09-24",
+  "site": "ADA SHS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 439321.54,
+  "items": [
+   {
+    "desc": "Substructure labour for 18 unit classroom",
+    "qty": null,
+    "unit": null,
+    "total": 114500,
+    "unitLabel": null,
+    "supplier": "0249292177  Hackman EH Core Builders"
+   },
+   {
+    "desc": "Substructure labour for Dormitory",
+    "qty": null,
+    "unit": null,
+    "total": 206763,
+    "unitLabel": null,
+    "supplier": "0249292177  Hackman EH Core Builders"
+   },
+   {
+    "desc": "Substructure labour for bungalows",
+    "qty": null,
+    "unit": null,
+    "total": 118058.54,
+    "unitLabel": null,
+    "supplier": "0249292177  Hackman EH Core Builders"
+   }
+  ]
+ },
+ {
+  "row": 531,
+  "date": "2026-09-24",
+  "site": "ADA SHS",
+  "eng": "Stephen Selasi Dogbe",
+  "lead": "Approved",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Substructure labour for 12 unit classroom",
+    "qty": null,
+    "unit": null,
+    "total": 112442.2,
+    "unitLabel": null,
+    "supplier": "0249292177  Hackman EH Core Builders"
+   }
+  ]
+ },
+ {
+  "row": 534,
+  "date": "2026-09-25",
+  "site": "SHEA FARM",
+  "eng": "Richard Agyei",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Labour Payment for Preparation and Installation of column Reinforcement",
+    "qty": 1.02,
+    "unit": 1000,
+    "total": 1020,
+    "unitLabel": null,
+    "supplier": "0546011174-Arizi Emmanuel"
+   }
+  ]
+ },
+ {
+  "row": 535,
+  "date": "2026-09-25",
+  "site": "SHEA FARM",
+  "eng": "Richard Agyei",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Labour payment for casting of concrete Columns (first floor)",
+    "qty": 25,
+    "unit": null,
+    "total": 5000,
+    "unitLabel": null,
+    "supplier": "Henry Boateng (054212488)"
+   }
+  ]
+ },
+ {
+  "row": 536,
+  "date": "2026-09-25",
+  "site": "SHEA FARM",
+  "eng": "Richard Agyei",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Labourpaymentfor shuttering of first floor columns",
+    "qty": 25,
+    "unit": null,
+    "total": 3000,
+    "unitLabel": null,
+    "supplier": "0549136337 ( Ishmeal Antwi)"
+   }
+  ]
+ },
+ {
+  "row": 538,
+  "date": "2026-09-25",
+  "site": "24 Hour market - Lockable shops first fix plumbing items (PPR Pipes)",
+  "eng": "Eric Andoh",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "EraGlue big size",
+    "qty": "4- big size",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ },
+ {
+  "row": 543,
+  "date": "2026-09-03",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "Completed; amount per requisition differs from stated rate",
+  "stated_total": 20400,
+  "items": [
+   {
+    "desc": "Staff Quarters Foundation Excavation",
+    "qty": 1,
+    "unit": 3800,
+    "total": 3700,
+    "unitLabel": null,
+    "supplier": "Charles H. W. Derby - MoMo 0244404408"
+   },
+   {
+    "desc": "Washrooms Foundation Excavation",
+    "qty": 2,
+    "unit": 2600,
+    "total": 2600,
+    "unitLabel": null,
+    "supplier": "Charles H. W. Derby - MoMo 0244404408"
+   },
+   {
+    "desc": "6-Unit Classrooms Foundation Excavation",
+    "qty": 3,
+    "unit": 12000,
+    "total": 12400,
+    "unitLabel": null,
+    "supplier": "Charles H. W. Derby - MoMo 0244404408"
+   },
+   {
+    "desc": "Additional Works - Sleeper Walls (6-Unit Classrooms)",
+    "qty": 4,
+    "unit": 1700,
+    "total": 1700,
+    "unitLabel": null,
+    "supplier": "Charles H. W. Derby - MoMo 0244404408"
+   }
+  ]
+ },
+ {
+  "row": 549,
+  "date": "2026-09-06",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "4 trips supplied; requisition shows GH\u00a258,000 and total GH\u00a283,300, while invoice/filename differ",
+  "stated_total": 83300,
+  "items": [
+   {
+    "desc": "Granite Chippings",
+    "qty": "12 trips",
+    "unit": 4900,
+    "total": 58000,
+    "unitLabel": null,
+    "supplier": "KOB-Mens Enterprise - 0535116630"
+   },
+   {
+    "desc": "Rough Sand",
+    "qty": "11 trips",
+    "unit": 2300,
+    "total": 25300,
+    "unitLabel": null,
+    "supplier": "Abdul Kassim Isaac - Aggregates Supplier - 0535116630 - Mankessim"
+   }
+  ]
+ },
+ {
+  "row": 553,
+  "date": "2026-09-06",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": 42500,
+  "items": [
+   {
+    "desc": "Cement 32.5R - Dangote",
+    "qty": 500,
+    "unit": 80,
+    "total": 40000,
+    "unitLabel": null,
+    "supplier": "Glory Garment or Clement Krampah Amoah - Dangote Cement - 0240415265"
+   },
+   {
+    "desc": "T&T Delivery Charges",
+    "qty": 500,
+    "unit": 5,
+    "total": 2500,
+    "unitLabel": null,
+    "supplier": "Glory Garment or Clement Krampah Amoah - Dangote Cement - 0240415265"
+   }
+  ]
+ },
+ {
+  "row": 557,
+  "date": "2026-09-16",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "3.5 days",
+  "stated_total": 7250,
+  "items": [
+   {
+    "desc": "Concrete Mixture Machine",
+    "qty": 3.5,
+    "unit": 700,
+    "total": 2450,
+    "unitLabel": null,
+    "supplier": "Philip Nana Obrafi - Concrete Mixture Hiring - 0537397250 - Baifikrom"
+   },
+   {
+    "desc": "Operating Fee",
+    "qty": 3.5,
+    "unit": 600,
+    "total": 2100,
+    "unitLabel": null,
+    "supplier": "Philip Nana Obrafi - Concrete Mixture Hiring - 0537397250 - Baifikrom"
+   },
+   {
+    "desc": "3 Assistants Labourers",
+    "qty": 3.5,
+    "unit": 300,
+    "total": 1050,
+    "unitLabel": null,
+    "supplier": "Philip Nana Obrafi - Concrete Mixture Hiring - 0537397250 - Baifikrom"
+   },
+   {
+    "desc": "Kia Mighty Truck",
+    "qty": 1,
+    "unit": 1400,
+    "total": 1400,
+    "unitLabel": null,
+    "supplier": "Philip Nana Obrafi - Concrete Mixture Hiring - 0537397250 - Baifikrom"
+   },
+   {
+    "desc": "Fuel to Pump Water for Concrete Mixing Works",
+    "qty": 3.5,
+    "unit": 250,
+    "total": 250,
+    "unitLabel": null,
+    "supplier": "Philip Nana Obrafi - Concrete Mixture Hiring - 0537397250 - Baifikrom"
+   }
+  ]
+ },
+ {
+  "row": 564,
+  "date": "2026-09-16",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "Collected",
+  "finance_notes": "Three quarters removed",
+  "stated_total": 7600,
+  "items": [
+   {
+    "desc": "Removal of Demolished Classroom Block Debris from Site",
+    "qty": 1,
+    "unit": 7600,
+    "total": 7600,
+    "unitLabel": null,
+    "supplier": "Charles H. W. Derby - MoMo 0244404408"
+   }
+  ]
+ },
+ {
+  "row": 567,
+  "date": "2026-09-22",
+  "site": "MDF AJUMAKO OCHISO",
+  "eng": "Charles H. W. Derby",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "Shortage at site",
+  "stated_total": 33168,
+  "items": [
+   {
+    "desc": "10mm Iron Rods",
+    "qty": "2 tons",
+    "unit": 5814,
+    "total": 11628,
+    "unitLabel": null,
+    "supplier": "Lakwarps Ent. - Iron Rods - 0242444408 - Mankessim"
+   },
+   {
+    "desc": "12mm Iron Rods",
+    "qty": "3 tons",
+    "unit": 6900,
+    "total": 20700,
+    "unitLabel": null,
+    "supplier": "Lakwarps Ent. - Iron Rods - 0242444408 - Mankessim"
+   },
+   {
+    "desc": "Binding Wire",
+    "qty": "20 coils",
+    "unit": 42,
+    "total": 840,
+    "unitLabel": null,
+    "supplier": "Lakwarps Ent. - Iron Rods - 0242444408 - Mankessim"
+   }
+  ]
+ },
+ {
+  "row": 571,
+  "date": "2026-09-27",
+  "site": "Nkroful Renovation Project",
+  "eng": "Agyei Richard",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Material payment (DPM)",
+    "qty": 2,
+    "unit": 1000,
+    "total": 2000,
+    "unitLabel": null,
+    "supplier": "Nems Construction Solutions (0257446920)"
+   }
+  ]
+ },
+ {
+  "row": 572,
+  "date": "2026-09-27",
+  "site": "SHEAFARM",
+  "eng": "Agyei Richard",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Material payment (Chipping)",
+    "qty": 1,
+    "unit": 6000,
+    "total": 6000,
+    "unitLabel": null,
+    "supplier": "Sons of Ishallahu Ventures Sons of Ishallahu Ventures(0594498012)"
+   }
+  ]
+ },
+ {
+  "row": 574,
+  "date": "2026-09-27",
+  "site": "Nkroful Renovation Project",
+  "eng": "Allotey",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "White Emulsion paints for painting works (10ltrs)",
+    "qty": 3,
+    "unit": 180,
+    "total": 540,
+    "unitLabel": null,
+    "supplier": "Fayekor Eikwe Store (Stella Andoh - 0543780352)"
+   }
+  ]
+ },
+ {
+  "row": 576,
+  "date": "2026-09-27",
+  "site": "MDF Ellembelle",
+  "eng": "Allotey",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "6'' Solid Quarry dust blocks",
+    "qty": 4000,
+    "unit": 12,
+    "total": 48000,
+    "unitLabel": null,
+    "supplier": "Nems Construction Solutions (0257446920)"
+   }
+  ]
+ },
+ {
+  "row": 578,
+  "date": "2026-09-27",
+  "site": "Esiama Market",
+  "eng": "Allotey",
+  "lead": "",
+  "procurement": "",
+  "cost_control": "",
+  "po_number": "",
+  "payment": "",
+  "finance_notes": "",
+  "stated_total": null,
+  "items": [
+   {
+    "desc": "Smooth Sand",
+    "qty": 1,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Tile Chemical (25kg)",
+    "qty": 3,
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Grout",
+    "qty": "2 Boxes",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   },
+   {
+    "desc": "Cement",
+    "qty": "200 bags",
+    "unit": null,
+    "total": null,
+    "unitLabel": null,
+    "supplier": ""
+   }
+  ]
+ }
+]
