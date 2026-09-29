@@ -4,8 +4,15 @@ import { normalizeRole, isElevated } from '@/lib/roles'
 /**
  * The approval chain, in order.
  *
- * Requester → Project Lead → Supply Chain → Administrator (creates the purchase
- * order) → Cost Control → Finance.
+ * Requester → Project Lead → Supply Chain → Cost Control → Administrator.
+ *
+ * Cost Control audits the rates and the vendor invoices Supply Chain attached,
+ * and only once that passes does the Administrator raise the purchase order and
+ * close the requisition. Administration is terminal — nothing follows it.
+ *
+ * Finance remains defined because paid purchase orders and their routes still
+ * exist, but it is no longer part of the chain: it is off `STAGE_ORDER`, so
+ * `nextStage` never routes to it.
  *
  * Every route, guard, dashboard and notification derives from this file. If a
  * stage moves, it moves here and nowhere else.
@@ -63,7 +70,7 @@ export const STAGES: Record<Stage, StageDefinition> = {
   supply_chain: {
     id: 'supply_chain',
     label: 'Supply Chain',
-    blurb: 'Checks specifications, quantities and suppliers.',
+    blurb: 'Prices each line, attaches vendor quotes and invoices, then submits.',
     roles: ['supply_chain'],
     status: 'pending_supply_chain',
     route: (id) => `/mintah/requests/${id}`,
@@ -71,7 +78,7 @@ export const STAGES: Record<Stage, StageDefinition> = {
   admin: {
     id: 'admin',
     label: 'Administrator',
-    blurb: 'Raises the purchase order and attaches it to the requisition.',
+    blurb: 'Final authorization — raises the purchase order and closes the requisition.',
     roles: ['administrator'],
     status: 'pending_admin',
     route: (id) => `/admin/requests/${id}`,
@@ -79,7 +86,7 @@ export const STAGES: Record<Stage, StageDefinition> = {
   cost_control: {
     id: 'cost_control',
     label: 'Cost Control',
-    blurb: 'Reviews the purchase order against budget.',
+    blurb: 'Audits rates and vendor invoices against budget before Administration.',
     roles: ['cost_control'],
     status: 'pending_cost_control',
     route: (id) => `/cost-control/requests/${id}`,
@@ -99,13 +106,20 @@ export const STAGE_ORDER: Stage[] = [
   'requester',
   'lead',
   'supply_chain',
-  'admin',
   'cost_control',
-  'finance',
+  'admin',
 ]
 
 /** Stages that review rather than raise — used for queue pages. */
-export const REVIEW_STAGES: Stage[] = ['lead', 'supply_chain', 'admin', 'cost_control', 'finance']
+export const REVIEW_STAGES: Stage[] = ['lead', 'supply_chain', 'cost_control', 'admin']
+
+/**
+ * Stages with a "Reviewed" list of their own.
+ *
+ * Every stage but the requester keeps a record of what it decided; the
+ * requester's own requisitions are already their dashboard.
+ */
+export const REVIEWED_STAGES: Stage[] = ['lead', 'supply_chain', 'cost_control', 'admin']
 
 const STATUS_TO_STAGE: Partial<Record<RequestStatus, Stage>> = {
   draft: 'requester',
@@ -134,13 +148,33 @@ export function currentStage(
 }
 
 export function nextStage(stage: Stage): Stage | null {
-  const i = STAGE_ORDER.indexOf(stage)
-  return i >= 0 && i < STAGE_ORDER.length - 1 ? STAGE_ORDER[i + 1] : null
+  if (stage === 'requester') return 'lead'
+  if (stage === 'lead') return 'supply_chain'
+  if (stage === 'supply_chain') return 'cost_control'
+  if (stage === 'cost_control') return 'admin'
+  // The Administrator closes the requisition, so there is nothing after them.
+  if (stage === 'admin') return null
+  // Finance is off the chain; a legacy row still sitting there is terminal.
+  if (stage === 'finance') return null
+  return null
 }
 
 export function previousStage(stage: Stage): Stage | null {
-  const i = STAGE_ORDER.indexOf(stage)
-  return i > 0 ? STAGE_ORDER[i - 1] : null
+  if (stage === 'admin') return 'cost_control'
+  if (stage === 'cost_control') return 'supply_chain'
+  if (stage === 'supply_chain') return 'lead'
+  if (stage === 'lead') return 'requester'
+  // legacy fallback for rows written before Finance left the chain
+  if (stage === 'finance') return 'cost_control'
+  return null
+}
+
+/** The stage that closes a requisition — the only one whose approval completes it. */
+export const TERMINAL_STAGE: Stage = 'admin'
+
+/** Does approving at this stage complete the requisition outright? */
+export function isTerminalStage(stage: Stage): boolean {
+  return nextStage(stage) === null
 }
 
 /** The request status for an item sitting at this stage. */
@@ -169,11 +203,17 @@ export function queueStatusesForRole(role: string | null | undefined): RequestSt
 }
 
 /**
- * The purchase order is created at the Administrator stage, so every stage from
- * there on reviews the PO as well as the requisition.
+ * Who sees the purchase order: everyone.
+ *
+ * A purchase order can be attached at any point in the chain, and once it is,
+ * it is the single most important document on the requisition — the engineer
+ * who raised it, the Project Lead who justified it, Supply Chain, Cost Control
+ * and Administration all need to see the same PO. Gating it by stage index
+ * meant whoever opened the requisition before the attaching stage saw nothing,
+ * so the gate is gone. The parameter stays so existing call sites still read.
  */
-export function stageSeesPurchaseOrder(stage: Stage): boolean {
-  return STAGE_ORDER.indexOf(stage) >= STAGE_ORDER.indexOf('admin')
+export function stageSeesPurchaseOrder(): boolean {
+  return true
 }
 
 export const STAGE_LABEL = (stage: string): string =>

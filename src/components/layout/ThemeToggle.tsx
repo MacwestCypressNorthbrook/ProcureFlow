@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Moon, Sun } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 export default function ThemeToggle({ className = '' }: { className?: string }) {
   const [isDark, setIsDark] = useState(false)
@@ -27,7 +28,10 @@ export default function ThemeToggle({ className = '' }: { className?: string }) 
       type="button"
       onClick={toggle}
       aria-label="Toggle color theme"
-      className={`relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground press-active ${className}`}
+      className={cn(
+        'relative inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground press-active',
+        className
+      )}
     >
       {/* Render a stable icon until mounted to avoid hydration mismatch */}
       <Sun

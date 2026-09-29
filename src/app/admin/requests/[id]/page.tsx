@@ -7,5 +7,5 @@ export default async function AdminPORaisePage({ params }: { params: Promise<{ i
   const { id } = await params
   const user = await requirePageRole('administrator', 'super_user')
 
-  return <StageReview requestId={id} user={user} backHref="/admin/requests" backLabel="Back to PO queue" />
+  return <StageReview requestId={id} user={user} backHref="/admin/requests" backLabel="Back to authorization queue" />
 }

@@ -199,7 +199,7 @@ export default function AttachPODrawer({
               Attach Odoo Purchase Order
             </SheetTitle>
             <SheetDescription className="text-xs text-muted-foreground leading-relaxed">
-              Upload the official PO generated from your Odoo system and forward this requisition directly to Cost Control.
+              Upload the official PO generated from your Odoo system. Attaching it authorizes the requisition and closes it — everyone on the chain is notified.
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -245,6 +245,7 @@ export default function AttachPODrawer({
             </label>
             <Input
               required
+              id="odoo-po-number"
               placeholder="e.g. PO00412"
               value={poNumber}
               onChange={(e) => setPoNumber(e.target.value)}
@@ -379,16 +380,16 @@ export default function AttachPODrawer({
             )}
           </div>
 
-          {/* Comment / Note for Cost Control */}
+          {/* Closing note, sent to everyone on the requisition */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              Reviewer Notes for Cost Control (Optional)
+              Closing Notes (Optional)
             </label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={3}
-              placeholder="Add any context, vendor payment terms, or budget code for Cost Control..."
+              placeholder="Add any context, vendor payment terms, or budget code..."
               className="w-full resize-none rounded-xl border border-input bg-card p-3 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
               disabled={isSubmitting}
             />
@@ -423,7 +424,7 @@ export default function AttachPODrawer({
             ) : (
               <>
                 <Check size={16} />
-                <span>Approve & Route to Cost Control</span>
+                <span>Authorize & Complete</span>
               </>
             )}
           </button>

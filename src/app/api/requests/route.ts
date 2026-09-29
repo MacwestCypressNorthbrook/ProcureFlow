@@ -1,11 +1,14 @@
 import { query, queryOne, transaction } from '@/lib/db'
 import { requireCapability, isElevated } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
-import { sendRequisitionAlertEmail } from '@/lib/email/client'
+import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import type { Request as DbRequest, User } from '@/lib/types'
-import { statusForStage } from '@/lib/workflow'
+import { STAGES, statusForStage, nextStage } from '@/lib/workflow'
+
+/** The stage a freshly submitted requisition lands on. */
+const FIRST_REVIEW_STAGE = nextStage('requester')!
 import { getRequestWindowSettings, isRequestDayBlocked, blockedDaysLabel } from '@/lib/settings'
 
 /** One material line as submitted by the requisition form. */
@@ -182,40 +185,68 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to save requisition line items' }, { status: 500 })
   }
 
-  // ── Notify reviewers (best effort) ────────────────────────────────────────
+  // ── Notify the stage that actually holds it (best effort) ─────────────────
+  //
+  // A stage hears about a requisition when it ARRIVES at that stage, never
+  // before. A new requisition sits with the Project Lead, so the Project Lead
+  // is who gets told. Cost Control and the Administrator are the fourth and
+  // fifth stages of the chain and have nothing to do until it reaches them —
+  // they used to be emailed on every single submission, which is noise that
+  // trains people to ignore the alerts that do matter.
+  //
+  // The recipients are derived from `STAGES` rather than listed here, so this
+  // cannot drift out of step with the chain the way the old hardcoded role
+  // list did.
   try {
-    const reviewers = await query<User>(
+    const holderRoles = STAGES[FIRST_REVIEW_STAGE].roles
+    const holders = await query<User>(
       `SELECT id, email, name, role FROM public.users
-       WHERE role IN ('project_lead', 'cost_control', 'administrator', 'super_user')
-         AND is_active`
+        WHERE role = ANY($1::text[])
+          AND COALESCE(is_active, true)
+          AND auth_id NOT LIKE 'pending:%'`,
+      [holderRoles]
     )
 
-    for (const reviewer of reviewers) {
+    for (const holder of holders) {
       await createNotification({
-        userId: reviewer.id,
-        title: 'New Requisition Submitted',
-        message: `${guard.user.name || 'An engineer'} submitted a requisition: "${purpose}" for review.`,
+        userId: holder.id,
+        title: 'New requisition to review',
+        message: `${guard.user.name || 'An engineer'} submitted "${purpose}" for your review.`,
         type: 'approval',
         target: { type: 'request', id: data.id },
       })
-
-      // Project Leads get the in-app ping above instantly, but not an email
-      // per requisition — that would flood their inbox. They get one bundled
-      // email on the weekly digest instead; see getLeadDigestSettings.
-      if (reviewer.email && reviewer.role !== 'project_lead') {
-        await sendRequisitionAlertEmail({
-          recipientEmail: reviewer.email,
-          recipientName: reviewer.name || reviewer.role,
-          requestId: data.id,
-          purpose,
-          requesterName: guard.user.name || guard.user.email,
-          estimatedAmount: totalAmount,
-          roleName: reviewer.role,
-        })
-      }
     }
+
+    // Super Users oversee the whole system, so they get the in-app record —
+    // but not the per-requisition email, which would be the same flood by
+    // another name.
+    const overseers = await query<User>(
+      `SELECT id, email, name, role FROM public.users
+        WHERE role IN ('super_user', 'superuser')
+          AND COALESCE(is_active, true)
+          AND auth_id NOT LIKE 'pending:%'`
+    )
+    for (const overseer of overseers) {
+      if (holders.some((h) => h.id === overseer.id)) continue
+      await createNotification({
+        userId: overseer.id,
+        title: 'New requisition submitted',
+        message: `${guard.user.name || 'An engineer'} submitted "${purpose}". It is with the ${STAGES[FIRST_REVIEW_STAGE].label}.`,
+        type: 'info',
+        target: { type: 'request', id: data.id },
+      })
+    }
+
+    // The full designed notice — materials, notes and the chain — to the one
+    // stage that has to act on it.
+    await dispatchWorkflowEmail({
+      eventType: 'requisition_submitted',
+      requestId: data.id,
+      recipientRole: holderRoles[0],
+      performerId: guard.user.id,
+    })
   } catch (notifyErr) {
-    console.error('Error notifying reviewers:', notifyErr)
+    console.error('Error notifying the holding stage:', notifyErr)
   }
 
   return NextResponse.json({ data }, { status: 201 })

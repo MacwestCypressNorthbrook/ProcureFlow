@@ -118,7 +118,7 @@ export default function AuditTrail({ entries }: { entries: PoAuditEntry[] }) {
               </p>
 
               {entry.notes && (
-                <p className="mt-1.5 rounded-md border-l-2 border-border bg-muted/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground/80">
+                <p className="mt-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] leading-relaxed text-foreground/80">
                   {entry.notes}
                 </p>
               )}

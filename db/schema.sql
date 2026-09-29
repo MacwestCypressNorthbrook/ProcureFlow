@@ -383,3 +383,37 @@ CREATE TABLE IF NOT EXISTS public.stage_digest_queue (
 );
 
 CREATE INDEX IF NOT EXISTS idx_stage_digest_queue_stage ON public.stage_digest_queue(stage, queued_at);
+
+-- ── Cost Control before Administration, and urgent requisitions ─────────────
+-- (mirrors db/migrations/012_flow_reorder_and_urgent.sql)
+-- The chain ends with the Administrator: Requester → Project Lead → Supply
+-- Chain → Cost Control → Administrator. A Project Lead can also flag a
+-- requisition urgent, which notifies Supply Chain at once rather than in the
+-- bundled stage digest.
+ALTER TABLE public.requests
+    ADD COLUMN IF NOT EXISTS is_urgent BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN IF NOT EXISTS urgent_reason TEXT,
+    ADD COLUMN IF NOT EXISTS urgent_marked_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS urgent_marked_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_requests_urgent_status
+    ON public.requests(is_urgent DESC, status, created_at DESC);
+
+ALTER TABLE public.request_approvals DROP CONSTRAINT IF EXISTS request_approvals_action_check;
+ALTER TABLE public.request_approvals ADD CONSTRAINT request_approvals_action_check CHECK (
+    action IN (
+        'submitted', 'approved', 'sent_back', 'resubmitted', 'po_created',
+        'marked_urgent', 'completed', 'paid', 'rejected'
+    )
+);
+
+-- Re-adding a CHECK replaces it, so every permitted value is listed —
+-- 'partially_paid' included, which the part-payment work writes.
+ALTER TABLE public.purchase_orders DROP CONSTRAINT IF EXISTS purchase_orders_status_check;
+ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_status_check CHECK (
+    status IN (
+        'draft', 'pending_cost_control', 'pending_admin', 'pending_finance',
+        'partially_paid', 'sent_back', 'approved', 'paid', 'rejected',
+        'cancelled', 'pending_approval'
+    )
+);

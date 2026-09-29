@@ -57,7 +57,7 @@ export const ROLES: Record<RoleId, RoleDefinition> = {
   cost_control: {
     id: 'cost_control',
     label: 'Cost Control',
-    description: 'Reviews purchase orders against budget before payment.',
+    description: 'Audits rates and vendor invoices against budget, before Administration closes.',
     dashboard: '/cost-control',
     accent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     dot: 'bg-emerald-500',
@@ -82,7 +82,7 @@ export const ROLES: Record<RoleId, RoleDefinition> = {
   administrator: {
     id: 'administrator',
     label: 'Administrator',
-    description: 'Raises purchase orders against approved requisitions.',
+    description: 'Final authorization — raises the purchase order and closes the requisition.',
     dashboard: '/admin',
     // Deliberately NOT elevated. `elevated` is a blanket bypass in `can()`,
     // so granting it here would hand the Administrator every system-management
@@ -160,6 +160,7 @@ export type Capability =
   | 'request:edit'
   | 'request:review'
   | 'request:convert'
+  | 'request:urgent'
   | 'po:view'
   | 'po:approve'
   | 'po:pay'
@@ -181,17 +182,25 @@ export const CAPABILITIES: Record<Capability, RoleId[]> = {
   'request:edit': ['engineer'],
 
   // Reviewed by someone other than the requester, in chain order:
-  // Project Lead, then Supply Chain, then Cost Control.
-  'request:review': ['project_lead', 'supply_chain', 'cost_control'],
+  // Project Lead, then Supply Chain, then Cost Control, then the Administrator
+  // who closes it. The Administrator is included because the chain now ends
+  // with them: they hold a stage and decide on it like any other reviewer.
+  'request:review': ['project_lead', 'supply_chain', 'cost_control', 'administrator'],
 
-  // The Administrator raises the purchase order once both reviews have passed.
+  // The Administrator raises the purchase order at the final stage, once the
+  // Project Lead, Supply Chain and Cost Control reviews have all passed.
   'request:convert': ['administrator'],
+
+  // Emergency escalation. The Project Lead knows what is actually holding up a
+  // site, so the red button is theirs alone — if every stage could raise an
+  // urgent flag, nothing would be urgent.
+  'request:urgent': ['project_lead'],
 
   // Everyone in the chain can read a PO and discuss it.
   'po:view': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance', 'administrator'],
   'po:comment': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance', 'administrator'],
 
-  // Cost Control reviews the purchase order it did not create.
+  // Cost Control reviews rates and vendor invoices before Administration.
   'po:approve': ['cost_control'],
 
   // Payment is Finance alone.

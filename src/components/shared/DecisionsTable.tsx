@@ -3,8 +3,11 @@
 import { useRouter } from 'next/navigation'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
+import ExportMenu from '@/components/shared/ExportMenu'
+import type { ExportColumn } from '@/lib/export'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Check, RotateCcw, ShoppingBag, Banknote, XCircle } from 'lucide-react'
+import { Check, RotateCcw, ShoppingBag, Banknote, XCircle, Zap } from 'lucide-react'
+import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { StageDecision } from '@/lib/review'
 
 const ACTION: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
@@ -27,6 +30,21 @@ const ACTION: Record<string, { label: string; className: string; icon: React.Rea
     label: 'Paid',
     className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
     icon: <Banknote size={12} />,
+  },
+  completed: {
+    label: 'Completed',
+    className: 'bg-teal-500/10 text-teal-600 dark:text-teal-400',
+    icon: <Check size={12} />,
+  },
+  marked_urgent: {
+    label: 'Marked urgent',
+    className: 'bg-red-500/10 text-red-600 dark:text-red-400',
+    icon: <Zap size={12} />,
+  },
+  resubmitted: {
+    label: 'Resubmitted',
+    className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    icon: <RotateCcw size={12} />,
   },
   rejected: {
     label: 'Rejected',
@@ -62,12 +80,39 @@ export default function DecisionsTable({
   rows,
   hrefBase,
   storageKey,
+  /** Names the export — "Cost Control", "Project Lead" and so on. */
+  stageLabel = 'Stage',
+  exportSection = 'reviewed',
+  exportedBy,
 }: {
   rows: StageDecision[]
   hrefBase: string
   storageKey: string
+  stageLabel?: string
+  exportSection?: string
+  exportedBy?: string | null
 }) {
   const router = useRouter()
+
+  /**
+   * The export mirrors the table, plus the columns a spreadsheet needs but a
+   * screen does not — the full comment rather than a truncated one, and the
+   * requisition reference so a row can be traced back.
+   */
+  const exportColumns: ExportColumn<StageDecision>[] = [
+    { header: 'Decided', value: (d) => formatDate(d.created_at) },
+    { header: 'Requisition', value: (d) => d.purpose },
+    { header: 'Type', value: (d) => REQUISITION_TYPE_CONFIG[requisitionType(d.description)].label },
+    { header: 'Decision', value: (d) => ACTION[d.action]?.label ?? d.action },
+    { header: 'Project site', value: (d) => d.project_name ?? '' },
+    { header: 'Requested by', value: (d) => d.requester_name ?? '' },
+    { header: 'Decided by', value: (d) => d.actor_name ?? '' },
+    { header: 'PO number', value: (d) => d.po_number ?? '' },
+    { header: 'Urgent', value: (d) => (d.is_urgent ? 'Yes' : 'No') },
+    { header: 'Comment', value: (d) => d.comment ?? '' },
+    { header: 'Value (GHS)', value: (d) => d.total_amount ?? 0, total: true },
+    { header: 'Reference', value: (d) => d.request_id },
+  ]
 
   const columns: DataColumn<StageDecision>[] = [
     {
@@ -77,7 +122,10 @@ export default function DecisionsTable({
       sortValue: (d) => d.purpose,
       cell: (d) => (
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">{d.purpose}</p>
+          <div className="flex items-center gap-1.5">
+            {d.is_urgent && <UrgentBadge size="sm" />}
+            <p className="truncate text-sm font-medium text-foreground">{d.purpose}</p>
+          </div>
           <p className="truncate text-xs text-muted-foreground">{d.requester_name ?? 'Unknown'}</p>
         </div>
       ),
@@ -205,6 +253,18 @@ export default function DecisionsTable({
       ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
+      toolbarExtra={(visible) => (
+        <ExportMenu
+          rows={visible}
+          columns={exportColumns}
+          section={exportSection}
+          meta={{
+            title: `${stageLabel} — reviewed requisitions`,
+            subtitle: 'Every approval, send-back and escalation recorded at this stage.',
+            exportedBy,
+          }}
+        />
+      )}
       onRowClick={(d) => router.push(`${hrefBase}/${d.request_id}`)}
       emptyTitle="Nothing reviewed yet"
       emptyMessage="Approvals and send-backs you make will be listed here."

@@ -39,7 +39,9 @@ await execute(
 )
 
 // ── Walk the chain, asserting queue membership at each step ───────
-const stages = ['lead', 'supply_chain', 'admin', 'cost_control', 'finance'] as const
+// The chain in its current order: Cost Control audits before Administration
+// raises the purchase order and closes the requisition.
+const stages = ['lead', 'supply_chain', 'cost_control', 'admin'] as const
 for (const stage of stages) {
   await execute(`UPDATE public.requests SET status = $2 WHERE id = $1`, [id, statusForStage(stage)])
 
@@ -57,17 +59,20 @@ for (const stage of stages) {
 }
 
 // ── Send-back routing and resumption ─────────────────────────────
+// Cost Control bounces to Supply Chain — the stage immediately before it —
+// and the requisition resumes at Cost Control rather than walking the chain
+// from the beginning.
 console.log('\n── Send-back from Cost Control')
 await execute(
   `UPDATE public.requests
-      SET status = 'sent_back', sent_back_to = 'admin', return_to_stage = 'cost_control',
+      SET status = 'sent_back', sent_back_to = 'supply_chain', return_to_stage = 'cost_control',
           sent_back_by = $2, sent_back_at = now()
     WHERE id = $1`, [id, actor.id]
 )
 const bounced = await queryOne<{ status: string; sent_back_to: string; return_to_stage: string }>(
   `SELECT status, sent_back_to, return_to_stage FROM public.requests WHERE id = $1`, [id]
 )
-check('held by the Administrator, not the requester', currentStage(bounced!.status, bounced!.sent_back_to) === 'admin')
+check('held by Supply Chain, not the requester', currentStage(bounced!.status, bounced!.sent_back_to) === 'supply_chain')
 const ccQueue = await getStageQueue([statusForStage('cost_control')])
 check('drops out of the Cost Control queue while bounced', !ccQueue.some((r) => r.id === id))
 
@@ -77,6 +82,24 @@ await execute(
 )
 const resumed = await queryOne<{ status: string }>(`SELECT status FROM public.requests WHERE id = $1`, [id])
 check('resumes at Cost Control, not back at the start', resumed!.status === 'pending_cost_control')
+
+// ── Urgent escalation ────────────────────────────────────────────
+console.log('\n── Urgent escalation')
+await execute(
+  `UPDATE public.requests
+      SET is_urgent = true, urgent_reason = 'Site stopped — e2e test',
+          urgent_marked_by = $2, urgent_marked_at = now()
+    WHERE id = $1`, [id, actor.id]
+)
+const urgentRow = await queryOne<{ is_urgent: boolean; urgent_reason: string }>(
+  `SELECT is_urgent, urgent_reason FROM public.requests WHERE id = $1`, [id]
+)
+check('the urgent flag persists', urgentRow?.is_urgent === true)
+check('the reason travels with it', urgentRow?.urgent_reason === 'Site stopped — e2e test')
+const urgentQueue = await getStageQueue([statusForStage('cost_control')])
+check('urgent items sort to the top of the queue',
+  urgentQueue.length === 0 || urgentQueue[0].is_urgent === true || !urgentQueue.some((r) => r.id === id),
+  String(urgentQueue[0]?.is_urgent))
 
 // ── The reviewer's bundle ────────────────────────────────────────
 console.log('\n── Review bundle')

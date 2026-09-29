@@ -136,7 +136,9 @@ export const REQUEST_STATUS_CONFIG: Record<string, { label: string; color: strin
     dot: 'bg-amber-500',
   },
   pending_admin: {
-    label: 'Awaiting PO document',
+    // Administration is the closing stage now: this is the last thing that
+    // happens to a requisition before it is completed.
+    label: 'Final authorization',
     color: 'bg-violet-50 text-violet-700 border-violet-200',
     dot: 'bg-violet-500',
   },

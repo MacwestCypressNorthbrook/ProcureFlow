@@ -6,7 +6,14 @@ import { ArrowLeft, TrendingDown, TrendingUp } from 'lucide-react'
    Layout primitives — full-bleed, minimalist page scaffolding
    ============================================================ */
 
-/** Full-width padded page body. Replaces the old centered `mx-auto max-w-*`. */
+/**
+ * Full-width padded page body, with a ceiling.
+ *
+ * Full-bleed is right up to about a 1600px viewport. Past that the columns keep
+ * stretching, line lengths get uncomfortable and a two-column layout leaves a
+ * void where the narrower column runs out of content. The cap only engages
+ * above `2xl`, so nothing below a very large desktop changes.
+ */
 export function PageContainer({
   children,
   className,
@@ -15,7 +22,7 @@ export function PageContainer({
   className?: string
 }) {
   return (
-    <div className={cn('w-full px-5 py-6 sm:px-7 lg:px-9', className)}>
+    <div className={cn('mx-auto w-full max-w-[1600px] px-5 py-6 sm:px-7 lg:px-9', className)}>
       {children}
     </div>
   )

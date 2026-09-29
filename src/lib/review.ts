@@ -16,6 +16,12 @@ export interface QueueRow extends DbRequest {
   po_status: string | null
   /** True once a purchase order exists for this requisition. */
   has_po: boolean
+  /** Escalated by the Project Lead for emergency approval. */
+  is_urgent: boolean | null
+  urgent_reason: string | null
+  urgent_marked_at: string | null
+  /** Who escalated it, resolved for display. */
+  urgent_marked_by_name: string | null
 }
 
 /**
@@ -37,10 +43,12 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
               po.id AS po_id,
               po.po_number,
               po.status AS po_status,
-              (po.id IS NOT NULL) AS has_po
+              (po.id IS NOT NULL) AS has_po,
+              uu.name AS urgent_marked_by_name
          FROM public.requests r
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.users u ON u.id = r.created_by
+         LEFT JOIN public.users uu ON uu.id = r.urgent_marked_by
          LEFT JOIN LATERAL (
               SELECT id, po_number, status
                 FROM public.purchase_orders
@@ -49,7 +57,7 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
                LIMIT 1
          ) po ON true
         WHERE r.status = ANY($1::text[])
-        ORDER BY r.created_at DESC`,
+        ORDER BY r.is_urgent DESC, r.created_at DESC`,
       [statuses]
     )
   } catch (err) {
@@ -79,10 +87,12 @@ export async function getStageInbox(stage: Stage): Promise<QueueRow[]> {
               po.id AS po_id,
               po.po_number,
               po.status AS po_status,
-              (po.id IS NOT NULL) AS has_po
+              (po.id IS NOT NULL) AS has_po,
+              uu.name AS urgent_marked_by_name
          FROM public.requests r
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.users u ON u.id = r.created_by
+         LEFT JOIN public.users uu ON uu.id = r.urgent_marked_by
          LEFT JOIN LATERAL (
               SELECT id, po_number, status
                 FROM public.purchase_orders
@@ -92,7 +102,7 @@ export async function getStageInbox(stage: Stage): Promise<QueueRow[]> {
          ) po ON true
         WHERE r.status = $1
            OR (r.status = 'sent_back' AND r.sent_back_to = $2)
-        ORDER BY r.created_at DESC`,
+        ORDER BY r.is_urgent DESC, r.created_at DESC`,
       [statusForStage(stage), stage]
     )
   } catch (err) {
@@ -112,10 +122,13 @@ export async function getSentBackToRequester(userId: string): Promise<QueueRow[]
               0 AS document_count,
               NULL::uuid AS po_id,
               NULL::text AS po_number,
-              NULL::text AS po_status
+              NULL::text AS po_status,
+              false AS has_po,
+              uu.name AS urgent_marked_by_name
          FROM public.requests r
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.users u ON u.id = r.created_by
+         LEFT JOIN public.users uu ON uu.id = r.urgent_marked_by
         WHERE r.status = 'sent_back'
           AND r.sent_back_to = 'requester'
           AND r.created_by = $1
@@ -167,10 +180,13 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
               0 AS document_count,
               NULL::uuid AS po_id,
               NULL::text AS po_number,
-              NULL::text AS po_status
+              NULL::text AS po_status,
+              false AS has_po,
+              uu.name AS urgent_marked_by_name
          FROM public.requests r
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.users u ON u.id = r.created_by
+         LEFT JOIN public.users uu ON uu.id = r.urgent_marked_by
         WHERE r.id = $1
         LIMIT 1`,
       [requestId]
@@ -195,11 +211,24 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
           LIMIT 1`,
         [requestId]
       ),
-      query<{ id: string; file_name: string; file_url: string; file_size: number | null }>(
-        `SELECT id, file_name, file_url, file_size
-           FROM public.request_attachments
-          WHERE request_id = $1
-          ORDER BY created_at DESC`,
+      query<{
+        id: string
+        file_name: string
+        file_url: string
+        file_size: number | null
+        status: string | null
+        reviewed_by: string | null
+        reviewed_at: string | null
+        reviewer_name: string | null
+        review_notes: string | null
+      }>(
+        `SELECT ra.id, ra.file_name, ra.file_url, ra.file_size, ra.status,
+                ra.reviewed_by, ra.reviewed_at, ra.review_notes,
+                u.name AS reviewer_name
+           FROM public.request_attachments ra
+           LEFT JOIN public.users u ON u.id = ra.reviewed_by
+          WHERE ra.request_id = $1
+          ORDER BY ra.created_at DESC`,
         [requestId]
       ),
       query<ApprovalEntry>(
@@ -221,6 +250,11 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
       file_url: documentHref(d.id, d.file_url),
       file_size: d.file_size,
       source: 'request' as const,
+      status: (d.status as 'pending' | 'accepted' | 'declined') || 'pending',
+      reviewed_by: d.reviewed_by,
+      reviewed_at: d.reviewed_at,
+      reviewer_name: d.reviewer_name,
+      review_notes: d.review_notes,
     }))
 
     if (po) {
@@ -277,6 +311,7 @@ export interface StageDecision {
   requester_name: string | null
   po_number: string | null
   po_status: string | null
+  is_urgent: boolean | null
 }
 
 /**
@@ -304,6 +339,7 @@ export async function getStageDecisions(
               r.purpose,
               r.description,
               r.total_amount,
+              r.is_urgent,
               p.name AS project_name,
               ru.name AS requester_name,
               po.po_number,

@@ -7,7 +7,7 @@ import RichRequisitionView from '@/components/shared/RichRequisitionView'
 import { PageContainer, PageHeader, Panel, Field, EmptyState } from '@/components/shared/ui-kit'
 import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveAttachments } from '@/lib/resolve-file-url'
-import { FileText, Paperclip, Clock, Package, Receipt } from 'lucide-react'
+import { FileText, Paperclip, Clock, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
 import ApprovalPanel, { type ApprovalEntry } from '@/components/shared/ApprovalPanel'
@@ -15,6 +15,9 @@ import StageProgress from '@/components/shared/StageProgress'
 import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
 import RemindButton from '@/components/shared/RemindButton'
 import { currentStage } from '@/lib/workflow'
+import PoDocumentActions from '@/components/shared/PoDocumentActions'
+import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
+import { documentHref } from '@/lib/resolve-file-url'
 import type { PurchaseOrder } from '@/lib/types'
 import { getPaymentPosition, listPayments } from '@/lib/payments'
 
@@ -28,6 +31,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   let attachments: Record<string, unknown>[] = []
   let items: Awaited<ReturnType<typeof getRequestItems>> = []
   let po: PurchaseOrder | null = null
+  let poDoc: { id: string; file_name: string; file_url: string } | null = null
   let approvalHistory: ApprovalEntry[] = []
 
   try {
@@ -66,6 +70,33 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       items = itemRows
       po = poRow
       approvalHistory = historyRows
+
+      // The purchase order document itself. A requester could previously see
+      // the PO's number and value but not open the document, which is the one
+      // thing they are actually asked for when chasing a delivery.
+      if (po) {
+        const poDocRow = await queryOne<{ id: string; file_name: string; file_url: string }>(
+          `SELECT id, file_name, file_url
+             FROM public.po_attachments
+            WHERE po_id = $1
+            ORDER BY created_at DESC
+            LIMIT 1`,
+          [po.id]
+        )
+        if (poDocRow) {
+          poDoc = {
+            id: poDocRow.id,
+            file_name: poDocRow.file_name,
+            file_url: documentHref(poDocRow.id, poDocRow.file_url),
+          }
+        } else if (po.file_path) {
+          poDoc = {
+            id: `po-file-${po.id}`,
+            file_name: po.file_name ?? 'Purchase order',
+            file_url: documentHref(`po-file-${po.id}`, po.file_path),
+          }
+        }
+      }
     }
   } catch (err) {
     console.error('Failed to load request detail from Neon:', err)
@@ -100,6 +131,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   const poPayments = po ? await listPayments(po.id) : []
 
   const reviewStage = currentStage(status, (requestData.sent_back_to as string | null) ?? null)
+  const isUrgent = requestData.is_urgent === true
 
   // `estimated_unit_rate` only holds a value when a requisition has exactly one
   // line, so it reads zero for anything larger — the stored total is the figure
@@ -129,81 +161,35 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
           title={String(requestData.purpose || '')}
           subtitle={`Submitted ${formatDate(String(requestData.created_at || ''))}`}
           actions={
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {isUrgent && <UrgentBadge />}
               <StatusBadge status={status} config={REQUEST_STATUS_CONFIG} />
               {isOwner && (canEdit || canDelete) && <RequestActions requestId={id} canEdit={canEdit} canDelete={canDelete} />}
             </div>
           }
         />
 
+        {isUrgent && (
+          <UrgentBanner
+            reason={(requestData.urgent_reason as string | null) ?? null}
+            markedAt={(requestData.urgent_marked_at as string | null) ?? null}
+          />
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
           {/* Main */}
           <div className="min-w-0 space-y-6">
+            {/* One requisition document, rendered from the live line items.
+                A second "Materials & Labour" panel used to repeat these rows
+                from the same data, and the document above it repeated them
+                again from the submission snapshot — three tables, two totals. */}
             <RichRequisitionView
               description={String(requestData.description || '')}
               fallbackPurpose={String(requestData.purpose || '')}
               fallbackDate={String(requestData.created_at || '')}
+              items={items}
+              discountAmount={Number(requestData.discount_amount) || 0}
             />
-
-            <Panel title={`Materials & Labour${items.length ? ` (${items.length})` : ''}`} icon={<Package size={16} />}>
-              {items.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No material or labour lines on this request.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground">
-                        <th className="py-2 pr-3 font-medium">Description</th>
-                        <th className="py-2 px-3 text-right font-medium">Qty</th>
-                        <th className="py-2 px-3 text-right font-medium">Unit price</th>
-                        <th className="py-2 pl-3 text-right font-medium">Line total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {items.map((item) => (
-                        <tr key={item.id} className="border-b border-border/50 last:border-0">
-                          <td className="py-2.5 pr-3">
-                            <p className="font-medium text-foreground">
-                              {item.category === 'labour' && (
-                                <span className="mr-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-600">
-                                  Labour
-                                </span>
-                              )}
-                              {item.description}
-                            </p>
-                            {item.supplier_name && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">{item.supplier_name}</p>
-                            )}
-                            {item.remarks && (
-                              <p className="mt-0.5 text-xs text-muted-foreground">{item.remarks}</p>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-3 text-right tabular-nums text-foreground">
-                            {Number(item.quantity)}{item.unit ? ` ${item.unit}` : ''}
-                          </td>
-                          <td className="py-2.5 px-3 text-right tabular-nums text-foreground">
-                            {formatCurrency(Number(item.unit_price))}
-                          </td>
-                          <td className="py-2.5 pl-3 text-right font-semibold tabular-nums text-foreground">
-                            {formatCurrency(Number(item.line_total))}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-border">
-                        <td colSpan={3} className="py-2.5 pr-3 text-right text-xs font-medium text-muted-foreground">
-                          Total
-                        </td>
-                        <td className="py-2.5 pl-3 text-right font-semibold tabular-nums text-foreground">
-                          {formatCurrency(Number(requestData.total_amount) || 0)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-              )}
-            </Panel>
 
             <Panel title="Progress">
               <StageProgress
@@ -271,6 +257,19 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
                     </div>
                   )}
 
+                  {poDoc && (
+                    <div className="border-t border-border pt-3">
+                      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Purchase order document
+                      </p>
+                      <PoDocumentActions
+                        documentId={poDoc.id}
+                        fileName={poDoc.file_name}
+                        fileUrl={poDoc.file_url}
+                      />
+                    </div>
+                  )}
+
                   <p className="text-xs text-muted-foreground">
                     Quote this PO number with Finance or Supply Chain when following up on payment.
                   </p>
@@ -291,6 +290,7 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               resubmit that puts it back in front of them.
             */}
             <ApprovalPanel
+              showHistory={false}
               requestId={id}
               stage={reviewStage}
               canAct={isOwner && requestData.status === 'sent_back'}

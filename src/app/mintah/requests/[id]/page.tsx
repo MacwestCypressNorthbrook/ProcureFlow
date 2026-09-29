@@ -1,39 +1,11 @@
-import { requirePageCapability } from '@/lib/auth-guard'
-import { query, queryOne } from '@/lib/db'
-import { notFound } from 'next/navigation'
-import MintahRequestDetailClient from '@/components/shared/MintahRequestDetailClient'
-import { resolveAttachments } from '@/lib/resolve-file-url'
-import type { Request as DbRequest, RequestAttachment } from '@/lib/types'
+import { requirePageRole } from '@/lib/auth-guard'
+import StageReview from '@/components/shared/StageReview'
 
 export const dynamic = 'force-dynamic'
 
 export default async function MintahRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const user = await requirePageCapability('request:review')
+  const user = await requirePageRole('supply_chain')
 
-  const [request, attachmentsRaw] = await Promise.all([
-    queryOne<DbRequest>(`SELECT * FROM public.requests WHERE id = $1 LIMIT 1`, [id]),
-    query<RequestAttachment>(
-      `SELECT id, request_id, file_name, file_url, uploaded_by, created_at
-       FROM public.request_attachments
-       WHERE request_id = $1
-       ORDER BY created_at DESC`,
-      [id]
-    ),
-  ])
-
-  if (!request) {
-    notFound()
-  }
-
-  const resolvedAttachments = await resolveAttachments(attachmentsRaw)
-
-  return (
-    <MintahRequestDetailClient
-      request={request}
-      attachments={resolvedAttachments}
-      user={user ? { name: user.name, email: user.email } : null}
-      role={user?.role ?? 'supply_chain'}
-    />
-  )
+  return <StageReview requestId={id} user={user} backHref="/mintah/requests" backLabel="Back to requests" />
 }

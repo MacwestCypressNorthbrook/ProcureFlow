@@ -1,7 +1,7 @@
 import { queryOne, execute } from '@/lib/db'
 import { uploadFile } from '@/lib/storage'
 import { requireCapability } from '@/lib/auth-guard'
-import { createNotification, notifyStage } from '@/lib/notifications'
+import { createNotification, notifyRequisitionParties, notifyStage } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
@@ -100,16 +100,17 @@ export async function POST(
     return NextResponse.json({ error: 'Request not found' }, { status: 404 })
   }
 
-  // A purchase order document belongs to a requisition both earlier reviews
-  // have cleared. Attaching one to anything else would skip a stage, so the
-  // queue gating in the UI is re-checked here.
+  // The Administrator now closes the chain, so a purchase order belongs to a
+  // requisition that has cleared Project Lead, Supply Chain AND Cost Control —
+  // that is exactly `pending_admin` under the reordered flow. The UI gates on
+  // the same thing; this re-checks it, because the UI is not the authority.
   if (req.status !== 'pending_admin') {
     return NextResponse.json(
       {
         error:
           req.status === 'sent_back'
             ? 'This requisition was sent back and is not awaiting a purchase order.'
-            : 'This requisition has not cleared Project Lead and Supply Chain review yet.',
+            : 'This requisition has not cleared Cost Control review yet.',
       },
       { status: 409 }
     )
@@ -207,12 +208,21 @@ startxref
               total_amount = COALESCE($3, total_amount),
               file_name = COALESCE($4, file_name),
               file_path = COALESCE($5, file_path),
-              status = 'pending_cost_control',
+              status = $8,
               notes = COALESCE($6, notes),
               updated_at = now()
         WHERE id = $7
         RETURNING *`,
-      [poNumber, vendorName, finalAmount, fileName, fileUrl, comment, existingPo.id]
+      [
+        poNumber,
+        vendorName,
+        finalAmount,
+        fileName,
+        fileUrl,
+        comment,
+        existingPo.id,
+        approveImmediately ? 'approved' : 'pending_admin',
+      ]
     )
   } else {
     po = await queryOne<PurchaseOrder>(
@@ -220,7 +230,7 @@ startxref
          po_number, request_id, purpose, description, vendor_name, quantity, unit_rate, total_amount,
          file_name, file_path, created_by, status, notes
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending_cost_control', $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $13, $12)
        RETURNING *`,
       [
         poNumber,
@@ -235,6 +245,7 @@ startxref
         fileUrl,
         guard.user.id,
         comment,
+        approveImmediately ? 'approved' : 'pending_admin',
       ]
     )
   }
@@ -259,11 +270,13 @@ startxref
     )
   }
 
-  // If approved immediately (the standard workflow), transition request to Cost Control
+  // Attaching the purchase order at the closing stage IS the completion: the
+  // Administrator is the last stage, so there is nobody to hand it on to. The
+  // requisition closes here and the whole chain is told at once.
   if (approveImmediately) {
     await execute(
       `UPDATE public.requests
-          SET status = 'pending_cost_control',
+          SET status = 'completed',
               sent_back_to = NULL,
               return_to_stage = NULL,
               updated_at = now()
@@ -271,7 +284,6 @@ startxref
       [id]
     )
 
-    // Record approval history
     await execute(
       `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
        VALUES ($1, $2, 'admin', 'po_created', $3, $4)`,
@@ -279,45 +291,75 @@ startxref
         id,
         po.id,
         guard.user.id,
-        comment || `Odoo Purchase Order #${poNumber} attached and routed to Cost Control.`,
+        comment || `Purchase order #${poNumber} attached and the requisition authorized.`,
       ]
     )
 
-    // Record audit trail
+    await execute(
+      `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
+       VALUES ($1, $2, 'admin', 'completed', $3, $4)`,
+      [id, po.id, guard.user.id, comment]
+    )
+
     await execute(
       `INSERT INTO public.po_audit_trail (po_id, action, performed_by, notes)
        VALUES ($1, 'created', $2, $3)`,
-      [po.id, guard.user.id, `Odoo PO #${poNumber} attached and submitted for Cost Control review.`]
+      [po.id, guard.user.id, `PO #${poNumber} attached; requisition authorized and closed.`]
     )
 
-    // Notify Cost Control stage reviewers
-    await notifyStage(
-      'cost_control',
-      id,
-      'Requisition awaiting Cost Control',
-      `Odoo PO #${poNumber} for "${req.purpose}" was raised by Administrator (${guard.user.name || guard.user.email}) and is now awaiting your review.${comment ? ` Note: ${comment}` : ''}`,
-      'approval',
-      guard.user.id
-    )
+    // The purchase order is the document the whole chain argued about, so once
+    // it is attached and accepted, everyone who raised, justified, priced or
+    // audited the requisition is told — each linked into their own area, since
+    // no single URL serves an engineer and an administrator alike.
+    await notifyRequisitionParties(id, {
+      title: `Purchase order #${poNumber} attached — requisition completed`,
+      message: `Purchase order #${poNumber} for "${req.purpose}" was attached by ${guard.user.name || guard.user.email} and the requisition is now authorized and closed. The purchase order is visible on the requisition.`,
+      type: 'success',
+      sendEmailAlert: true,
+      excludeUserId: guard.user.id,
+    })
 
-    // Notify the requester
-    if (req.created_by && req.created_by !== guard.user.id) {
-      await createNotification({
-        userId: req.created_by,
-        title: 'PO Generated from Odoo',
-        message: `Purchase Order #${poNumber} has been created for your requisition "${req.purpose}" and routed to Cost Control.`,
-        type: 'info',
-        target: { type: 'request', id },
-      })
-
-      // Dispatch workflow email to requester
+    // A designed email to match, to every stage of the chain.
+    for (const role of ['engineer', 'project_lead', 'supply_chain', 'cost_control'] as const) {
       await dispatchWorkflowEmail({
-        eventType: 'converted',
+        eventType: 'po_attached',
+        requestId: id,
+        poId: po.id,
+        recipientRole: role,
+        performerId: guard.user.id,
+        comments: comment,
+      })
+    }
+
+    if (req.created_by && req.created_by !== guard.user.id) {
+      await dispatchWorkflowEmail({
+        eventType: 'requisition_completed',
         requestId: id,
         poId: po.id,
         recipientUserId: req.created_by,
         performerId: guard.user.id,
         comments: comment,
+      })
+    }
+  } else {
+    // Saved but not yet authorized: the requisition stays with the
+    // Administrator and only they need to know it is ready to sign off.
+    await notifyStage(
+      'admin',
+      id,
+      'Purchase order saved — awaiting your authorization',
+      `Purchase order #${poNumber} for "${req.purpose}" was saved as a draft and is ready for final authorization.`,
+      'approval',
+      guard.user.id
+    )
+
+    if (req.created_by && req.created_by !== guard.user.id) {
+      await createNotification({
+        userId: req.created_by,
+        title: 'Purchase order raised',
+        message: `Purchase order #${poNumber} has been raised against your requisition "${req.purpose}".`,
+        type: 'info',
+        target: { type: 'request', id },
       })
     }
   }
@@ -327,7 +369,7 @@ startxref
       success: true,
       po_id: po.id,
       po_number: po.po_number,
-      status: approveImmediately ? 'pending_cost_control' : req.status,
+      status: approveImmediately ? 'completed' : req.status,
     },
     { status: 201 }
   )

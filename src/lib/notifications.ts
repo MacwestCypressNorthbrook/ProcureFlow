@@ -419,10 +419,11 @@ export async function dispatchStageDigests(): Promise<{ sent: Record<string, num
 }
 
 /** The stage that hands work to this one, for the digest's "approved by" line. */
-function STAGE_ORDER_BEFORE(stage: string): 'requester' | 'lead' | 'supply_chain' | 'admin' | 'cost_control' | null {
-  const order = ['requester', 'lead', 'supply_chain', 'admin', 'cost_control', 'finance'] as const
-  const i = order.indexOf(stage as (typeof order)[number])
-  return i > 0 ? (order[i - 1] as 'requester' | 'lead' | 'supply_chain' | 'admin' | 'cost_control') : null
+function STAGE_ORDER_BEFORE(stage: string): 'requester' | 'lead' | 'supply_chain' | 'cost_control' | null {
+  if (stage === 'cost_control') return 'supply_chain'
+  if (stage === 'supply_chain') return 'lead'
+  if (stage === 'lead') return 'requester'
+  return null
 }
 
 /** Notify everyone who can act at a stage, plus record it in-app and by email. */
@@ -463,3 +464,116 @@ export async function notifyStage(
   return targets.length
 }
 
+
+/* ============================================================
+   Everyone on a requisition
+   ============================================================ */
+
+/** A person who should hear about a requisition, with the role that routes their link. */
+export interface RequisitionParty {
+  id: string
+  name: string | null
+  email: string | null
+  role: string | null
+  /** Why they are on the list, used to word the message. */
+  relation: 'requester' | 'stage'
+}
+
+/**
+ * Everyone with a stake in one requisition.
+ *
+ * That is the engineer who raised it plus every active holder of the roles in
+ * the chain — Project Lead, Supply Chain, Cost Control and Administration. A
+ * purchase order is the document the whole chain argues about, so when one is
+ * attached or accepted it is not enough to tell the stage that happens to hold
+ * the requisition at that moment; everybody who has touched it, or is about to,
+ * needs to know it exists.
+ *
+ * Deduplicated by user id, because the requester is frequently also a holder of
+ * one of these roles on a small team.
+ */
+export async function getRequisitionParties(requestId: string): Promise<RequisitionParty[]> {
+  const { STAGES, REVIEW_STAGES } = await import('@/lib/workflow')
+
+  const chainRoles = Array.from(new Set(REVIEW_STAGES.flatMap((s) => STAGES[s].roles)))
+
+  try {
+    const [requesterRows, holders] = await Promise.all([
+      query<{ id: string; name: string | null; email: string | null; role: string | null }>(
+        `SELECT u.id, u.name, u.email, u.role
+           FROM public.requests r
+           JOIN public.users u ON u.id = r.created_by
+          WHERE r.id = $1`,
+        [requestId]
+      ),
+      query<{ id: string; name: string | null; email: string | null; role: string | null }>(
+        `SELECT id, name, email, role
+           FROM public.users
+          WHERE role = ANY($1::text[])
+            AND COALESCE(is_active, true)
+            AND auth_id NOT LIKE 'pending:%'`,
+        [chainRoles]
+      ),
+    ])
+
+    const seen = new Set<string>()
+    const parties: RequisitionParty[] = []
+
+    for (const r of requesterRows) {
+      if (seen.has(r.id)) continue
+      seen.add(r.id)
+      parties.push({ ...r, relation: 'requester' })
+    }
+    for (const h of holders) {
+      if (seen.has(h.id)) continue
+      seen.add(h.id)
+      parties.push({ ...h, relation: 'stage' })
+    }
+
+    return parties
+  } catch (err) {
+    console.error('Failed to resolve the parties on a requisition:', err)
+    return []
+  }
+}
+
+/**
+ * Tell everyone on a requisition something, each linked into their own area.
+ *
+ * `target` rather than a fixed `link`: the areas are role-guarded, so one URL
+ * cannot serve an engineer and an administrator at once.
+ */
+export async function notifyRequisitionParties(
+  requestId: string,
+  {
+    title,
+    message,
+    type = 'info',
+    sendEmailAlert = false,
+    excludeUserId,
+  }: {
+    title: string
+    message: string
+    type?: 'info' | 'approval' | 'reminder' | 'warning' | 'success'
+    sendEmailAlert?: boolean
+    excludeUserId?: string | null
+  }
+): Promise<number> {
+  const parties = await getRequisitionParties(requestId)
+  const targets = excludeUserId ? parties.filter((p) => p.id !== excludeUserId) : parties
+
+  await Promise.all(
+    targets.map((p) =>
+      createNotification({
+        userId: p.id,
+        title,
+        message,
+        type,
+        target: { type: 'request', id: requestId },
+        sendEmailAlert,
+      })
+    )
+  )
+
+  return targets.length
+}

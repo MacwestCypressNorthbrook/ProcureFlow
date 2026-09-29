@@ -5,6 +5,7 @@ import DataView, { type DataColumn } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Paperclip, ShoppingBag } from 'lucide-react'
+import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { QueueRow } from '@/lib/review'
 import Link from 'next/link'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
@@ -38,13 +39,16 @@ export default function QueueTable({
         <div className="min-w-0 max-w-[200px] sm:max-w-[260px] xl:max-w-[340px]">
           {/* A real anchor, not just the row's click handler — so the
               requisition can be opened in a new tab and reached by keyboard. */}
-          <Link
-            href={`${hrefBase}/${r.id}`}
-            className="block truncate text-sm font-medium text-foreground outline-none hover:underline focus-visible:underline"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {r.purpose}
-          </Link>
+          <div className="flex items-center gap-1.5">
+            {r.is_urgent && <UrgentBadge size="sm" />}
+            <Link
+              href={`${hrefBase}/${r.id}`}
+              className="block truncate text-sm font-medium text-foreground outline-none hover:underline focus-visible:underline"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {r.purpose}
+            </Link>
+          </div>
           <p className="truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
           </p>
@@ -136,7 +140,22 @@ export default function QueueTable({
   ]
 
   const types = Array.from(new Set(rows.map((r) => requisitionType(r.description))))
+  const hasUrgent = rows.some((r) => r.is_urgent)
   const facets = [
+    ...(hasUrgent
+      ? [
+        {
+          id: 'urgency',
+          label: 'Urgency',
+          options: [
+            { value: 'urgent', label: 'Urgent only' },
+            { value: 'normal', label: 'Normal' },
+          ],
+          matches: (r: QueueRow, value: string) =>
+            value === 'urgent' ? Boolean(r.is_urgent) : !r.is_urgent,
+        },
+      ]
+      : []),
     {
       id: 'po_filter',
       label: 'PO Status',
@@ -181,7 +200,10 @@ export default function QueueTable({
         <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
           <div className="flex items-start justify-between gap-3">
             <p className="line-clamp-2 text-sm font-semibold text-foreground">{r.purpose}</p>
-            <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
+            <div className="flex shrink-0 flex-col items-end gap-1">
+              {r.is_urgent && <UrgentBadge size="sm" />}
+              <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
+            </div>
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}

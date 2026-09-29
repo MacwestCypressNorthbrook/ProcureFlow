@@ -180,12 +180,12 @@ export default function RequestForm({
       ls.map((l) =>
         l.id === id
           ? {
-              ...l,
-              isSubcontractor: on,
-              quantity: on ? '1' : l.quantity,
-              unit: on ? 'lumpsum' : l.unit === 'lumpsum' ? 'man-days' : l.unit,
-              subcontractorNote: on ? l.subcontractorNote : '',
-            }
+            ...l,
+            isSubcontractor: on,
+            quantity: on ? '1' : l.quantity,
+            unit: on ? 'lumpsum' : l.unit === 'lumpsum' ? 'man-days' : l.unit,
+            subcontractorNote: on ? l.subcontractorNote : '',
+          }
           : l
       )
     )
@@ -483,7 +483,7 @@ export default function RequestForm({
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <FileText size={16} className="text-muted-foreground" />
               Materials &amp; Labour
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+              <span className="rounded-full bg-muted  py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
                 {filledLines}
               </span>
             </h2>
@@ -501,191 +501,191 @@ export default function RequestForm({
             {lines.map((line, i) => {
               const isCollapsed = lines.length > 1 && collapsedLines.has(line.id)
               return (
-              <div key={line.id} className="rounded-xl border border-border bg-background/40 p-4">
-                <div className={`flex items-center justify-between gap-2 ${isCollapsed ? '' : 'mb-3'}`}>
-                  <button
-                    type="button"
-                    onClick={() => lines.length > 1 && toggleCollapsed(line.id)}
-                    disabled={lines.length <= 1}
-                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
-                  >
-                    <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Item {i + 1}
-                    </span>
-                    {isCollapsed && (
-                      <span className="truncate text-sm text-foreground">
-                        {line.description.trim() || (line.category === 'labour' ? 'Untitled labour line' : 'Untitled material')}
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                          · {line.quantity || 0} {line.unit}
-                          {Number(line.unitPrice) > 0 ? ` · ${ghs(lineTotal(line))}` : ''}
+                <div key={line.id} className="rounded-md border border-border bg-background/40 p-4">
+                  <div className={`flex items-center justify-between gap-2 ${isCollapsed ? '' : 'mb-3'}`}>
+                    <button
+                      type="button"
+                      onClick={() => lines.length > 1 && toggleCollapsed(line.id)}
+                      disabled={lines.length <= 1}
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Item {i + 1}
+                      </span>
+                      {isCollapsed && (
+                        <span className="truncate text-sm text-foreground">
+                          {line.description.trim() || (line.category === 'labour' ? 'Untitled labour line' : 'Untitled material')}
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            · {line.quantity || 0} {line.unit}
+                            {Number(line.unitPrice) > 0 ? ` · ${ghs(lineTotal(line))}` : ''}
+                          </span>
                         </span>
-                      </span>
-                    )}
-                    {lines.length > 1 && (
-                      <span className="ml-auto shrink-0 text-muted-foreground">
-                        {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => removeLine(line.id)}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                    aria-label={`Remove item ${i + 1}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-
-                {!isCollapsed && (
-                <div className="space-y-4">
-                  <CategoryToggle value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
-
-                  {line.category === 'labour' && (
-                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-input bg-muted/30 px-3.5 py-3 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={line.isSubcontractor}
-                        onChange={(e) => setSubcontractor(line.id, e.target.checked)}
-                        className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
-                      />
-                      <span className="font-medium text-foreground">
-                        Rendered by a sub-contractor
-                        <span className="block text-xs font-normal text-muted-foreground">
-                          Charged as one agreed amount rather than a daily rate.
+                      )}
+                      {lines.length > 1 && (
+                        <span className="ml-auto shrink-0 text-muted-foreground">
+                          {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                         </span>
-                      </span>
-                    </label>
-                  )}
-
-                  <div>
-                    <Label required>
-                      {line.category === 'other'
-                        ? 'Expense description'
-                        : line.category === 'labour'
-                          ? line.isSubcontractor
-                            ? 'Service rendered'
-                            : 'Labour description'
-                          : 'Material description'}
-                    </Label>
-                    <textarea
-                      value={line.description}
-                      onChange={(e) => updateLine(line.id, { description: e.target.value })}
-                      placeholder={
-                        line.category === 'other'
-                          ? 'e.g. Site permit fees — district assembly'
-                          : line.category === 'labour'
-                            ? line.isSubcontractor
-                              ? 'e.g. Electrical first fix — Block B, per signed scope'
-                              : 'e.g. Mason & 2 labourers — foundation blockwork'
-                            : 'e.g. Iron rods 12mm, high tensile'
-                      }
-                      rows={2}
-                      className={`${fieldClass} resize-none py-3`}
-                    />
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(line.id)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      aria-label={`Remove item ${i + 1}`}
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
 
-                  {!isLumpSum(line) && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label required>Quantity</Label>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        step="any"
-                        value={line.quantity}
-                        onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
-                        className={inputClass}
-                      />
+                  {!isCollapsed && (
+                    <div className="space-y-4">
+                      <CategoryToggle value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
+
+                      {line.category === 'labour' && (
+                        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-input bg-muted/30 px-3.5 py-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={line.isSubcontractor}
+                            onChange={(e) => setSubcontractor(line.id, e.target.checked)}
+                            className="mt-0.5 h-4 w-4 rounded border-input accent-primary"
+                          />
+                          <span className="font-medium text-foreground">
+                            Rendered by a sub-contractor
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              Charged as one agreed amount rather than a daily rate.
+                            </span>
+                          </span>
+                        </label>
+                      )}
+
+                      <div>
+                        <Label required>
+                          {line.category === 'other'
+                            ? 'Expense description'
+                            : line.category === 'labour'
+                              ? line.isSubcontractor
+                                ? 'Service rendered'
+                                : 'Labour description'
+                              : 'Material description'}
+                        </Label>
+                        <textarea
+                          value={line.description}
+                          onChange={(e) => updateLine(line.id, { description: e.target.value })}
+                          placeholder={
+                            line.category === 'other'
+                              ? 'e.g. Site permit fees — district assembly'
+                              : line.category === 'labour'
+                                ? line.isSubcontractor
+                                  ? 'e.g. Electrical first fix — Block B, per signed scope'
+                                  : 'e.g. Mason & 2 labourers — foundation blockwork'
+                                : 'e.g. Iron rods 12mm, high tensile'
+                          }
+                          rows={2}
+                          className={`${fieldClass} resize-none py-3`}
+                        />
+                      </div>
+
+                      {!isLumpSum(line) && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <Label required>Quantity</Label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="any"
+                              value={line.quantity}
+                              onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
+                              className={inputClass}
+                            />
+                          </div>
+                          <div>
+                            <Label>Unit</Label>
+                            <select
+                              value={line.unit}
+                              onChange={(e) => updateLine(line.id, { unit: e.target.value })}
+                              className={`${inputClass} appearance-none`}
+                            >
+                              {UNITS.map((u) => (
+                                <option key={u} value={u}>{u}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                      )}
+
+                      <div>
+                        <Label required={isLumpSum(line)}>
+                          {isLumpSum(line) ? 'Amount (GHS)' : 'Unit price (GHS)'}
+                        </Label>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="0.01"
+                          placeholder={isLumpSum(line) ? '0.00' : '0.00 (optional)'}
+                          value={line.unitPrice}
+                          onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
+                          className={inputClass}
+                        />
+                      </div>
+
+                      {line.isSubcontractor && (
+                        <div>
+                          <Label>Scope / supporting detail (optional)</Label>
+                          <textarea
+                            value={line.subcontractorNote}
+                            onChange={(e) => updateLine(line.id, { subcontractorNote: e.target.value })}
+                            placeholder="What the sub-contractor delivered, and anything the reviewers should know."
+                            rows={2}
+                            className={`${fieldClass} resize-none py-3`}
+                          />
+                          <p className="mt-1.5 text-xs text-muted-foreground">
+                            Attach the signed scope, quotation or completion certificate under Supporting documents below.
+                          </p>
+                        </div>
+                      )}
+
+                      <div>
+                        <Label>
+                          {line.category === 'other'
+                            ? 'Paid to (optional)'
+                            : line.isSubcontractor
+                              ? 'Sub-contractor (optional)'
+                              : line.category === 'labour'
+                                ? 'Contractor (optional)'
+                                : 'Supplier (optional)'}
+                        </Label>
+                        <SupplierPicker
+                          value={line.supplierId}
+                          suppliers={suppliers}
+                          onChange={(supplierId) => updateLine(line.id, { supplierId })}
+                          onCreated={registerSupplier}
+                        />
+                      </div>
+
+                      <div>
+                        <Label>Remarks</Label>
+                        <input
+                          value={line.remarks}
+                          onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
+                          placeholder="Optional note"
+                          className={inputClass}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3.5 py-3">
+                        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Line total
+                        </span>
+                        <span className="text-base font-semibold tabular-nums text-foreground">
+                          {ghs(lineTotal(line))}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <Label>Unit</Label>
-                      <select
-                        value={line.unit}
-                        onChange={(e) => updateLine(line.id, { unit: e.target.value })}
-                        className={`${inputClass} appearance-none`}
-                      >
-                        {UNITS.map((u) => (
-                          <option key={u} value={u}>{u}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
                   )}
-
-                  <div>
-                    <Label required={isLumpSum(line)}>
-                      {isLumpSum(line) ? 'Amount (GHS)' : 'Unit price (GHS)'}
-                    </Label>
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      min="0"
-                      step="0.01"
-                      placeholder={isLumpSum(line) ? '0.00' : '0.00 (optional)'}
-                      value={line.unitPrice}
-                      onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
-                      className={inputClass}
-                    />
-                  </div>
-
-                  {line.isSubcontractor && (
-                    <div>
-                      <Label>Scope / supporting detail (optional)</Label>
-                      <textarea
-                        value={line.subcontractorNote}
-                        onChange={(e) => updateLine(line.id, { subcontractorNote: e.target.value })}
-                        placeholder="What the sub-contractor delivered, and anything the reviewers should know."
-                        rows={2}
-                        className={`${fieldClass} resize-none py-3`}
-                      />
-                      <p className="mt-1.5 text-xs text-muted-foreground">
-                        Attach the signed scope, quotation or completion certificate under Supporting documents below.
-                      </p>
-                    </div>
-                  )}
-
-                  <div>
-                    <Label>
-                      {line.category === 'other'
-                        ? 'Paid to (optional)'
-                        : line.isSubcontractor
-                          ? 'Sub-contractor (optional)'
-                          : line.category === 'labour'
-                            ? 'Contractor (optional)'
-                            : 'Supplier (optional)'}
-                    </Label>
-                    <SupplierPicker
-                      value={line.supplierId}
-                      suppliers={suppliers}
-                      onChange={(supplierId) => updateLine(line.id, { supplierId })}
-                      onCreated={registerSupplier}
-                    />
-                  </div>
-
-                  <div>
-                    <Label>Remarks</Label>
-                    <input
-                      value={line.remarks}
-                      onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
-                      placeholder="Optional note"
-                      className={inputClass}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3.5 py-3">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Line total
-                    </span>
-                    <span className="text-base font-semibold tabular-nums text-foreground">
-                      {ghs(lineTotal(line))}
-                    </span>
-                  </div>
                 </div>
-                )}
-              </div>
               )
             })}
           </div>

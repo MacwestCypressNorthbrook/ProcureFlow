@@ -43,3 +43,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ── Never commit ─────────────────────────────────────────────────────────
+# Database backups hold real production rows, including personal data. Only
+# the data is ignored — the restore/remove scripts beside it stay committable.
+db/backups/*.json
+db/backups/*/
+# End-to-end run output and the harness, which names real staff accounts.
+e2e-evidence/
+pf-e2e.mjs

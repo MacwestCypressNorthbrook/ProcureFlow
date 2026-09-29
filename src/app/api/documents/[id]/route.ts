@@ -14,7 +14,17 @@ export const dynamic = 'force-dynamic'
  * whatever origin the tab happens to be on. Signing here also means links can
  * never go stale, and only a signed-in reviewer can resolve one.
  *
- * `?download=1` asks the browser to save rather than display the file.
+ * `?download=1` saves the file instead of displaying it, and is served from
+ * THIS origin rather than as a redirect.
+ *
+ * A redirect cannot be made to download reliably. The `download` attribute on
+ * an anchor is ignored the moment the response crosses to another origin, so
+ * the browser falls back to whatever the storage host says — and a PDF with no
+ * `Content-Disposition` of its own simply opens, usually in a new tab. Piping
+ * the bytes back through here keeps the whole exchange same-origin, which
+ * makes both the attribute and our own `Content-Disposition` authoritative.
+ * Previews still redirect: they are meant to be displayed, and that path
+ * should not pay to proxy the bytes.
  */
 export async function GET(
   request: Request,
@@ -46,12 +56,15 @@ export async function GET(
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })
   }
 
+  const download = new URL(request.url).searchParams.get('download') === '1'
+
   // Already an absolute URL (legacy rows, or a data: URL) — hand it back as-is.
   if (/^(https?|data|blob):/.test(row.file_url)) {
-    return NextResponse.redirect(row.file_url)
+    return download && /^https?:/.test(row.file_url)
+      ? streamAsAttachment(row.file_url, row.file_name)
+      : NextResponse.redirect(row.file_url)
   }
 
-  const download = new URL(request.url).searchParams.get('download') === '1'
   const signed = await getSignedDownloadUrl(row.file_url, 300, {
     fileName: row.file_name,
     download,
@@ -64,7 +77,43 @@ export async function GET(
     )
   }
 
-  return NextResponse.redirect(signed)
+  return download ? streamAsAttachment(signed, row.file_name) : NextResponse.redirect(signed)
+}
+
+/**
+ * Pipe a remote object back to the browser as an attachment.
+ *
+ * The body is streamed rather than buffered, so a large purchase order does not
+ * sit in memory on the way through.
+ */
+async function streamAsAttachment(url: string, fileName?: string | null) {
+  let upstream: Response
+  try {
+    upstream = await fetch(url)
+  } catch {
+    return NextResponse.json({ error: 'The document could not be retrieved' }, { status: 502 })
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    return NextResponse.json({ error: 'The document could not be retrieved' }, { status: 502 })
+  }
+
+  // A quoted filename cannot carry quotes, control characters or non-Latin-1
+  // bytes, so send a sanitised one for old clients and the RFC 5987 form for
+  // everyone else.
+  const name = (fileName || 'document').replace(/[\r\n"\\]/g, '_')
+  const ascii = name.replace(/[^\x20-\x7e]/g, '_')
+  const headers = new Headers({
+    'Content-Type': upstream.headers.get('content-type') ?? 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+    // The signed URL behind this is short-lived and the file is private.
+    'Cache-Control': 'private, no-store',
+    'X-Content-Type-Options': 'nosniff',
+  })
+  const length = upstream.headers.get('content-length')
+  if (length) headers.set('Content-Length', length)
+
+  return new NextResponse(upstream.body, { status: 200, headers })
 }
 
 interface AttachmentRow {
