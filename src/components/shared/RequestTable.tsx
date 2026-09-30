@@ -177,6 +177,7 @@ export default function RequestTable({
   const statuses = Array.from(new Set(requests.map((r) => r.status))).sort()
   const projects = Array.from(new Set(requests.map((r) => r.project_name).filter(Boolean))).sort() as string[]
   const types = Array.from(new Set(requests.map((r) => requisitionType(r.description))))
+  const engineers = Array.from(new Set(requests.map((r) => r.guest_name?.trim()).filter(Boolean))).sort() as string[]
   const facets: DataFacet<RequestRow>[] = [
     {
       id: 'status',
@@ -201,6 +202,16 @@ export default function RequestTable({
             label: 'Project site',
             options: projects.map((p) => ({ value: p, label: p })),
             matches: (r, value) => r.project_name === value,
+          } satisfies DataFacet<RequestRow>,
+        ]
+      : []),
+    ...(engineers.length > 0
+      ? [
+          {
+            id: 'engineer',
+            label: 'Engineer',
+            options: engineers.map((e) => ({ value: e, label: e })),
+            matches: (r, value) => r.guest_name?.trim() === value,
           } satisfies DataFacet<RequestRow>,
         ]
       : []),

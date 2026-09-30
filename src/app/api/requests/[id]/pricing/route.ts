@@ -18,7 +18,10 @@ const toNumber = (v: unknown): number => {
 /**
  * Supply Chain fills in what the engineer didn't know at request time: the
  * unit price (and, where it changed, the supplier) for each material, plus
- * one overall discount off the subtotal. Only the stage currently holding the
+ * one overall discount off the subtotal. Supply Chain may also drop lines that
+ * will not be procured (already on site, duplicated, out of scope) — though
+ * never every line, since a requisition with no materials is not one to
+ * approve. Only the stage currently holding the
  * requisition may touch its pricing — a Lead or Cost Control reviewer sees
  * the same numbers everyone else does, read-only.
  */
@@ -43,7 +46,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  let body: { items?: IncomingItemPrice[]; discountAmount?: number | string }
+  let body: { items?: IncomingItemPrice[]; removeIds?: unknown; discountAmount?: number | string }
   try {
     body = await request.json()
   } catch {
@@ -51,24 +54,47 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   const items = Array.isArray(body.items) ? body.items : []
-  if (items.length === 0) {
+  const removeIds = [
+    ...new Set(Array.isArray(body.removeIds) ? body.removeIds.filter((v): v is string => typeof v === 'string') : []),
+  ]
+  if (items.length === 0 && removeIds.length === 0) {
     return NextResponse.json({ error: 'No line items to update' }, { status: 400 })
   }
 
   // Every id must belong to this request — a stale form must not let one
-  // requisition write prices onto another's line items.
-  const owned = await query<{ id: string }>(
-    `SELECT id FROM public.request_items WHERE request_id = $1`,
+  // requisition write prices onto, or delete, another's line items.
+  const owned = await query<{
+    id: string
+    description: string
+    quantity: string
+    unit: string | null
+    unit_price: string
+  }>(
+    `SELECT id, description, quantity, unit, unit_price
+       FROM public.request_items
+      WHERE request_id = $1
+      ORDER BY position ASC`,
     [id]
   )
-  const ownedIds = new Set(owned.map((r) => r.id))
-  for (const item of items) {
-    if (!item.id || !ownedIds.has(item.id)) {
+  const ownedById = new Map(owned.map((r) => [r.id, r]))
+  for (const itemId of [...items.map((i) => i.id), ...removeIds]) {
+    if (!itemId || !ownedById.has(itemId)) {
       return NextResponse.json(
         { error: 'One or more line items do not belong to this requisition' },
         { status: 400 }
       )
     }
+  }
+
+  const removing = new Set(removeIds)
+  if (items.some((i) => removing.has(i.id!))) {
+    return NextResponse.json({ error: 'A line cannot be both priced and removed' }, { status: 400 })
+  }
+  if (owned.length - removing.size < 1) {
+    return NextResponse.json(
+      { error: 'A requisition must keep at least one line. Send it back instead of removing everything.' },
+      { status: 400 }
+    )
   }
 
   const supplierIds = [
@@ -84,23 +110,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
   }
 
-  await transaction(
-    items.map((item) => [
-      `UPDATE public.request_items
-          SET unit_price = $2,
-              supplier_id = $3
-        WHERE id = $1 AND request_id = $4`,
-      [item.id, toNumber(item.unitPrice), item.supplierId || null, id],
-    ])
-  )
-
+  // Work out the new subtotal before writing anything, so a discount that is
+  // too large is refused without leaving half the change saved — removed
+  // lines especially cannot be brought back.
+  const incomingPrice = new Map(items.map((i) => [i.id!, toNumber(i.unitPrice)]))
+  const subtotal = owned
+    .filter((r) => !removing.has(r.id))
+    .reduce((sum, r) => sum + Number(r.quantity) * (incomingPrice.get(r.id) ?? Number(r.unit_price)), 0)
   const discountAmount = toNumber(body.discountAmount)
-
-  const subtotalRow = await queryOne<{ subtotal: string }>(
-    `SELECT COALESCE(SUM(line_total), 0)::numeric AS subtotal FROM public.request_items WHERE request_id = $1`,
-    [id]
-  )
-  const subtotal = Number(subtotalRow?.subtotal) || 0
 
   if (discountAmount > subtotal) {
     return NextResponse.json(
@@ -109,15 +126,55 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     )
   }
 
-  const total = subtotal - discountAmount
+  // The deleted rows cannot be read back later, so the trail names each one —
+  // what was asked for and how much — in the same transaction as the delete.
+  const removedLines = owned
+    .filter((r) => removing.has(r.id))
+    .map((r) => `${r.description} (${Number(r.quantity)}${r.unit ? ` ${r.unit}` : ''})`)
+  const removalNote = `Removed ${removedLines.length} material${removedLines.length === 1 ? '' : 's'}: ${removedLines.join('; ')}`
 
-  const data = await queryOne<DbRequest>(
-    `UPDATE public.requests
-        SET discount_amount = $2, total_amount = $3, updated_at = now()
-      WHERE id = $1
-      RETURNING *`,
-    [id, discountAmount, total]
-  )
+  const results = await transaction<DbRequest>([
+    ...(removeIds.length > 0
+      ? [
+          [
+            `DELETE FROM public.request_items WHERE request_id = $1 AND id = ANY($2::uuid[])`,
+            [id, removeIds],
+          ] as [string, unknown[]],
+          [
+            `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
+             VALUES ($1, 'supply_chain', 'items_removed', $2, $3)`,
+            [id, guard.user.id, removalNote],
+          ] as [string, unknown[]],
+        ]
+      : []),
+    ...items.map(
+      (item) =>
+        [
+          `UPDATE public.request_items
+              SET unit_price = $2,
+                  supplier_id = $3
+            WHERE id = $1 AND request_id = $4`,
+          [item.id, toNumber(item.unitPrice), item.supplierId || null, id],
+        ] as [string, unknown[]]
+    ),
+    // The total is taken from the rows as they stand after the statements
+    // above, so it can never disagree with the line items it summarises.
+    [
+      `UPDATE public.requests
+          SET discount_amount = $2,
+              total_amount = GREATEST(
+                (SELECT COALESCE(SUM(line_total), 0) FROM public.request_items WHERE request_id = $1) - $2,
+                0
+              ),
+              updated_at = now()
+        WHERE id = $1
+        RETURNING *`,
+      [id, discountAmount],
+    ],
+  ])
 
-  return NextResponse.json({ data, subtotal, discountAmount, total })
+  const data = results.at(-1)?.[0] ?? null
+  const total = Number(data?.total_amount) || 0
+
+  return NextResponse.json({ data, subtotal, discountAmount, total, removed: removeIds.length })
 }

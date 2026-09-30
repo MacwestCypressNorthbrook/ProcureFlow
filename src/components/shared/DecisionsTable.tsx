@@ -6,7 +6,7 @@ import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '
 import ExportMenu from '@/components/shared/ExportMenu'
 import type { ExportColumn } from '@/lib/export'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { Check, RotateCcw, ShoppingBag, Banknote, XCircle, Zap } from 'lucide-react'
+import { Check, RotateCcw, ShoppingBag, Banknote, Trash2, XCircle, Zap } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { StageDecision } from '@/lib/review'
 
@@ -50,6 +50,11 @@ const ACTION: Record<string, { label: string; className: string; icon: React.Rea
     label: 'Rejected',
     className: 'bg-red-500/10 text-red-600 dark:text-red-400',
     icon: <XCircle size={12} />,
+  },
+  items_removed: {
+    label: 'Materials removed',
+    className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+    icon: <Trash2 size={12} />,
   },
 }
 

@@ -72,6 +72,7 @@ const ACTION_LABEL: Record<string, string> = {
   po_created: 'Purchase order raised',
   paid: 'Paid',
   rejected: 'Rejected',
+  items_removed: 'Materials removed',
 }
 
 const ACTION_TONE: Record<string, string> = {
@@ -82,6 +83,7 @@ const ACTION_TONE: Record<string, string> = {
   po_created: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
   paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   rejected: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  items_removed: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
 }
 
 /**

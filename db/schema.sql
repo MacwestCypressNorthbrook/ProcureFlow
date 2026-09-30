@@ -403,7 +403,7 @@ ALTER TABLE public.request_approvals DROP CONSTRAINT IF EXISTS request_approvals
 ALTER TABLE public.request_approvals ADD CONSTRAINT request_approvals_action_check CHECK (
     action IN (
         'submitted', 'approved', 'sent_back', 'resubmitted', 'po_created',
-        'marked_urgent', 'completed', 'paid', 'rejected'
+        'marked_urgent', 'completed', 'paid', 'rejected', 'items_removed'
     )
 );
 

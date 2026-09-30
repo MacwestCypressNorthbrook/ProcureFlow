@@ -141,6 +141,8 @@ export default function QueueTable({
 
   const types = Array.from(new Set(rows.map((r) => requisitionType(r.description))))
   const hasUrgent = rows.some((r) => r.is_urgent)
+  const engineerOf = (r: QueueRow) => (r.requester_name ?? r.guest_name)?.trim() || null
+  const engineers = Array.from(new Set(rows.map(engineerOf).filter(Boolean))).sort() as string[]
   const facets = [
     ...(hasUrgent
       ? [
@@ -172,6 +174,16 @@ export default function QueueTable({
           label: 'Type',
           options: types.map((t) => ({ value: t, label: REQUISITION_TYPE_CONFIG[t].label })),
           matches: (r: QueueRow, value: string) => requisitionType(r.description) === value,
+        },
+      ]
+      : []),
+    ...(engineers.length > 0
+      ? [
+        {
+          id: 'engineer',
+          label: 'Engineer',
+          options: engineers.map((e) => ({ value: e, label: e })),
+          matches: (r: QueueRow, value: string) => engineerOf(r) === value,
         },
       ]
       : []),

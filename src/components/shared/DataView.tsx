@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useSyncExternalStore } from 'react'
+import { useId, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -68,48 +68,78 @@ interface Prefs {
   pageSize?: number
 }
 
-const prefCache = new Map<string, string>()
-const prefListeners = new Set<() => void>()
-
-function subscribePrefs(listener: () => void) {
-  prefListeners.add(listener)
-  return () => prefListeners.delete(listener)
+/**
+ * What the viewer has narrowed the list to. Held for the browser tab's session
+ * so that opening a record and coming back — by the back button or the page's
+ * own "Back to …" link — lands on the same filtered, sorted page rather than
+ * the full list.
+ */
+interface Session {
+  term?: string
+  facets?: Record<string, string>
+  sort?: { id: string; dir: SortDir } | null
+  page?: number
 }
 
-function readPrefs(key: string): string {
-  if (!prefCache.has(key)) {
+const cache = new Map<string, string>()
+const listeners = new Set<() => void>()
+
+function subscribe(listener: () => void) {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
+
+/** Cache key → storage slot. Keys without a storage slot live in memory only. */
+function storageFor(key: string): { store: 'local' | 'session'; slot: string } | null {
+  if (key.startsWith('prefs:') && key.length > 'prefs:'.length) {
+    return { store: 'local', slot: `dataview:${key.slice('prefs:'.length)}` }
+  }
+  if (key.startsWith('session:') && key.length > 'session:'.length) {
+    return { store: 'session', slot: `dataview:${key.slice('session:'.length)}` }
+  }
+  return null
+}
+
+function webStorage(store: 'local' | 'session'): Storage {
+  return store === 'local' ? window.localStorage : window.sessionStorage
+}
+
+function readStored(key: string): string {
+  if (!cache.has(key)) {
     let raw = ''
-    if (key) {
+    const target = storageFor(key)
+    if (target) {
       try {
-        raw = window.localStorage.getItem(`dataview:${key}`) ?? ''
+        raw = webStorage(target.store).getItem(target.slot) ?? ''
       } catch {
         /* private mode or blocked storage: fall back to defaults */
       }
     }
-    prefCache.set(key, raw)
+    cache.set(key, raw)
   }
-  return prefCache.get(key) ?? ''
+  return cache.get(key) ?? ''
 }
 
-function writePrefs(key: string, prefs: Prefs) {
-  const raw = JSON.stringify(prefs)
-  prefCache.set(key, raw)
-  if (key) {
+function writeStored(key: string, value: object) {
+  const raw = JSON.stringify(value)
+  cache.set(key, raw)
+  const target = storageFor(key)
+  if (target) {
     try {
-      window.localStorage.setItem(`dataview:${key}`, raw)
+      webStorage(target.store).setItem(target.slot, raw)
     } catch {
-      /* preferences are a convenience; ignore write failures */
+      /* a convenience; ignore write failures */
     }
   }
-  prefListeners.forEach((listener) => listener())
+  listeners.forEach((listener) => listener())
 }
 
-function parsePrefs(raw: string): Prefs {
-  if (!raw) return {}
+function parseStored<V>(raw: string): V {
+  if (!raw) return {} as V
   try {
-    return JSON.parse(raw) as Prefs
+    return JSON.parse(raw) as V
   } catch {
-    return {}
+    return {} as V
   }
 }
 
@@ -174,7 +204,10 @@ export default function DataView<T>({
   onRowClick?: (row: T) => void
   defaultSort?: { id: string; dir: SortDir }
   defaultView?: ViewMode
-  /** Persists the view mode and page size per list, per browser. */
+  /**
+   * Persists the view mode and page size per list, per browser, and the
+   * search, filters, sort and page per list for the tab's session.
+   */
   storageKey?: string
   initialPageSize?: number
   emptyTitle?: string
@@ -190,40 +223,68 @@ export default function DataView<T>({
   /** Pre-filled search, used to focus a record arrived at from a deep link. */
   initialTerm?: string
 }) {
-  const [term, setTermState] = useState(initialTerm)
-  const [facetValues, setFacetValuesState] = useState<Record<string, string>>({})
-  const [sort, setSort] = useState<{ id: string; dir: SortDir } | null>(defaultSort ?? null)
-  const [page, setPage] = useState(1)
   const [showFilters, setShowFilters] = useState(false)
 
-  const prefKey = storageKey ?? ''
+  const prefKey = `prefs:${storageKey ?? ''}`
   const prefsRaw = useSyncExternalStore(
-    subscribePrefs,
-    () => readPrefs(prefKey),
+    subscribe,
+    () => readStored(prefKey),
     () => ''
   )
-  const prefs = useMemo(() => parsePrefs(prefsRaw), [prefsRaw])
+  const prefs = useMemo(() => parseStored<Prefs>(prefsRaw), [prefsRaw])
+
+  // A deep link that pre-fills the search is focusing one record, so it must
+  // not be overridden by — or overwrite — whatever the viewer had filtered to
+  // last time; that instance keeps its filters in memory only.
+  const instanceId = useId()
+  const sessionKey = storageKey && !initialTerm ? `session:${storageKey}` : `memory:${instanceId}`
+  const sessionRaw = useSyncExternalStore(
+    subscribe,
+    () => readStored(sessionKey),
+    () => ''
+  )
+  const session = useMemo(() => parseStored<Session>(sessionRaw), [sessionRaw])
+  const updateSession = (patch: Session) => writeStored(sessionKey, { ...session, ...patch })
+
+  const term = session.term ?? initialTerm
+  const page = session.page ?? 1
+  const setPage = (next: number) => updateSession({ page: next })
+
+  // Restored values are dropped when they no longer apply — a project that has
+  // since left the list, or a column that is gone — so a stale filter can never
+  // silently hide every row behind a select that reads "All".
+  const facetValues = useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const facet of facets) {
+      const value = session.facets?.[facet.id]
+      if (value && facet.options.some((o) => o.value === value)) out[facet.id] = value
+    }
+    return out
+  }, [session.facets, facets])
+
+  const storedSort = session.sort
+  const sort =
+    storedSort === undefined
+      ? defaultSort ?? null
+      : storedSort === null || columns.some((c) => c.id === storedSort.id && c.sortable && c.sortValue)
+        ? storedSort
+        : defaultSort ?? null
+  const setSort = (next: { id: string; dir: SortDir } | null) => updateSession({ sort: next })
 
   const view: ViewMode = renderCard ? prefs.view ?? defaultView : 'table'
   const pageSize =
     prefs.pageSize && PAGE_SIZES.includes(prefs.pageSize) ? prefs.pageSize : initialPageSize
 
-  const setView = (next: ViewMode) => writePrefs(prefKey, { ...prefs, view: next })
+  const setView = (next: ViewMode) => writeStored(prefKey, { ...prefs, view: next })
 
   // Narrowing the result set must not strand the viewer past the end, so every
   // input that changes the result set returns to the first page with it.
   const setPageSize = (next: number) => {
-    writePrefs(prefKey, { ...prefs, pageSize: next })
+    writeStored(prefKey, { ...prefs, pageSize: next })
     setPage(1)
   }
-  const setTerm = (next: string) => {
-    setTermState(next)
-    setPage(1)
-  }
-  const setFacetValues = (next: Record<string, string>) => {
-    setFacetValuesState(next)
-    setPage(1)
-  }
+  const setTerm = (next: string) => updateSession({ term: next, page: 1 })
+  const setFacetValues = (next: Record<string, string>) => updateSession({ facets: next, page: 1 })
 
   const sortableColumns = useMemo(
     () => columns.filter((c) => c.sortable && c.sortValue),
@@ -275,17 +336,13 @@ export default function DataView<T>({
   const pageRows = compact ? processed : processed.slice(start, start + pageSize)
 
   const toggleSort = (id: string) =>
-    setSort((current) =>
-      current?.id === id
-        ? { id, dir: current.dir === 'asc' ? 'desc' : 'asc' }
+    setSort(
+      sort?.id === id
+        ? { id, dir: sort.dir === 'asc' ? 'desc' : 'asc' }
         : { id, dir: 'asc' }
     )
 
-  const clearAll = () => {
-    setTermState('')
-    setFacetValuesState({})
-    setPage(1)
-  }
+  const clearAll = () => updateSession({ term: '', facets: {}, page: 1 })
 
   const hasToolbar =
     !compact && (Boolean(searchText) || facets.length > 0 || Boolean(renderCard) || Boolean(toolbarExtra))
@@ -546,7 +603,7 @@ export default function DataView<T>({
               <div className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => setPage(Math.max(1, safePage - 1))}
                   disabled={safePage === 1}
                   aria-label="Previous page"
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
@@ -576,7 +633,7 @@ export default function DataView<T>({
 
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  onClick={() => setPage(Math.min(pageCount, safePage + 1))}
                   disabled={safePage === pageCount}
                   aria-label="Next page"
                   className="flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
