@@ -648,7 +648,11 @@ export default function ApprovalPanel({
                                 {busy === 'resubmit' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                 {stage === 'supply_chain' ? 'Resubmit to Cost Control' : 'Resubmit for review'}
                               </button>
-                              {stage === 'supply_chain' && (
+                              {/* Whoever a requisition was returned to may not
+                                  hold the answer themselves — they can pass it
+                                  one stage further back. The answer then walks
+                                  forward through each stage it passed. */}
+                              {!isRequester && prev && (
                                 <button
                                   type="button"
                                   onClick={() => act('send_back')}
@@ -656,7 +660,7 @@ export default function ApprovalPanel({
                                   className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer @lg:w-auto"
                                 >
                                   {busy === 'send_back' ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
-                                  Send back to Project Lead
+                                  {sendBackLabel}
                                 </button>
                               )}
                             </>

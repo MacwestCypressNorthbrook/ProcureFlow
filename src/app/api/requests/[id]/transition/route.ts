@@ -93,6 +93,10 @@ async function notifyStage(
  * a send-back always returns to the stage immediately before the one that
  * bounced it, and a resubmission resumes at the stage that bounced it rather
  * than walking the chain again.
+ *
+ * A stage that was sent a requisition back may itself send it back further
+ * when it cannot answer. Each hop records the stage that passed it down, so the
+ * answer walks forward one stage at a time until it reaches whoever asked.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getUserFromSession()
