@@ -182,56 +182,67 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const removalNote = `Removed ${removedLines.length} material${removedLines.length === 1 ? '' : 's'}: ${removedLines.join('; ')}`
 
-  const results = await transaction<DbRequest>([
-    ...(removeIds.length > 0
-      ? [
+  let results: DbRequest[][]
+  try {
+    results = await transaction<DbRequest>([
+      ...(removeIds.length > 0
+        ? [
+            [
+              `DELETE FROM public.request_items WHERE request_id = $1 AND id = ANY($2::uuid[])`,
+              [id, removeIds],
+            ] as [string, unknown[]],
+            [
+              `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
+               VALUES ($1, 'supply_chain', 'items_removed', $2, $3)`,
+              [id, guard.user.id, removalNote],
+            ] as [string, unknown[]],
+          ]
+        : []),
+      ...items.map(
+        (item) =>
           [
-            `DELETE FROM public.request_items WHERE request_id = $1 AND id = ANY($2::uuid[])`,
-            [id, removeIds],
-          ] as [string, unknown[]],
-          [
-            `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
-             VALUES ($1, 'supply_chain', 'items_removed', $2, $3)`,
-            [id, guard.user.id, removalNote],
-          ] as [string, unknown[]],
-        ]
-      : []),
-    ...items.map(
-      (item) =>
-        [
-          `UPDATE public.request_items
-              SET unit_price = $2,
-                  supplier_id = $3,
-                  quantity = COALESCE($5, quantity)
-            WHERE id = $1 AND request_id = $4`,
-          [item.id, toNumber(item.unitPrice), item.supplierId || null, id, incomingQuantity.get(item.id!) ?? null],
-        ] as [string, unknown[]]
-    ),
-    ...(quantityChanges.length > 0
-      ? [
-          [
-            `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
-             VALUES ($1, 'supply_chain', 'edited', $2, $3)`,
-            [id, guard.user.id, `Quantities changed — ${quantityChanges.join('; ')}.`],
-          ] as [string, unknown[]],
-        ]
-      : []),
-    // The total is taken from the rows as they stand after the statements
-    // above, so it can never disagree with the line items it summarises.
-    [
-      `UPDATE public.requests
-          SET discount_amount = $2,
-              estimated_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM public.request_items WHERE request_id = $1),
-              total_amount = GREATEST(
-                (SELECT COALESCE(SUM(line_total), 0) FROM public.request_items WHERE request_id = $1) - $2,
-                0
-              ),
-              updated_at = now()
-        WHERE id = $1
-        RETURNING *`,
-      [id, discountAmount],
-    ],
-  ])
+            `UPDATE public.request_items
+                SET unit_price = $2,
+                    supplier_id = $3,
+                    quantity = COALESCE($5, quantity)
+              WHERE id = $1 AND request_id = $4`,
+            [item.id, toNumber(item.unitPrice), item.supplierId || null, id, incomingQuantity.get(item.id!) ?? null],
+          ] as [string, unknown[]]
+      ),
+      ...(quantityChanges.length > 0
+        ? [
+            [
+              `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
+               VALUES ($1, 'supply_chain', 'edited', $2, $3)`,
+              [id, guard.user.id, `Quantities changed — ${quantityChanges.join('; ')}.`],
+            ] as [string, unknown[]],
+          ]
+        : []),
+      // The total is taken from the rows as they stand after the statements
+      // above, so it can never disagree with the line items it summarises.
+      [
+        `UPDATE public.requests
+            SET discount_amount = $2,
+                estimated_quantity = (SELECT COALESCE(SUM(quantity), 0) FROM public.request_items WHERE request_id = $1),
+                total_amount = GREATEST(
+                  (SELECT COALESCE(SUM(line_total), 0) FROM public.request_items WHERE request_id = $1) - $2,
+                  0
+                ),
+                updated_at = now()
+          WHERE id = $1
+          RETURNING *`,
+        [id, discountAmount],
+      ],
+    ])
+  } catch (err) {
+    // The transaction rolled back, so nothing was saved; say so rather than
+    // letting the client fall back to a bare "could not save".
+    console.error('[pricing] save failed', err)
+    return NextResponse.json(
+      { error: 'Pricing could not be saved — nothing was changed. Please try again, and report it if it keeps happening.' },
+      { status: 500 }
+    )
+  }
 
   const data = results.at(-1)?.[0] ?? null
   const total = Number(data?.total_amount) || 0
