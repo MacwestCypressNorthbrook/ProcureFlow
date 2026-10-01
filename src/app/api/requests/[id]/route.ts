@@ -2,6 +2,8 @@ import { query, queryOne, execute, transaction } from '@/lib/db'
 import { getRequestItems } from '@/lib/requests'
 import { requireCapability } from '@/lib/auth-guard'
 import { isElevated, normalizeRole } from '@/lib/roles'
+import { formatCurrency } from '@/lib/utils'
+import { currentStage } from '@/lib/workflow'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest } from '@/lib/types'
 import { extractRequisition } from '@/lib/requisitions'
@@ -218,10 +220,29 @@ export async function PUT(
 
     const descriptionJson = JSON.stringify(richDoc)
 
-    // Atomically replace request_items and update request header
-    await execute(`DELETE FROM public.request_items WHERE request_id = $1`, [id])
-    await transaction(
-      items.map((item, index) => [
+    // Every line is replaced, so the history records what the edit did to the
+    // requisition as a whole — enough to see that the amount approved upstream
+    // is not the amount now on the form.
+    const before = await queryOne<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM public.request_items WHERE request_id = $1`,
+      [id]
+    )
+    const previousTotal = existing.total_amount == null ? null : Number(existing.total_amount)
+    const editSummary = [
+      previousTotal === totalAmount
+        ? `Total unchanged at ${formatCurrency(totalAmount)}`
+        : `Total: ${formatCurrency(previousTotal)} → ${formatCurrency(totalAmount)}`,
+      before?.count === items.length
+        ? `${items.length} line${items.length === 1 ? '' : 's'}`
+        : `Lines: ${before?.count ?? 0} → ${items.length}`,
+    ].join('; ') + '.'
+
+    // Replace the lines, update the header and record the edit as one unit, so
+    // a failure part-way cannot leave a requisition with no lines or an
+    // unrecorded change.
+    const results = await transaction<DbRequest>([
+      [`DELETE FROM public.request_items WHERE request_id = $1`, [id]],
+      ...items.map((item, index): [string, unknown[]] => [
         `INSERT INTO public.request_items
            (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks, category, is_subcontractor)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -237,36 +258,39 @@ export async function PUT(
           item.category,
           item.isSubcontractor,
         ],
-      ])
-    )
-
-    const data = await queryOne<DbRequest>(
-      `UPDATE public.requests
-          SET purpose = $1,
-              description = $2,
-              department = $3,
-              project_id = $4,
-              estimated_quantity = $5,
-              estimated_unit_rate = $6,
-              total_amount = $7,
-              guest_name = COALESCE($8, guest_name),
-              guest_email = COALESCE($9, guest_email),
-              updated_at = now()
-        WHERE id = $10
-        RETURNING *`,
+      ]),
       [
-        purpose,
-        descriptionJson,
-        department,
-        projectId,
-        totalQuantity,
-        items.length === 1 ? items[0].unitPrice : null,
-        totalAmount,
-        typeof body.guest_name === 'string' ? body.guest_name : null,
-        typeof body.guest_email === 'string' ? body.guest_email : null,
-        id,
-      ]
-    )
+        `UPDATE public.requests
+            SET purpose = $1,
+                description = $2,
+                department = $3,
+                project_id = $4,
+                estimated_quantity = $5,
+                estimated_unit_rate = $6,
+                total_amount = $7,
+                guest_name = COALESCE($8, guest_name),
+                guest_email = COALESCE($9, guest_email),
+                updated_at = now()
+          WHERE id = $10
+          RETURNING *`,
+        [
+          purpose,
+          descriptionJson,
+          department,
+          projectId,
+          totalQuantity,
+          items.length === 1 ? items[0].unitPrice : null,
+          totalAmount,
+          typeof body.guest_name === 'string' ? body.guest_name : null,
+          typeof body.guest_email === 'string' ? body.guest_email : null,
+          id,
+        ],
+      ],
+      editedStatement(id, existing, guard.user.id, editSummary),
+    ])
+
+    // The header UPDATE is the second-to-last statement.
+    const data = results[results.length - 2]?.[0] ?? null
 
     return NextResponse.json({ data, success: true })
   }
@@ -276,33 +300,61 @@ export async function PUT(
   const estRate = body.estimated_unit_rate ? Number(body.estimated_unit_rate) : null
   const totalAmount = estQty && estRate ? estQty * estRate : null
 
-  const data = await queryOne<DbRequest>(
-    `UPDATE public.requests
-     SET purpose = COALESCE($1, purpose),
-         description = COALESCE($2, description),
-         department = COALESCE($3, department),
-         estimated_quantity = COALESCE($4, estimated_quantity),
-         estimated_unit_rate = COALESCE($5, estimated_unit_rate),
-         total_amount = COALESCE($6, total_amount),
-         guest_name = COALESCE($7, guest_name),
-         guest_email = COALESCE($8, guest_email),
-         updated_at = now()
-     WHERE id = $9
-     RETURNING *`,
-    [
-      body.purpose,
-      body.description,
-      body.department,
-      estQty,
-      estRate,
-      totalAmount,
-      body.guest_name,
-      body.guest_email,
-      id,
-    ]
-  )
+  const previousTotal = existing.total_amount == null ? null : Number(existing.total_amount)
+  const editSummary =
+    totalAmount !== null && totalAmount !== previousTotal
+      ? `Total: ${formatCurrency(previousTotal)} → ${formatCurrency(totalAmount)}.`
+      : 'Details updated.'
 
-  return NextResponse.json({ data, success: true })
+  const results = await transaction<DbRequest>([
+    [
+      `UPDATE public.requests
+       SET purpose = COALESCE($1, purpose),
+           description = COALESCE($2, description),
+           department = COALESCE($3, department),
+           estimated_quantity = COALESCE($4, estimated_quantity),
+           estimated_unit_rate = COALESCE($5, estimated_unit_rate),
+           total_amount = COALESCE($6, total_amount),
+           guest_name = COALESCE($7, guest_name),
+           guest_email = COALESCE($8, guest_email),
+           updated_at = now()
+       WHERE id = $9
+       RETURNING *`,
+      [
+        body.purpose,
+        body.description,
+        body.department,
+        estQty,
+        estRate,
+        totalAmount,
+        body.guest_name,
+        body.guest_email,
+        id,
+      ],
+    ],
+    editedStatement(id, existing, guard.user.id, editSummary),
+  ])
+
+  return NextResponse.json({ data: results[0]?.[0] ?? null, success: true })
+}
+
+/**
+ * The `edited` entry for a requisition's history, as a [sql, params] pair for
+ * `transaction()`. Filed under the stage holding the requisition when it was
+ * edited, so the history shows where in the chain the change happened.
+ */
+function editedStatement(
+  requestId: string,
+  existing: DbRequest,
+  userId: string,
+  summary: string
+): [string, unknown[]] {
+  const stage = currentStage(existing.status, existing.sent_back_to) ?? 'requester'
+  return [
+    `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
+     VALUES ($1, $2, 'edited', $3, $4)`,
+    [requestId, stage, userId, summary],
+  ]
 }
 
 export async function DELETE(

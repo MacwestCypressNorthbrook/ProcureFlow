@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Check, Loader2, RotateCcw, Save, Tag, Trash2 } from 'lucide-react'
 import SupplierPicker, { type SupplierOption } from '@/components/shared/SupplierPicker'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatQuantity } from '@/lib/utils'
 
 export interface PricingItem {
   id: string
@@ -15,7 +15,13 @@ export interface PricingItem {
   supplier_id: string | null
   supplier_name: string | null
   remarks: string | null
+  category?: string | null
+  is_subcontractor?: boolean | null
 }
+
+/** Expenses and sub-contractor prices: quantity 1, the amount in unit_price. */
+const isLumpSum = (item: PricingItem) =>
+  item.category === 'other' || (item.category === 'labour' && Boolean(item.is_subcontractor))
 
 /**
  * The materials table on a requisition review screen.
@@ -24,7 +30,9 @@ export interface PricingItem {
  * engineers often don't know a market rate or a vendor's quote at request
  * time, so this is where those prices (and, if it changed, the supplier) get
  * filled in — plus one overall discount off the subtotal, for when a vendor
- * quote comes back better than list price. Supply Chain can also remove lines
+ * quote comes back better than list price. Supply Chain can correct a
+ * quantity too (a pack size, or what a vendor can actually supply); the change
+ * is recorded in the requisition's history. Supply Chain can also remove lines
  * that won't be procured; a removal is only marked until Save pricing, so it
  * can be undone right up to then. Saving here recomputes the
  * requisition's total; it does not advance the requisition, that is still a
@@ -48,6 +56,8 @@ export default function MaterialsPricingPanel({
   const [rows, setRows] = useState(() =>
     items.map((i) => ({
       id: i.id,
+      // Number() first: the database sends "45.000", which is not how anyone types a count.
+      quantity: String(Number(i.quantity) || 0),
       unitPrice: i.unit_price ? String(i.unit_price) : '',
       supplierId: i.supplier_id,
       removed: false,
@@ -61,7 +71,7 @@ export default function MaterialsPricingPanel({
 
   const updateRow = (
     id: string,
-    patch: Partial<{ unitPrice: string; supplierId: string | null; removed: boolean }>
+    patch: Partial<{ quantity: string; unitPrice: string; supplierId: string | null; removed: boolean }>
   ) => {
     setDirty(true)
     setSaved(false)
@@ -79,7 +89,7 @@ export default function MaterialsPricingPanel({
         const row = rows.find((r) => r.id === item.id)
         if (row?.removed) return sum
         const price = Number(row?.unitPrice) || 0
-        return sum + item.quantity * price
+        return sum + (Number(row?.quantity) || 0) * price
       }, 0),
     [items, rows]
   )
@@ -89,6 +99,7 @@ export default function MaterialsPricingPanel({
   const kept = rows.filter((r) => !r.removed)
   const removedCount = rows.length - kept.length
   const missingPrices = canEdit && kept.some((r) => !(Number(r.unitPrice) > 0))
+  const badQuantity = canEdit && kept.some((r) => !(Number(r.quantity) > 0))
 
   const save = async () => {
     setSaving(true)
@@ -98,7 +109,12 @@ export default function MaterialsPricingPanel({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: kept.map((r) => ({ id: r.id, unitPrice: r.unitPrice, supplierId: r.supplierId })),
+          items: kept.map((r) => ({
+            id: r.id,
+            quantity: r.quantity,
+            unitPrice: r.unitPrice,
+            supplierId: r.supplierId,
+          })),
           removeIds: rows.filter((r) => r.removed).map((r) => r.id),
           discountAmount: discount || 0,
         }),
@@ -127,8 +143,8 @@ export default function MaterialsPricingPanel({
         <div className="flex items-start gap-2.5 border-b border-border bg-primary/[0.03] px-4 py-3 text-xs text-muted-foreground">
           <Tag size={14} className="mt-0.5 shrink-0 text-primary" />
           <p>
-            Fill in the unit price for each material as you source it, and apply a discount below if the
-            vendor quoted one off. The total updates as you type — save it, then attach the invoice or quote
+            Fill in the unit price for each material as you source it, correct a quantity if it needs
+            changing, and apply a discount below if the vendor quoted one off. The total updates as you type — save it, then attach the invoice or quote
             in Documents before approving. Use the bin to remove a material that won&rsquo;t be procured.
           </p>
         </div>
@@ -139,7 +155,7 @@ export default function MaterialsPricingPanel({
           <thead className="bg-muted/50">
             <tr className="text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-2.5">Material</th>
-              <th className="w-24 px-3 py-2.5">Qty</th>
+              <th className={canEdit ? 'w-32 px-3 py-2.5' : 'w-24 px-3 py-2.5'}>Qty</th>
               <th className="w-36 px-3 py-2.5">Unit price</th>
               <th className="w-48 px-3 py-2.5">Supplier</th>
               <th className="w-32 px-4 py-2.5 text-right">Total</th>
@@ -150,6 +166,7 @@ export default function MaterialsPricingPanel({
             {items.map((item) => {
               const row = rows.find((r) => r.id === item.id)
               const price = Number(row?.unitPrice) || 0
+              const quantity = Number(row?.quantity) || 0
               const removed = Boolean(row?.removed)
               if (removed) {
                 return (
@@ -161,7 +178,7 @@ export default function MaterialsPricingPanel({
                       </p>
                     </td>
                     <td className="px-4 py-3 text-right text-sm tabular-nums text-muted-foreground line-through">
-                      {formatCurrency(item.quantity * price)}
+                      {formatCurrency(quantity * price)}
                     </td>
                     <td className="px-2 py-2.5 text-center">
                       <button
@@ -183,8 +200,26 @@ export default function MaterialsPricingPanel({
                     <p className="text-sm text-foreground">{item.description}</p>
                     {item.remarks && <p className="mt-0.5 text-xs text-muted-foreground">{item.remarks}</p>}
                   </td>
-                  <td className="px-3 py-3 text-sm tabular-nums text-foreground">
-                    {item.quantity} {item.unit ?? ''}
+                  <td className="px-3 py-2.5">
+                    {canEdit && !isLumpSum(item) ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min="0"
+                          step="any"
+                          value={row?.quantity ?? ''}
+                          onChange={(e) => updateRow(item.id, { quantity: e.target.value })}
+                          aria-label={`Quantity of ${item.description}`}
+                          className="h-10 w-full min-w-0 rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
+                        {item.unit && <span className="shrink-0 text-xs text-muted-foreground">{item.unit}</span>}
+                      </div>
+                    ) : (
+                      <span className="inline-block pt-0.5 text-sm tabular-nums text-foreground">
+                        {formatQuantity(item.quantity)} {item.unit ?? ''}
+                      </span>
+                    )}
                   </td>
                   <td className="px-3 py-2.5">
                     {canEdit ? (
@@ -216,7 +251,7 @@ export default function MaterialsPricingPanel({
                     )}
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-foreground">
-                    <span className="inline-block pt-2.5">{formatCurrency(item.quantity * price)}</span>
+                    <span className="inline-block pt-2.5">{formatCurrency(quantity * price)}</span>
                   </td>
                   {canEdit && (
                     <td className="px-2 py-2.5 text-center">
@@ -295,6 +330,10 @@ export default function MaterialsPricingPanel({
               <span className="flex items-center gap-1.5 font-medium text-destructive">
                 <AlertCircle size={13} /> {error}
               </span>
+            ) : badQuantity ? (
+              <span className="flex items-center gap-1.5 font-medium text-destructive">
+                <AlertCircle size={13} /> Every quantity must be more than zero — remove a line instead of zeroing it.
+              </span>
             ) : dirty ? (
               // Approving is a separate button, and it does not carry anything
               // typed here — so say plainly that these edits are not saved yet.
@@ -319,7 +358,7 @@ export default function MaterialsPricingPanel({
           <button
             type="button"
             onClick={save}
-            disabled={saving || !dirty}
+            disabled={saving || !dirty || badQuantity}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

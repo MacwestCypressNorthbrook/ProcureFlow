@@ -351,6 +351,8 @@ export async function getStageDecisions(
          LEFT JOIN public.projects p ON p.id = r.project_id
          LEFT JOIN public.purchase_orders po ON po.id = a.po_id
         WHERE a.stage = $1
+          -- Raising and editing a requisition are history, not a stage's decision.
+          AND a.action NOT IN ('submitted', 'edited')
           AND ($2::uuid IS NULL OR a.performed_by = $2)
         ORDER BY a.created_at DESC
         LIMIT $3`,

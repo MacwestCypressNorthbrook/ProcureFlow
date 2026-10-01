@@ -1,4 +1,5 @@
-import { execute, query, queryOne } from '@/lib/db'
+import { execute, query, queryOne, transaction } from '@/lib/db'
+import { poAuditStatement } from '@/lib/audit'
 import { getUserFromSession } from '@/lib/auth/server'
 import { isElevated } from '@/lib/roles'
 import {
@@ -372,23 +373,33 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
       const approvalAction = stage === 'finance' ? 'paid' : 'completed'
 
-      await execute(
-        `UPDATE public.requests
-            SET status = 'completed', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
-          WHERE id = $1`,
-        [id]
-      )
-      if (po) {
-        await execute(
-          `UPDATE public.purchase_orders SET status = 'approved', updated_at = now() WHERE id = $1`,
-          [po.id]
-        )
-      }
-      await execute(
-        `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [id, po?.id ?? null, stage, approvalAction, user.id, comment]
-      )
+      await transaction([
+        [
+          `UPDATE public.requests
+              SET status = 'completed', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
+            WHERE id = $1`,
+          [id],
+        ],
+        ...(po
+          ? [
+              [
+                `UPDATE public.purchase_orders SET status = 'approved', updated_at = now() WHERE id = $1`,
+                [po.id],
+              ] as [string, unknown[]],
+              poAuditStatement(
+                po.id,
+                'approved',
+                user.id,
+                comment || `Requisition authorized and closed by ${STAGES[stage].label}.`
+              ),
+            ]
+          : []),
+        [
+          `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [id, po?.id ?? null, stage, approvalAction, user.id, comment],
+        ],
+      ])
 
       // Completion is the one event the whole chain wants: the requisition is
       // closed and the purchase order behind it is final. Everyone who raised,
@@ -499,33 +510,38 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       )
     }
 
-    await execute(
-      `UPDATE public.requests
-          SET status = 'sent_back',
-              sent_back_to = $2,
-              return_to_stage = $3,
-              sent_back_by = $4,
-              sent_back_at = now(),
-              updated_at = now()
-        WHERE id = $1`,
-      [id, back, stage, user.id]
-    )
+    const poSentBack = po && (stage === 'cost_control' || stage === 'admin' || stage === 'finance')
 
-    if (po && (stage === 'cost_control' || stage === 'admin' || stage === 'finance')) {
-      await execute(
-        `UPDATE public.purchase_orders
-            SET status = 'sent_back', sent_back_to = $2, return_to_stage = $3,
-                rejection_reason = COALESCE($4, rejection_reason), updated_at = now()
+    await transaction([
+      [
+        `UPDATE public.requests
+            SET status = 'sent_back',
+                sent_back_to = $2,
+                return_to_stage = $3,
+                sent_back_by = $4,
+                sent_back_at = now(),
+                updated_at = now()
           WHERE id = $1`,
-        [po.id, back, stage, comment]
-      )
-    }
-
-    await execute(
-      `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
-       VALUES ($1, $2, $3, 'sent_back', $4, $5)`,
-      [id, po?.id ?? null, stage, user.id, comment]
-    )
+        [id, back, stage, user.id],
+      ],
+      ...(poSentBack
+        ? [
+            [
+              `UPDATE public.purchase_orders
+                  SET status = 'sent_back', sent_back_to = $2, return_to_stage = $3,
+                      rejection_reason = COALESCE($4, rejection_reason), updated_at = now()
+                WHERE id = $1`,
+              [po.id, back, stage, comment],
+            ] as [string, unknown[]],
+            poAuditStatement(po.id, 'sent_back', user.id, comment || `Sent back to ${STAGES[back].label}.`),
+          ]
+        : []),
+      [
+        `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
+         VALUES ($1, $2, $3, 'sent_back', $4, $5)`,
+        [id, po?.id ?? null, stage, user.id, comment],
+      ],
+    ])
 
     if (back === 'requester') {
       if (existing.created_by) {
@@ -610,25 +626,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
 
   /* ── Reject: close it out ────────────────────────────────── */
-  await execute(
-    `UPDATE public.requests
-        SET status = 'rejected', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
-      WHERE id = $1`,
-    [id]
-  )
-  if (po) {
-    await execute(
-      `UPDATE public.purchase_orders
-          SET status = 'rejected', rejection_reason = COALESCE($2, rejection_reason), updated_at = now()
+  await transaction([
+    [
+      `UPDATE public.requests
+          SET status = 'rejected', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
         WHERE id = $1`,
-      [po.id, comment]
-    )
-  }
-  await execute(
-    `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
-     VALUES ($1, $2, $3, 'rejected', $4, $5)`,
-    [id, po?.id ?? null, stage, user.id, comment]
-  )
+      [id],
+    ],
+    ...(po
+      ? [
+          [
+            `UPDATE public.purchase_orders
+                SET status = 'rejected', rejection_reason = COALESCE($2, rejection_reason), updated_at = now()
+              WHERE id = $1`,
+            [po.id, comment],
+          ] as [string, unknown[]],
+          poAuditStatement(po.id, 'rejected', user.id, comment || `Rejected by ${STAGES[stage].label}.`),
+        ]
+      : []),
+    [
+      `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by, comment)
+       VALUES ($1, $2, $3, 'rejected', $4, $5)`,
+      [id, po?.id ?? null, stage, user.id, comment],
+    ],
+  ])
   if (existing.created_by) {
     await createNotification({
       userId: existing.created_by,

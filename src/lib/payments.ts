@@ -1,4 +1,5 @@
-import { query, queryOne, execute } from '@/lib/db'
+import { query, queryOne, transaction } from '@/lib/db'
+import { poAuditStatement } from '@/lib/audit'
 import type { PoPayment } from '@/lib/types'
 
 export interface PaymentPosition {
@@ -75,30 +76,48 @@ export async function recordPayment(
     }
   }
 
-  await execute(
-    `INSERT INTO public.po_payments (po_id, amount, reference, note, paid_by)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [poId, amount, meta.reference?.trim() || null, meta.note?.trim() || null, userId]
-  )
+  // Worked out here rather than re-read after the insert, so the ledger row,
+  // the status and the audit entry can all commit as one transaction.
+  const paid = Math.round((before.paid + amount) * 100) / 100
+  const outstanding = Math.max(0, Math.round((before.total - paid) * 100) / 100)
+  const after: PaymentPosition = { total: before.total, paid, outstanding, settled: outstanding === 0 }
 
-  const after = await getPaymentPosition(poId, poTotal)
+  const reference = meta.reference?.trim() || null
+  const note = meta.note?.trim() || null
+  const auditNotes = [
+    `${ghs(amount)} paid — ${paymentSummary(after)}` +
+      (after.settled ? ', settled in full.' : `, ${ghs(after.outstanding)} outstanding.`),
+    reference && `Ref: ${reference}`,
+    note,
+  ]
+    .filter(Boolean)
+    .join(' · ')
 
-  await execute(
-    `UPDATE public.purchase_orders
-        SET status = $2,
-            paid_by = CASE WHEN $3 THEN $4 ELSE paid_by END,
-            paid_at = CASE WHEN $3 THEN now() ELSE paid_at END,
-            updated_at = now()
-      WHERE id = $1`,
-    [poId, after.settled ? 'paid' : 'partially_paid', after.settled, userId]
-  )
+  await transaction([
+    [
+      `INSERT INTO public.po_payments (po_id, amount, reference, note, paid_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [poId, amount, reference, note, userId],
+    ],
+    [
+      `UPDATE public.purchase_orders
+          SET status = $2,
+              paid_by = CASE WHEN $3 THEN $4 ELSE paid_by END,
+              paid_at = CASE WHEN $3 THEN now() ELSE paid_at END,
+              updated_at = now()
+        WHERE id = $1`,
+      [poId, after.settled ? 'paid' : 'partially_paid', after.settled, userId],
+    ],
+    poAuditStatement(poId, after.settled ? 'paid' : 'part_paid', userId, auditNotes),
+  ])
 
   return { ok: true, position: after, settled: after.settled }
 }
 
+const ghs = (n: number) =>
+  new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(n)
+
 /** "GH₵40,000.00 of GH₵75,000.00" — the phrase used in notifications and email. */
 export function paymentSummary(position: PaymentPosition): string {
-  const ghs = (n: number) =>
-    new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS' }).format(n)
   return `${ghs(position.paid)} of ${ghs(position.total)}`
 }

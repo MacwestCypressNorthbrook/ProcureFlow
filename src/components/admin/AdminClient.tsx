@@ -15,7 +15,7 @@ import ProjectsPanel from './ProjectsPanel'
 import SuppliersPanel, { type SupplierRow } from './SuppliersPanel'
 import EmailPreviewModal from './EmailPreviewModal'
 import RequestWindowPanel from './RequestWindowPanel'
-import LeadDigestPanel from './LeadDigestPanel'
+import NotificationSettingsPanel from './NotificationSettingsPanel'
 import AttachPODrawer from './AttachPODrawer'
 import ExportButton from './ExportButton'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
@@ -38,7 +38,8 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { AUDIT_ACTION_LABELS } from '@/lib/audit'
-import { can, type Capability } from '@/lib/roles'
+import { can, type Capability, type RoleId } from '@/lib/roles'
+import type { RoleEmailPolicy } from '@/lib/notification-settings'
 
 const ghs = (n: number | string | null | undefined) => {
   if (n == null || n === '') return '—'
@@ -185,8 +186,7 @@ export default function AdminClient({
   pos,
   auditTrail,
   requestWindowBlockedDays,
-  leadDigestEnabled,
-  leadDigestDayOfWeek,
+  notificationRoles,
 }: {
   user: { name?: string; email: string } | null
   role: string | null
@@ -197,8 +197,7 @@ export default function AdminClient({
   pos: PurchaseOrder[]
   auditTrail: AuditEntry[]
   requestWindowBlockedDays: number[]
-  leadDigestEnabled: boolean
-  leadDigestDayOfWeek: number
+  notificationRoles: Record<RoleId, RoleEmailPolicy> | null
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -1057,9 +1056,11 @@ export default function AdminClient({
               <RequestWindowPanel initialBlockedDays={requestWindowBlockedDays} />
             </div>
 
-            <div className="lg:col-span-2">
-              <LeadDigestPanel initialEnabled={leadDigestEnabled} initialDayOfWeek={leadDigestDayOfWeek} />
-            </div>
+            {notificationRoles && (
+              <div className="lg:col-span-2">
+                <NotificationSettingsPanel initialRoles={notificationRoles} />
+              </div>
+            )}
 
             <Panel title="Workspace">
               <dl className="divide-y divide-border">

@@ -57,8 +57,9 @@ export default function RequisitionTimeline({
     if (entry.action === 'sent_back') bounceAt.set(entry.stage, entry)
   }
 
-  const lastMoved =
-    ordered.length > 0 ? ordered[ordered.length - 1].created_at : createdAt
+  // An edit changes the form, not where it sits, so it does not restart the wait.
+  const moves = ordered.filter((entry) => entry.action !== 'edited')
+  const lastMoved = moves.length > 0 ? moves[moves.length - 1].created_at : createdAt
   const waitingDays = daysSince(sentBackAt ?? lastMoved)
 
   const headline = rejected

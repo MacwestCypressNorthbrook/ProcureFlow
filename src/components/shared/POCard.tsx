@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import StatusBadge from '@/components/shared/StatusBadge'
-import { PO_STATUS_CONFIG } from '@/lib/utils'
+import { PO_STATUS_CONFIG, formatQuantity } from '@/lib/utils'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { ArrowRight, Document } from '@/lib/icons'
 import type { PurchaseOrder } from '@/lib/types'
@@ -38,7 +38,7 @@ export default function POCard({ po, href, showActions = true }: POCardProps) {
           </span>
           {po.quantity && po.unit_rate && (
             <span className="text-muted-foreground">
-              {po.quantity} &times; {formatCurrency(po.unit_rate)}
+              {formatQuantity(po.quantity)} &times; {formatCurrency(po.unit_rate)}
             </span>
           )}
         </div>

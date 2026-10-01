@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { documentUrl } from '@/lib/files'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatQuantity } from '@/lib/utils'
 import type { ReviewDocument } from '@/components/shared/ApprovalPanel'
 import type { RequestItemRow } from '@/lib/review'
 
@@ -618,7 +618,7 @@ export function CostControlAuditTable({
     const category = item.category || 'material'
     const isLump = category === 'other' || (category === 'labour' && Boolean(item.is_subcontractor))
     if (isLump) return null
-    return `${Number(item.quantity)}${item.unit ? ` ${item.unit}` : ''} × ${formatCurrency(Number(item.unit_price) || 0)}`
+    return `${formatQuantity(item.quantity)}${item.unit ? ` ${item.unit}` : ''} × ${formatCurrency(Number(item.unit_price) || 0)}`
   }
 
   return (
@@ -741,7 +741,7 @@ export function CostControlAuditTable({
                     )}
                   </TableCell>
                   <TableCell className="w-24 py-3 px-3 text-right text-sm tabular-nums text-muted-foreground">
-                    {isLump ? '—' : `${Number(item.quantity)}${item.unit ? ` ${item.unit}` : ''}`}
+                    {isLump ? '—' : `${formatQuantity(item.quantity)}${item.unit ? ` ${item.unit}` : ''}`}
                   </TableCell>
                   <TableCell className="w-32 py-3 px-3 text-right text-sm tabular-nums text-muted-foreground">
                     {isLump ? '—' : formatCurrency(Number(item.unit_price) || 0)}

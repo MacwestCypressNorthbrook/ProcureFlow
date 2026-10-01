@@ -403,7 +403,8 @@ ALTER TABLE public.request_approvals DROP CONSTRAINT IF EXISTS request_approvals
 ALTER TABLE public.request_approvals ADD CONSTRAINT request_approvals_action_check CHECK (
     action IN (
         'submitted', 'approved', 'sent_back', 'resubmitted', 'po_created',
-        'marked_urgent', 'completed', 'paid', 'rejected', 'items_removed'
+        'marked_urgent', 'completed', 'paid', 'rejected', 'items_removed',
+        'edited'
     )
 );
 
@@ -417,3 +418,18 @@ ALTER TABLE public.purchase_orders ADD CONSTRAINT purchase_orders_status_check C
         'cancelled', 'pending_approval'
     )
 );
+
+-- ── Email digest queue ──────────────────────────────────────────────────────
+-- (mirrors db/migrations/015_email_digest_queue.sql)
+-- Emails held for roles on a daily or weekly digest; see notification-settings.ts.
+CREATE TABLE IF NOT EXISTS public.email_digest_queue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    request_id UUID REFERENCES public.requests(id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    message TEXT,
+    link TEXT,
+    queued_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_digest_queue_user ON public.email_digest_queue(user_id, queued_at);

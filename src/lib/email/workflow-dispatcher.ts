@@ -1,5 +1,6 @@
 import { query, queryOne } from '@/lib/db'
 import { sendEmail } from '@/lib/email/client'
+import { deliverNotificationEmail } from '@/lib/email/delivery'
 import { linkForRole } from '@/lib/links'
 import {
   buildWorkflowEmailSubject,
@@ -303,15 +304,33 @@ export async function dispatchWorkflowEmail({
 
     // Each recipient gets their own render, because the link and the greeting
     // both depend on who is reading it.
+    //
+    // Whether each one is sent now, held for a digest, or dropped follows the
+    // recipient's role setting. An urgent escalation always goes now.
+    type SendResult = Awaited<ReturnType<typeof sendEmail>>
     const results = await Promise.all(
-      recipients.map((user) => {
+      recipients.map(async (user): Promise<SendResult> => {
         const data = buildFor(user)
-        return sendEmail({
-          to: user.email,
-          subject: buildWorkflowEmailSubject(data),
-          html: renderWorkflowEmailHtml(data),
-          text: renderWorkflowEmailText(data),
-        })
+        let result: SendResult = { success: true }
+        await deliverNotificationEmail(
+          { id: user.id, role: user.role },
+          {
+            title: buildWorkflowEmailSubject(data),
+            message: data.comments,
+            link: data.actionUrl,
+            requestId: req?.id ?? po?.request_id ?? null,
+          },
+          async () => {
+            result = await sendEmail({
+              to: user.email,
+              subject: buildWorkflowEmailSubject(data),
+              html: renderWorkflowEmailHtml(data),
+              text: renderWorkflowEmailText(data),
+            })
+          },
+          { urgent: eventType === 'urgent_escalation' }
+        )
+        return result
       })
     )
 

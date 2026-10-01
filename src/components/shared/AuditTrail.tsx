@@ -1,6 +1,6 @@
 import { AUDIT_ACTION_LABELS, auditTone, relativeTime, type PoAuditEntry } from '@/lib/audit'
 import { ROLE_LABELS } from '@/lib/utils'
-import { CheckCircle, XCircle, Send, MessageSquare, FileText, Clock, Banknote } from 'lucide-react'
+import { CheckCircle, XCircle, Send, MessageSquare, FileText, Clock, Banknote, Pencil, RotateCcw } from 'lucide-react'
 
 function actionIcon(action: string) {
   switch (action) {
@@ -8,8 +8,13 @@ function actionIcon(action: string) {
     case 'approved_by_sam':
       return <CheckCircle size={12} />
     case 'paid':
+    case 'part_paid':
     case 'payment_completed':
       return <Banknote size={12} />
+    case 'edited':
+      return <Pencil size={12} />
+    case 'resubmitted':
+      return <RotateCcw size={12} />
     case 'rejected':
     case 'rejected_by_sam':
     case 'sent_back':

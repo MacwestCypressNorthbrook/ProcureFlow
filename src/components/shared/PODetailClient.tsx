@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import POProgress from '@/components/shared/POProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
-import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
+import { PO_STATUS_CONFIG, formatCurrency, formatDate, formatQuantity } from '@/lib/utils'
 import { ArrowLeft, CheckCircle, XCircle, FileText, Download } from 'lucide-react'
 import Link from 'next/link'
 import RichRequisitionView from '@/components/shared/RichRequisitionView'
@@ -109,7 +109,7 @@ export default function PODetailClient({ po, user, role }: PODetailProps) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label className="text-xs font-medium text-muted-foreground mb-1 block">Quantity</Label>
-                      <p className="text-xs font-bold text-foreground">{po.quantity ?? '—'}</p>
+                      <p className="text-xs font-bold text-foreground">{formatQuantity(po.quantity)}</p>
                     </div>
                     <div>
                       <Label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Rate</Label>

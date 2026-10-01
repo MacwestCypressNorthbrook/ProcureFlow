@@ -8,7 +8,7 @@ import POProgress from '@/components/shared/POProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
 import RichRequisitionView, { isRichRequisition } from '@/components/shared/RichRequisitionView'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
-import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
+import { PO_STATUS_CONFIG, formatCurrency, formatDate, formatQuantity } from '@/lib/utils'
 import { FileText, Send, MessageSquare, Clock, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import type { PoAuditEntry } from '@/lib/audit'
@@ -91,7 +91,7 @@ export default function MintahPODetailClient({
                     <Field label="Description"><p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{po.description}</p></Field>
                   )}
                   <div className="grid grid-cols-3 gap-4">
-                    <Field label="Quantity"><p className="text-sm font-semibold tabular-nums text-foreground">{po.quantity ?? '—'}</p></Field>
+                    <Field label="Quantity"><p className="text-sm font-semibold tabular-nums text-foreground">{formatQuantity(po.quantity)}</p></Field>
                     <Field label="Unit Rate"><p className="text-sm font-semibold tabular-nums text-foreground">{formatCurrency(po.unit_rate)}</p></Field>
                     <Field label="Total"><p className="text-sm font-semibold tabular-nums text-primary">{formatCurrency(po.total_amount)}</p></Field>
                   </div>

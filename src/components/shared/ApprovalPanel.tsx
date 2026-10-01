@@ -73,6 +73,7 @@ const ACTION_LABEL: Record<string, string> = {
   paid: 'Paid',
   rejected: 'Rejected',
   items_removed: 'Materials removed',
+  edited: 'Edited',
 }
 
 const ACTION_TONE: Record<string, string> = {
@@ -84,6 +85,7 @@ const ACTION_TONE: Record<string, string> = {
   paid: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   rejected: 'bg-red-500/10 text-red-600 dark:text-red-400',
   items_removed: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+  edited: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
 }
 
 /**

@@ -14,6 +14,20 @@ export function formatCurrency(amount: number | null): string {
   }).format(amount)
 }
 
+/**
+ * A count, not money: "45", "50.6", "5,000" — never "45.000".
+ *
+ * Postgres returns NUMERIC quantities as fixed-scale strings ("45.000"), which
+ * read as currency when printed raw. Only the decimals a quantity actually has
+ * are shown, up to the column's three.
+ */
+export function formatQuantity(quantity: number | string | null | undefined): string {
+  if (quantity === null || quantity === undefined || quantity === '') return '—'
+  const n = Number(quantity)
+  if (!Number.isFinite(n)) return String(quantity)
+  return new Intl.NumberFormat('en-GH', { maximumFractionDigits: 3 }).format(n)
+}
+
 /** "27 Sept 2026" — the dense-table form of {@link formatDate}, same fixed zone. */
 export function formatDateShort(date: string | Date | null | undefined): string {
   if (!date) return '—'

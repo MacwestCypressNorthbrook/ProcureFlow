@@ -1,9 +1,24 @@
 import { query, queryOne, execute } from '@/lib/db'
-import { sendEmail, sendActionReminderEmail, sendLeadDigestEmail, sendStageDigestEmail } from '@/lib/email/client'
+import {
+  esc as escapeHtml,
+  sendEmail,
+  sendActionReminderEmail,
+  sendNotificationDigestEmail,
+  sendStageDigestEmail,
+} from '@/lib/email/client'
+import { deliverNotificationEmail } from '@/lib/email/delivery'
 import { linkForRole, type LinkTarget } from '@/lib/links'
 import type { Notification, Reminder } from '@/lib/types'
 import { getStageInbox } from '@/lib/review'
-import { getLeadDigestSettings, markLeadDigestSent, accraWeekday, accraDateStr } from '@/lib/settings'
+import { accraDateStr } from '@/lib/settings'
+import {
+  ROLE_IDS,
+  emailPolicyFor,
+  getNotificationSettings,
+  isDigestDue,
+  markRoleDigestSent,
+} from '@/lib/notification-settings'
+import { normalizeRole, type RoleId } from '@/lib/roles'
 
 interface CreateNotificationParams {
   userId: string
@@ -35,11 +50,15 @@ export async function createNotification({
   try {
     let resolvedLink = link ?? null
 
+    const recipient =
+      target || sendEmailAlert
+        ? await queryOne<{ role: string | null; email: string | null }>(
+            `SELECT role, email FROM public.users WHERE id = $1 LIMIT 1`,
+            [userId]
+          )
+        : null
+
     if (target) {
-      const recipient = await queryOne<{ role: string }>(
-        `SELECT role FROM public.users WHERE id = $1 LIMIT 1`,
-        [userId]
-      )
       resolvedLink = linkForRole(recipient?.role, target)
     }
 
@@ -50,26 +69,31 @@ export async function createNotification({
       [userId, title, message, type, resolvedLink]
     )
 
-    if (sendEmailAlert) {
-      // Lookup user email
-      const user = await queryOne<{ email: string; name: string }>(
-        `SELECT email, name FROM public.users WHERE id = $1 LIMIT 1`,
-        [userId]
-      )
-
-      if (user?.email) {
-        await sendEmail({
-          to: user.email,
-          subject: `[ProcureFlow] ${title}`,
-          html: `
+    // The in-app row above is always immediate; the email follows the
+    // recipient's role setting — now, in their digest, or not at all.
+    if (sendEmailAlert && recipient?.email) {
+      const email = recipient.email
+      await deliverNotificationEmail(
+        { id: userId, role: recipient.role },
+        {
+          title,
+          message,
+          link: resolvedLink,
+          requestId: target?.type === 'request' ? target.id : null,
+        },
+        () =>
+          sendEmail({
+            to: email,
+            subject: `[ProcureFlow] ${title}`,
+            html: `
             <div style="font-family: sans-serif; padding: 20px;">
-              <h2>${title}</h2>
-              <p>${message}</p>
-              ${link ? `<p><a href="${process.env.NEXT_PUBLIC_APP_URL || ''}${link}">View in ProcureFlow</a></p>` : ''}
+              <h2>${escapeHtml(title)}</h2>
+              <p>${escapeHtml(message)}</p>
+              ${resolvedLink ? `<p><a href="${process.env.NEXT_PUBLIC_APP_URL || ''}${resolvedLink}">View in ProcureFlow</a></p>` : ''}
             </div>
           `,
-        })
-      }
+          })
+      )
     }
 
     return inserted
@@ -219,62 +243,124 @@ export async function dispatchPendingReminders(): Promise<{ processed: number }>
 }
 
 /**
- * Bundles everything sitting in the Project Lead queue into one email per
- * Lead, on whichever weekday the Super User has configured (default
- * Thursday). Leads already got an in-app notification the instant each
- * requisition landed; this only replaces the "one email per requisition"
- * alert that would otherwise flood their inbox.
+ * Send each daily or weekly digest that is due.
  *
- * Safe to call from a cron that fires more than once a day, or on days other
- * than the configured one — it only ever sends once per Accra-local day,
- * tracked in `app_settings` rather than in the cron schedule itself, so
- * changing the day in the admin panel takes effect immediately.
+ * For every role on a digest (Admin → Notifications), once its configured
+ * hour has passed on a matching day, each active person in that role gets one
+ * email: the notification emails held for them since their last digest,
+ * grouped by requisition, plus whatever is waiting in their stage's queue.
+ * Their in-app notifications were already instant.
+ *
+ * Safe to call from a cron that fires every few minutes — each role sends at
+ * most once per Accra-local day, tracked in `app_settings`, so changing a
+ * schedule in Admin takes effect without a deploy. Emails held for a role
+ * that has since been switched back to "immediately" are flushed on the next
+ * run; for a role switched to "off", they are dropped.
  */
-export async function dispatchLeadDigest(): Promise<{ sent: number; reason: string }> {
-  try {
-    const settings = await getLeadDigestSettings()
-    if (!settings.enabled) return { sent: 0, reason: 'digest disabled' }
-    if (accraWeekday() !== settings.dayOfWeek) return { sent: 0, reason: 'not the configured day' }
+export async function dispatchEmailDigests(): Promise<{ sent: Partial<Record<RoleId, number>> }> {
+  const sent: Partial<Record<RoleId, number>> = {}
+  const { STAGES, STAGE_ORDER } = await import('@/lib/workflow')
+  const settings = await getNotificationSettings()
+  const today = accraDateStr()
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+  const absolute = (link: string | null) => (link && link.startsWith('/') ? `${baseUrl}${link}` : link)
 
-    const today = accraDateStr()
-    if (settings.lastSentOn === today) return { sent: 0, reason: 'already sent today' }
-
-    const pending = await getStageInbox('lead')
-    if (pending.length === 0) {
-      await markLeadDigestSent(today)
-      return { sent: 0, reason: 'no requisitions waiting' }
-    }
-
-    const leads = await query<{ id: string; email: string; name: string }>(
-      `SELECT id, email, name FROM public.users WHERE role = 'project_lead' AND is_active`
+  // Legacy role values (`sam`, `mintah`…) map to a role only through
+  // normalizeRole, which SQL cannot call — so match here, as the dispatcher does.
+  const people = (
+    await query<{ id: string; email: string | null; name: string | null; role: string | null }>(
+      `SELECT id, email, name, role FROM public.users
+        WHERE COALESCE(is_active, true) AND auth_id NOT LIKE 'pending:%'`
     )
+  ).filter((p) => p.email)
 
-    const queueUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}/sam/requests`
-    let sent = 0
-    for (const lead of leads) {
-      if (!lead.email) continue
-      await sendLeadDigestEmail({
-        recipientEmail: lead.email,
-        recipientName: lead.name || 'there',
-        items: pending.map((r) => ({
-          requestId: r.id,
-          purpose: r.purpose,
-          requesterName: r.requester_name || 'Unknown',
-          projectName: r.project_name,
-          amount: r.total_amount,
-          createdAt: r.created_at,
-        })),
-        queueUrl,
-      })
-      sent++
+  for (const role of ROLE_IDS) {
+    try {
+      const policy = settings.roles[role]
+      const members = people.filter((p) => normalizeRole(p.role) === role)
+      if (members.length === 0) continue
+
+      if (policy.delivery === 'off') {
+        await execute(`DELETE FROM public.email_digest_queue WHERE user_id = ANY($1::uuid[])`, [members.map((m) => m.id)])
+        continue
+      }
+
+      const scheduled = isDigestDue(policy, settings.lastSent[role])
+      // A role switched back to "immediately" with emails still held: flush now.
+      if (!scheduled && policy.delivery !== 'immediate') continue
+
+      // The stages this role holds — exactly, not every stage an elevated role
+      // could oversee, or an Administrator's digest would list the whole chain.
+      const stages = STAGE_ORDER.filter((s) => STAGES[s].roles.includes(role))
+      const waiting = scheduled ? (await Promise.all(stages.map((s) => getStageInbox(s)))).flat() : []
+      const queueUrl = stages.length > 0 ? `${baseUrl}${STAGE_QUEUE_PATH[stages[0]] ?? '/'}` : baseUrl || null
+
+      let count = 0
+      for (const member of members) {
+        const held = await query<{
+          id: string
+          request_id: string | null
+          purpose: string | null
+          title: string
+          message: string | null
+          link: string | null
+          queued_at: string
+        }>(
+          `SELECT q.id, q.request_id, r.purpose, q.title, q.message, q.link, q.queued_at
+             FROM public.email_digest_queue q
+             LEFT JOIN public.requests r ON r.id = q.request_id
+            WHERE q.user_id = $1
+            ORDER BY q.queued_at ASC`,
+          [member.id]
+        )
+        if (held.length === 0 && waiting.length === 0) continue
+
+        // One group per requisition; a notice about anything else stands alone.
+        // The same event often arrives twice (an in-app alert and a designed
+        // email for one action), so identical lines within a group collapse.
+        const groups = new Map<string, { heading: string; link: string | null; updates: Array<{ title: string; message: string | null; at: string }> }>()
+        for (const h of held) {
+          const key = h.request_id ?? `${h.title}\u0000${h.message ?? ''}`
+          const group = groups.get(key) ?? {
+            heading: h.purpose ?? h.title,
+            link: absolute(h.link),
+            updates: [],
+          }
+          if (!group.updates.some((u) => u.title === h.title && u.message === h.message)) {
+            group.updates.push({ title: h.title, message: h.message, at: h.queued_at })
+          }
+          groups.set(key, group)
+        }
+
+        await sendNotificationDigestEmail({
+          recipientEmail: member.email!,
+          recipientName: member.name || 'there',
+          period: policy.delivery === 'daily' ? 'daily' : 'weekly',
+          groups: [...groups.values()],
+          waiting: waiting.map((r) => ({
+            purpose: r.purpose,
+            requesterName: r.requester_name || 'Unknown',
+            projectName: r.project_name,
+            amount: r.total_amount,
+            urgent: Boolean(r.is_urgent),
+          })),
+          queueUrl,
+        })
+
+        if (held.length > 0) {
+          await execute(`DELETE FROM public.email_digest_queue WHERE id = ANY($1::uuid[])`, [held.map((h) => h.id)])
+        }
+        count++
+      }
+
+      if (scheduled) await markRoleDigestSent(role, today)
+      if (count > 0) sent[role] = count
+    } catch (err) {
+      console.error(`Failed to dispatch the ${role} email digest:`, err)
     }
-
-    await markLeadDigestSent(today)
-    return { sent, reason: '' }
-  } catch (err) {
-    console.error('Error dispatching the lead digest:', err)
-    return { sent: 0, reason: 'error' }
   }
+
+  return { sent }
 }
 
 /* ============================================================
@@ -379,13 +465,19 @@ export async function dispatchStageDigests(): Promise<{ sent: Record<string, num
       await execute(`DELETE FROM public.stage_digest_queue WHERE stage = $1`, [stage])
       if (items.length === 0) continue
 
-      const holders = await query<{ id: string; email: string; name: string }>(
-        `SELECT id, email, name FROM public.users
+      const allHolders = await query<{ id: string; email: string; name: string; role: string }>(
+        `SELECT id, email, name, role FROM public.users
           WHERE role = ANY($1::text[])
             AND COALESCE(is_active, true)
             AND auth_id NOT LIKE 'pending:%'`,
         [STAGES[stage].roles]
       )
+      // A holder whose role is on a daily or weekly digest (or has email off)
+      // sees this batch in the digest's "Waiting on you" list instead.
+      const holders: typeof allHolders = []
+      for (const h of allHolders) {
+        if ((await emailPolicyFor(h.role)).delivery === 'immediate') holders.push(h)
+      }
 
       const previous = STAGE_ORDER_BEFORE(stage)
       const queueUrl = `${process.env.NEXT_PUBLIC_APP_URL || ''}${STAGE_QUEUE_PATH[stage] ?? '/'}`

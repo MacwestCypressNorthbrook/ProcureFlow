@@ -1,9 +1,10 @@
-import { query, queryOne } from '@/lib/db'
+import { queryOne, transaction } from '@/lib/db'
 import { requireCapability } from '@/lib/auth-guard'
 import { isElevated } from '@/lib/roles'
+import { formatCurrency } from '@/lib/utils'
 import { NextResponse } from 'next/server'
 import type { PurchaseOrder } from '@/lib/types'
-import { getPoAuditTrail } from '@/lib/audit'
+import { getPoAuditTrail, poAuditStatement } from '@/lib/audit'
 
 export async function GET(
   request: Request,
@@ -46,7 +47,7 @@ export async function PUT(
   if (guard.error) return guard.error
 
   const existing = await queryOne<PurchaseOrder>(
-    `SELECT id, created_by, status FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
+    `SELECT * FROM public.purchase_orders WHERE id = $1 LIMIT 1`,
     [id]
   )
 
@@ -62,32 +63,60 @@ export async function PUT(
   const unitRate = body.unit_rate !== undefined ? Number(body.unit_rate) : null
   const totalAmount = quantity && unitRate ? quantity * unitRate : (body.total_amount ? Number(body.total_amount) : null)
 
-  const updated = await queryOne<PurchaseOrder>(
-    `UPDATE public.purchase_orders
-     SET purpose = COALESCE($1, purpose),
-         description = COALESCE($2, description),
-         vendor_name = COALESCE($3, vendor_name),
-         quantity = COALESCE($4, quantity),
-         unit_rate = COALESCE($5, unit_rate),
-         total_amount = COALESCE($6, total_amount),
-         file_path = COALESCE($7, file_path),
-         file_name = COALESCE($8, file_name),
-         status = CASE WHEN status = 'sent_back' OR status = 'rejected' THEN 'pending_cost_control' ELSE status END,
-         updated_at = now()
-     WHERE id = $9
-     RETURNING *`,
-    [
-      body.purpose,
-      body.description,
-      body.vendor_name,
-      quantity,
-      unitRate,
-      totalAmount,
-      body.file_path,
-      body.file_name,
-      id,
-    ]
-  )
+  // What the edit actually changes, in words, for the audit trail. COALESCE
+  // below keeps any field the body leaves out, so only supplied values count.
+  const changes: string[] = []
+  const noteText = (label: string, before: unknown, after: unknown) => {
+    if (after === undefined || after === null || after === '' || String(after) === String(before ?? '')) return
+    changes.push(`${label}: ${before ?? '—'} → ${after}`)
+  }
+  const noteAmount = (label: string, before: unknown, after: number | null) => {
+    if (after === null || Number(before) === after) return
+    changes.push(`${label}: ${formatCurrency(before === null ? null : Number(before))} → ${formatCurrency(after)}`)
+  }
+  noteText('Purpose', existing.purpose, body.purpose)
+  noteText('Vendor', existing.vendor_name, body.vendor_name)
+  noteText('Quantity', existing.quantity, quantity)
+  noteAmount('Unit rate', existing.unit_rate, unitRate)
+  noteAmount('Total', existing.total_amount, totalAmount)
+  if (body.description && body.description !== existing.description) changes.push('Description updated')
+  if (body.file_path && body.file_path !== existing.file_path) {
+    changes.push(`Document replaced${body.file_name ? ` with ${body.file_name}` : ''}`)
+  }
 
-  return NextResponse.json({ data: updated })
+  // An edit to a sent-back or rejected PO is its resubmission.
+  const resubmits = existing.status === 'sent_back' || existing.status === 'rejected'
+
+  const results = await transaction<PurchaseOrder>([
+    [
+      `UPDATE public.purchase_orders
+       SET purpose = COALESCE($1, purpose),
+           description = COALESCE($2, description),
+           vendor_name = COALESCE($3, vendor_name),
+           quantity = COALESCE($4, quantity),
+           unit_rate = COALESCE($5, unit_rate),
+           total_amount = COALESCE($6, total_amount),
+           file_path = COALESCE($7, file_path),
+           file_name = COALESCE($8, file_name),
+           status = CASE WHEN status = 'sent_back' OR status = 'rejected' THEN 'pending_cost_control' ELSE status END,
+           updated_at = now()
+       WHERE id = $9
+       RETURNING *`,
+      [
+        body.purpose,
+        body.description,
+        body.vendor_name,
+        quantity,
+        unitRate,
+        totalAmount,
+        body.file_path,
+        body.file_name,
+        id,
+      ],
+    ],
+    ...(changes.length > 0 ? [poAuditStatement(id, 'edited', guard.user.id, changes.join('; '))] : []),
+    ...(resubmits ? [poAuditStatement(id, 'resubmitted', guard.user.id, 'Returned to Cost Control for approval.')] : []),
+  ])
+
+  return NextResponse.json({ data: results[0]?.[0] ?? null })
 }

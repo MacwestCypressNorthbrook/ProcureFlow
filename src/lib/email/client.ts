@@ -163,40 +163,63 @@ export async function sendRequisitionAlertEmail({
 }
 
 /**
- * Template: weekly bundle of requisitions awaiting a Project Lead's review.
+ * Template: one person's collated notifications — the daily or weekly digest.
  *
- * Leads still get an instant in-app notification per requisition; this is
- * the once-a-week email so their inbox gets one message instead of one per
- * submission. See `getLeadDigestSettings` for the schedule.
+ * Their in-app notifications were instant; this replaces the individual emails
+ * their role is set to collect (Admin → Notifications). Updates are grouped by
+ * requisition so five events on one requisition read as one entry, followed by
+ * what is waiting on them right now.
  */
-export async function sendLeadDigestEmail({
+export async function sendNotificationDigestEmail({
   recipientEmail,
   recipientName,
-  items,
+  period,
+  groups,
+  waiting,
   queueUrl,
 }: {
   recipientEmail: string
   recipientName: string
-  items: Array<{
-    requestId: string
-    purpose: string
-    requesterName: string
-    projectName?: string | null
-    amount?: number | null
-    createdAt: string
-  }>
-  queueUrl: string
+  period: 'daily' | 'weekly'
+  /** Updates since the last digest, one group per requisition (or per standalone notice). */
+  groups: Array<{ heading: string; link: string | null; updates: Array<{ title: string; message: string | null; at: string }> }>
+  /** Requisitions sitting in this person's stage queue. */
+  waiting: Array<{ purpose: string; requesterName: string; projectName?: string | null; amount?: number | null; urgent?: boolean }>
+  queueUrl: string | null
 }) {
   const ghs = (n?: number | null) =>
     n == null ? '—' : new Intl.NumberFormat('en-GH', { style: 'currency', currency: 'GHS', maximumFractionDigits: 0 }).format(n)
+  const when = (iso: string) =>
+    new Date(iso).toLocaleString('en-GB', { timeZone: 'Africa/Accra', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  const label = period === 'weekly' ? 'Weekly' : 'Daily'
+  const updateCount = groups.reduce((n, g) => n + g.updates.length, 0)
 
-  const rows = items
+  const updatesHtml = groups
+    .map(
+      (g) => `
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin: 0 0 10px;">
+          <p style="margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #0f172a;">
+            ${g.link ? `<a href="${esc(g.link)}" style="color: #0f172a; text-decoration: none;">${esc(g.heading)}</a>` : esc(g.heading)}
+          </p>
+          ${g.updates
+            .map(
+              (u) => `
+            <p style="margin: 4px 0 0; font-size: 13px; color: #334155;">
+              <span style="color: #94a3b8; font-size: 11px;">${when(u.at)}</span> · <strong>${esc(u.title)}</strong>${u.message ? ` — ${esc(u.message)}` : ''}
+            </p>`
+            )
+            .join('')}
+        </div>`
+    )
+    .join('')
+
+  const waitingRows = waiting
     .map(
       (item) => `
         <tr>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a;">${item.purpose}</td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${item.requesterName}</td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${item.projectName || '—'}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a;">${item.urgent ? '<strong style="color: #dc2626;">URGENT</strong> · ' : ''}${esc(item.purpose)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${esc(item.requesterName)}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #475569;">${esc(item.projectName || '—')}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #0f172a; text-align: right;">${ghs(item.amount)}</td>
         </tr>`
     )
@@ -204,30 +227,53 @@ export async function sendLeadDigestEmail({
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; color: #1e293b;">
-      <h2 style="color: #0f172a; margin-bottom: 8px;">ProcureFlow Weekly Digest</h2>
-      <p style="color: #334155; font-size: 14px;">Hello ${recipientName || 'there'},</p>
-      <p style="color: #64748b; font-size: 14px;">
-        ${items.length} requisition${items.length === 1 ? '' : 's'} ${items.length === 1 ? 'is' : 'are'} waiting on your review.
-      </p>
-      <table style="width: 100%; border-collapse: collapse; margin: 16px 0; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+      <h2 style="color: #0f172a; margin-bottom: 8px;">ProcureFlow ${label} Digest</h2>
+      <p style="color: #334155; font-size: 14px;">Hello ${esc(recipientName || 'there')},</p>
+      ${
+        waiting.length > 0
+          ? `
+      <h3 style="margin: 20px 0 8px; font-size: 15px; color: #0f172a;">Waiting on you (${waiting.length})</h3>
+      <table style="width: 100%; border-collapse: collapse; margin: 0 0 8px; border: 1px solid #e2e8f0;">
         <thead>
           <tr style="background-color: #f8fafc;">
             <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Requisition</th>
             <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Requester</th>
             <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b;">Site</th>
-            <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: #64748b;">Est. amount</th>
+            <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: #64748b;">Value</th>
           </tr>
         </thead>
-        <tbody>${rows}</tbody>
-      </table>
-      <p style="margin-top: 24px;">
-        <a href="${queueUrl}" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; display: inline-block;">Review requisitions</a>
+        <tbody>${waitingRows}</tbody>
+      </table>`
+          : ''
+      }
+      ${
+        groups.length > 0
+          ? `
+      <h3 style="margin: 20px 0 8px; font-size: 15px; color: #0f172a;">Updates since your last digest (${updateCount})</h3>
+      ${updatesHtml}`
+          : ''
+      }
+      ${
+        queueUrl
+          ? `<p style="margin-top: 24px;">
+        <a href="${esc(queueUrl)}" style="background-color: #2563eb; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; display: inline-block;">Open ProcureFlow</a>
+      </p>`
+          : ''
+      }
+      <p style="margin-top: 20px; font-size: 11px; color: #94a3b8;">
+        Your role receives notification emails as a ${period} digest. Urgent escalations are still emailed immediately.
       </p>
     </div>
   `
+
+  const parts = [
+    waiting.length > 0 ? `${waiting.length} waiting on you` : null,
+    updateCount > 0 ? `${updateCount} update${updateCount === 1 ? '' : 's'}` : null,
+  ].filter(Boolean)
+
   return sendEmail({
     to: recipientEmail,
-    subject: `[ProcureFlow] Weekly digest: ${items.length} requisition${items.length === 1 ? '' : 's'} awaiting your review`,
+    subject: `[ProcureFlow] ${label} digest: ${parts.join(', ')}`,
     html,
   })
 }
@@ -345,7 +391,7 @@ export async function sendActionReminderEmail({
 }
 
 /** Escape user-supplied values before they go into an HTML email body. */
-function esc(value: string): string {
+export function esc(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

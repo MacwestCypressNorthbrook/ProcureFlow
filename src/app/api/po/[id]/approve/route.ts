@@ -1,9 +1,12 @@
-import { query, queryOne, execute } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import { requireCapability } from '@/lib/auth-guard'
 import { createNotification } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import type { PurchaseOrder, User } from '@/lib/types'
+
+/** Statuses past Cost Control's approval — approving again would rewind them. */
+const ALREADY_DECIDED = ['pending_finance', 'partially_paid', 'paid', 'approved', 'rejected', 'cancelled']
 
 export async function POST(
   request: Request,
@@ -22,38 +25,46 @@ export async function POST(
     return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
   }
 
-  await execute(
-    `UPDATE public.purchase_orders
-     SET status = 'pending_finance',
-         approved_by = $1,
-         approved_at = now(),
-         sam_approved_by = $1,
-         sam_approved_at = now(),
-         updated_at = now()
-     WHERE id = $2`,
-    [guard.user.id, id]
-  )
-
-  // Cost Control's approval hands the requisition to Finance.
-  if (po.request_id) {
-    await execute(
-      `UPDATE public.requests
-          SET status = 'pending_finance', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
-        WHERE id = $1`,
-      [po.request_id]
-    )
-    await execute(
-      `INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by)
-       VALUES ($1, $2, 'cost_control', 'approved', $3)`,
-      [po.request_id, id, guard.user.id]
+  if (ALREADY_DECIDED.includes(po.status)) {
+    return NextResponse.json(
+      { error: `This purchase order is already ${po.status.replace(/_/g, ' ')}.` },
+      { status: 409 }
     )
   }
 
-  await execute(
-    `INSERT INTO public.po_audit_trail (po_id, action, performed_by, notes)
-     VALUES ($1, $2, $3, $4)`,
-    [id, 'approved', guard.user.id, `Approved by ${guard.user.name || guard.user.role}`]
+  // One statement, so the approval, its audit entry and the requisition's move
+  // to Finance commit together. The status guard sits on the UPDATE itself: a
+  // double-click's second request matches no row and records nothing.
+  // Cost Control's approval hands the requisition to Finance.
+  const approved = await query<{ id: string }>(
+    `WITH po AS (
+       UPDATE public.purchase_orders
+          SET status = 'pending_finance',
+              approved_by = $2,
+              approved_at = now(),
+              sam_approved_by = $2,
+              sam_approved_at = now(),
+              updated_at = now()
+        WHERE id = $1 AND status <> ALL($3::text[])
+        RETURNING id, request_id
+     ), audit AS (
+       INSERT INTO public.po_audit_trail (po_id, action, performed_by)
+       SELECT id, 'approved', $2 FROM po
+     ), req AS (
+       UPDATE public.requests
+          SET status = 'pending_finance', sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
+        WHERE id IN (SELECT request_id FROM po)
+     ), approval AS (
+       INSERT INTO public.request_approvals (request_id, po_id, stage, action, performed_by)
+       SELECT request_id, id, 'cost_control', 'approved', $2 FROM po WHERE request_id IS NOT NULL
+     )
+     SELECT id FROM po`,
+    [id, guard.user.id, ALREADY_DECIDED]
   )
+
+  if (approved.length === 0) {
+    return NextResponse.json({ error: 'This purchase order was just actioned by someone else.' }, { status: 409 })
+  }
 
   // Notify creator
   if (po.created_by) {

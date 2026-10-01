@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { dispatchPendingReminders, dispatchLeadDigest, dispatchStageDigests } from '@/lib/notifications'
+import { dispatchPendingReminders, dispatchEmailDigests, dispatchStageDigests } from '@/lib/notifications'
 import { pruneRateLimits } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
@@ -21,9 +21,10 @@ export async function POST(request: Request) {
 
   const result = await dispatchPendingReminders()
 
-  // The weekly Lead digest rides the same cron: it no-ops on every day except
-  // the one configured in the admin panel, and at most once per day even then.
-  const digest = await dispatchLeadDigest()
+  // Each role's daily or weekly email digest rides the same cron: it no-ops
+  // until a role's configured day and hour (Admin → Notifications), and sends
+  // at most once per day even then.
+  const digests = await dispatchEmailDigests()
 
   // Each downstream stage's approved batch, sent once the approvals settle.
   // How soon that is after a reviewer finishes is bounded by this cron's own
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     success: true,
     processed: result.processed,
-    leadDigest: digest,
+    emailDigests: digests.sent,
     stageDigests: stageDigests.sent,
   })
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatQuantity } from '@/lib/utils'
 import { User, Calendar, Briefcase, Tag, Archive } from '@/lib/icons'
 
 interface RichRequisitionViewProps {
@@ -184,7 +184,7 @@ export default function RichRequisitionView({
                     {item.description}
                   </TableCell>
                   <TableCell className="px-3 py-2.5 text-center text-xs tabular-nums">
-                    {item.quantity ? `${item.quantity}${item.unit ? ` ${item.unit}` : ''}` : '—'}
+                    {item.quantity ? `${formatQuantity(item.quantity)}${item.unit ? ` ${item.unit}` : ''}` : '—'}
                   </TableCell>
                   <TableCell className="px-3 py-2.5 text-right text-xs tabular-nums">{item.unitPrice ? formatGHS(item.unitPrice) : '—'}</TableCell>
                   <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums">{item.amount ? formatGHS(item.amount) : '—'}</TableCell>

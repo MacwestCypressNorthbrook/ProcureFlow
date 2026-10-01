@@ -39,9 +39,43 @@ export async function getPoAuditTrail(poId: string): Promise<PoAuditEntry[]> {
   )
 }
 
+/** An action the PO routes write to `po_audit_trail`. */
+export type PoAuditAction =
+  | 'created'
+  | 'approved'
+  | 'rejected'
+  | 'sent_back'
+  | 'edited'
+  | 'resubmitted'
+  | 'part_paid'
+  | 'paid'
+
 /**
- * Human labels for the actions the PO routes actually write:
- * 'created', 'approved', 'rejected', 'sent_back', 'paid'.
+ * The INSERT for one audit entry, as a [sql, params] pair for `transaction()`.
+ *
+ * Returned rather than executed so the entry commits in the same transaction
+ * as the change it records — a status that moved without its audit row, or an
+ * audit row for a change that rolled back, is exactly what a trail must not show.
+ *
+ * Stamped with clock_timestamp() rather than the column default now(), which is
+ * fixed for the whole transaction — two entries written together (an edit and
+ * the resubmission it caused) would otherwise tie and sort by random id.
+ */
+export function poAuditStatement(
+  poId: string,
+  action: PoAuditAction,
+  performedBy: string,
+  notes: string | null = null
+): [string, unknown[]] {
+  return [
+    `INSERT INTO public.po_audit_trail (po_id, action, performed_by, notes, created_at)
+     VALUES ($1, $2, $3, $4, clock_timestamp())`,
+    [poId, action, performedBy, notes],
+  ]
+}
+
+/**
+ * Human labels for every {@link PoAuditAction}.
  * The *_by_sam / payment_completed keys are legacy spellings kept so older
  * rows still render a proper label rather than raw snake_case.
  */
@@ -50,6 +84,9 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   approved: 'Approved',
   rejected: 'Rejected',
   sent_back: 'Sent back for revision',
+  edited: 'Purchase order edited',
+  resubmitted: 'Resubmitted for approval',
+  part_paid: 'Part payment recorded',
   paid: 'Payment completed',
   // legacy
   approved_by_sam: 'Approved',
@@ -62,7 +99,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
 
 export type AuditTone = 'positive' | 'negative' | 'neutral'
 
-const POSITIVE_ACTIONS = new Set(['approved', 'paid', 'approved_by_sam', 'payment_completed'])
+const POSITIVE_ACTIONS = new Set(['approved', 'paid', 'part_paid', 'approved_by_sam', 'payment_completed'])
 const NEGATIVE_ACTIONS = new Set(['rejected', 'sent_back', 'rejected_by_sam', 'sent_back_by_sam'])
 
 export function auditTone(action: string): AuditTone {

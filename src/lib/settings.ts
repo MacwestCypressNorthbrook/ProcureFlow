@@ -88,13 +88,12 @@ export function blockedDaysLabel(blockedDays: number[]): string {
 }
 
 /**
- * How often Project Leads get a bundled email of new requisitions.
+ * The old Project Lead email digest setting.
  *
- * A Lead still gets an in-app notification the moment a requisition lands in
- * their queue — this setting only governs the emailed summary, which would
- * otherwise fire once per requisition and flood their inbox. `lastSentOn` is
- * written by the dispatcher, not the Super User, so a cron that runs more
- * than once on the configured day doesn't send the digest twice.
+ * Superseded by per-role delivery in notification-settings.ts, and no longer
+ * written. Still read once, so a workspace that set the Lead digest before the
+ * change keeps that choice as the Project Lead default until someone saves the
+ * new settings.
  */
 export interface LeadDigestSettings {
   enabled: boolean
@@ -130,37 +129,4 @@ export async function getLeadDigestSettings(): Promise<LeadDigestSettings> {
     console.error('Failed to load the lead email digest settings:', err)
     return DEFAULT_LEAD_DIGEST
   }
-}
-
-/** Super User control: whether the digest runs at all, and which weekday. */
-export async function setLeadDigestSettings(
-  input: { enabled?: unknown; dayOfWeek?: unknown },
-  userId: string
-): Promise<LeadDigestSettings> {
-  const current = await getLeadDigestSettings()
-  const next: LeadDigestSettings = {
-    enabled: input.enabled !== false,
-    dayOfWeek: sanitizeDay(input.dayOfWeek),
-    lastSentOn: current.lastSentOn,
-  }
-  await execute(
-    `INSERT INTO public.app_settings (key, value, updated_by, updated_at)
-     VALUES ($1, $2::jsonb, $3, now())
-     ON CONFLICT (key) DO UPDATE
-       SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = now()`,
-    [LEAD_DIGEST_KEY, JSON.stringify(next), userId]
-  )
-  return next
-}
-
-/** Dispatcher-only: records that today's digest went out, so it fires once. */
-export async function markLeadDigestSent(dateStr: string): Promise<void> {
-  const current = await getLeadDigestSettings()
-  await execute(
-    `INSERT INTO public.app_settings (key, value, updated_by, updated_at)
-     VALUES ($1, $2::jsonb, NULL, now())
-     ON CONFLICT (key) DO UPDATE
-       SET value = EXCLUDED.value, updated_at = now()`,
-    [LEAD_DIGEST_KEY, JSON.stringify({ ...current, lastSentOn: dateStr })]
-  )
 }

@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
-import { PO_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
+import { PO_STATUS_CONFIG, formatCurrency, formatDate, formatQuantity } from '@/lib/utils'
 import { ChevronRight, FileText, AlertTriangle } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
@@ -75,7 +75,7 @@ export default function POTable({
       hideBelow: 'md',
       cell: (p) => (
         <span className="text-xs tabular-nums text-muted-foreground whitespace-nowrap">
-          {p.quantity && p.unit_rate ? `${p.quantity} × ${formatCurrency(p.unit_rate)}` : '—'}
+          {p.quantity && p.unit_rate ? `${formatQuantity(p.quantity)} × ${formatCurrency(p.unit_rate)}` : '—'}
         </span>
       ),
     },
@@ -174,7 +174,7 @@ export default function POTable({
             <p className="text-lg font-semibold tabular-nums text-foreground">{formatCurrency(p.total_amount)}</p>
             <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span className="truncate">
-                {p.quantity && p.unit_rate ? `${p.quantity} × ${formatCurrency(p.unit_rate)}` : '—'}
+                {p.quantity && p.unit_rate ? `${formatQuantity(p.quantity)} × ${formatCurrency(p.unit_rate)}` : '—'}
               </span>
               <span className="shrink-0">{formatDate(p.created_at)}</span>
             </div>

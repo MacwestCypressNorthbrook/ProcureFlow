@@ -4,6 +4,7 @@ import { createNotification } from '@/lib/notifications'
 import { dispatchWorkflowEmail } from '@/lib/email/workflow-dispatcher'
 import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { formatCurrency } from '@/lib/utils'
 import type { Request as DbRequest, User } from '@/lib/types'
 import { STAGES, statusForStage, nextStage } from '@/lib/workflow'
 
@@ -159,8 +160,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    await transaction(
-      items.map((item, index) => [
+    await transaction([
+      ...items.map((item, index): [string, unknown[]] => [
         `INSERT INTO public.request_items
            (request_id, position, description, quantity, unit, unit_price, supplier_id, remarks, category, is_subcontractor)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
@@ -176,8 +177,18 @@ export async function POST(request: Request) {
           item.category,
           item.isSubcontractor,
         ],
-      ])
-    )
+      ]),
+      // The first line of the requisition's history: who raised it, for how much.
+      [
+        `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
+         VALUES ($1, 'requester', 'submitted', $2, $3)`,
+        [
+          data.id,
+          guard.user.id,
+          `${items.length} line${items.length === 1 ? '' : 's'}, ${formatCurrency(totalAmount)}.`,
+        ],
+      ],
+    ])
   } catch {
     // The header without its lines is an unusable record — remove it rather
     // than leaving a half-written requisition in the reviewers' queue.

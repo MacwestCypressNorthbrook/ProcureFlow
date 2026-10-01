@@ -12,6 +12,8 @@
  * has seen one of these can read all of them at a glance.
  */
 
+import { formatQuantity } from '@/lib/utils'
+
 export type WorkflowEventType =
   /** A requisition has landed at a stage and is waiting on them. */
   | 'requisition_submitted'
@@ -418,7 +420,7 @@ function itemsHtml(data: WorkflowEmailData, theme: StatusTheme): string {
   const rows = shown
     .map((item, i) => {
       const bg = i % 2 === 0 ? '#ffffff' : WASH
-      const qty = `${item.quantity ?? 1}${item.unit ? ` ${esc(String(item.unit))}` : ''}`
+      const qty = `${formatQuantity(item.quantity ?? 1)}${item.unit ? ` ${esc(String(item.unit))}` : ''}`
       const rate =
         item.unit_price != null ? formatMoney(Number(item.unit_price), data.currency || 'GHS') : '—'
       const total =
@@ -642,7 +644,7 @@ export function renderWorkflowEmailHtml(data: WorkflowEmailData): string {
           <div style="background-color: #ffffff; border: 1px solid ${LINE}; border-radius: 10px; padding: 15px 16px;">
             <div style="font-size: 10px; font-weight: 700; color: ${FAINT}; text-transform: uppercase; letter-spacing: 0.06em;">Vendor / supplier</div>
             <div style="font-size: 15px; font-weight: 700; color: ${INK}; margin-top: 5px; line-height: 1.35;">${esc(data.vendorName || 'Not yet sourced')}</div>
-            <div style="font-size: 11px; color: ${MUTED}; margin-top: 3px;">${data.quantity ? `Qty ${esc(String(data.quantity))}${data.unitRate ? ` @ ${formatMoney(Number(data.unitRate), data.currency || 'GHS')}` : ''}` : 'Awaiting sourcing'}</div>
+            <div style="font-size: 11px; color: ${MUTED}; margin-top: 3px;">${data.quantity ? `Qty ${esc(formatQuantity(data.quantity))}${data.unitRate ? ` @ ${formatMoney(Number(data.unitRate), data.currency || 'GHS')}` : ''}` : 'Awaiting sourcing'}</div>
           </div>
         </td>
       </tr>
@@ -753,7 +755,7 @@ export function renderWorkflowEmailText(data: WorkflowEmailData): string {
     for (const item of data.items.slice(0, 10)) {
       const total = item.line_total != null ? formatMoney(Number(item.line_total), data.currency || 'GHS') : '—'
       lines.push(`- ${item.description}`)
-      lines.push(`    Qty ${item.quantity ?? 1}${item.unit ? ` ${item.unit}` : ''} · ${total}`)
+      lines.push(`    Qty ${formatQuantity(item.quantity ?? 1)}${item.unit ? ` ${item.unit}` : ''} · ${total}`)
     }
     const discount = Number(data.discountAmount) || 0
     if (discount > 0) lines.push(`  Discount: -${formatMoney(discount, data.currency || 'GHS')}`)
