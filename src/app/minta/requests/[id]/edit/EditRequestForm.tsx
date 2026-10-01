@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Panel, Field } from '@/components/shared/ui-kit'
 import SupplierPicker, { type SupplierOption } from '@/components/shared/SupplierPicker'
-import type { Project } from '@/lib/types'
+import { uploadDocument } from '@/lib/upload-client'
+import { openDocument } from '@/lib/files'
+import type { Project, RequestAttachment } from '@/lib/types'
 import {
   RotateCcw,
   Send,
@@ -23,6 +25,10 @@ import {
   CheckCircle2,
   Building2,
   FileText,
+  Paperclip,
+  ExternalLink,
+  Undo2,
+  X,
 } from 'lucide-react'
 
 const MATERIAL_UNITS = ['pcs', 'bags', 'tonnes', 'kg', 'litres', 'm', 'm²', 'm³', 'rolls', 'trips', 'lumpsum']
@@ -64,6 +70,7 @@ interface EditRequestFormProps {
     created_at: string
     stage?: string | null
   } | null
+  attachments?: RequestAttachment[]
 }
 
 const isLumpSum = (l: FormLine) =>
@@ -84,6 +91,7 @@ export default function EditRequestForm({
   projects,
   suppliers: initialSuppliers,
   sendBackInfo,
+  attachments = [],
 }: EditRequestFormProps) {
   const router = useRouter()
   const [suppliers, setSuppliers] = useState<SupplierOption[]>(initialSuppliers)
@@ -97,6 +105,73 @@ export default function EditRequestForm({
   const [notes, setNotes] = useState(initialData.notes)
   const [lines, setLines] = useState<FormLine[]>(initialData.items)
   const [resubmitComment, setResubmitComment] = useState('')
+  const [files, setFiles] = useState<File[]>([])
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
+  const [uploading, setUploading] = useState<{ index: number; total: number; percent: number } | null>(null)
+
+  const addFiles = (incoming: FileList | null) => {
+    if (incoming) setFiles((f) => [...f, ...Array.from(incoming)])
+  }
+
+  const toggleRemoved = (id: string) => {
+    setRemovedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Runs after the edits are saved, so a failed upload never loses them.
+  // Returns the names of documents that could not be uploaded or removed.
+  const syncAttachments = async (): Promise<string[]> => {
+    const failed: string[] = []
+
+    for (const attachmentId of removedIds) {
+      const res = await fetch(
+        `/api/requests/${requestId}/attachments?attachmentId=${encodeURIComponent(attachmentId)}`,
+        { method: 'DELETE' }
+      ).catch(() => null)
+      if (!res?.ok) failed.push(attachments.find((a) => a.id === attachmentId)?.file_name || 'document')
+    }
+
+    for (const [index, file] of files.entries()) {
+      setUploading({ index, total: files.length, percent: 0 })
+      try {
+        const uploaded = await uploadDocument(file, {
+          scope: `request-docs/${requestId}`,
+          onProgress: (percent: number) => setUploading({ index, total: files.length, percent }),
+        })
+
+        const res = uploaded.viaServer
+          ? await fetch(`/api/requests/${requestId}/attachments`, {
+              method: 'POST',
+              body: (() => {
+                const form = new FormData()
+                form.append('file', file)
+                return form
+              })(),
+            })
+          : await fetch(`/api/requests/${requestId}/attachments`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                file_name: uploaded.fileName,
+                file_url: uploaded.key,
+                file_size: uploaded.fileSize,
+                file_type: uploaded.contentType,
+              }),
+            })
+        if (!res.ok) failed.push(file.name)
+      } catch (uploadErr) {
+        console.error('Attachment upload failed:', uploadErr)
+        failed.push(file.name)
+      }
+    }
+    setUploading(null)
+
+    return failed
+  }
 
   const grandTotal = useMemo(() => lines.reduce((sum, l) => sum + lineTotal(l), 0), [lines])
   const filledLinesCount = lines.filter((l) => l.description.trim()).length
@@ -217,7 +292,21 @@ export default function EditRequestForm({
         return
       }
 
-      // 2. If resubmitting, call transition endpoint
+      // 2. Upload new documents and drop removed ones before any resubmission,
+      //    so the reviewer sees the corrected set.
+      const failedDocs = await syncAttachments()
+      if (failedDocs.length > 0) {
+        setFiles((list) => list.filter((f) => failedDocs.includes(f.name)))
+        setRemovedIds(new Set())
+        setError(
+          `Changes saved, but these documents could not be updated: ${failedDocs.join(', ')}. Try again before resubmitting.`
+        )
+        setIsSubmitting(false)
+        router.refresh()
+        return
+      }
+
+      // 3. If resubmitting, call transition endpoint
       if (shouldResubmit) {
         const transRes = await fetch(`/api/requests/${requestId}/transition`, {
           method: 'POST',
@@ -564,6 +653,99 @@ export default function EditRequestForm({
             placeholder="Add any additional context, justification or instructions for the project lead and review team…"
           />
         </Field>
+      </Panel>
+
+      {/* Supporting documents */}
+      <Panel title="Supporting Documents" icon={<Paperclip size={16} />}>
+        <div className="space-y-3">
+          {attachments.length > 0 && (
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
+              {attachments.map((att) => {
+                const removed = removedIds.has(att.id)
+                return (
+                  <li key={att.id} className="flex items-center gap-2.5 px-3 py-2.5">
+                    <FileText size={14} className="shrink-0 text-muted-foreground" />
+                    <span
+                      className={`min-w-0 flex-1 truncate text-sm ${
+                        removed ? 'text-muted-foreground line-through' : 'text-foreground'
+                      }`}
+                    >
+                      {att.file_name}
+                    </span>
+                    {!removed && (
+                      <button
+                        type="button"
+                        onClick={() => openDocument(att.file_url)}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                        aria-label={`Open ${att.file_name}`}
+                      >
+                        <ExternalLink size={14} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleRemoved(att.id)}
+                      disabled={isSubmitting}
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                      aria-label={removed ? `Keep ${att.file_name}` : `Remove ${att.file_name}`}
+                      title={removed ? 'Keep' : 'Remove on save'}
+                    >
+                      {removed ? <Undo2 size={14} /> : <Trash2 size={14} />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <label className="flex min-h-[104px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-border px-4 py-5 text-center transition-colors hover:bg-muted/40">
+            <input
+              type="file"
+              multiple
+              disabled={isSubmitting}
+              onChange={(e) => {
+                addFiles(e.target.files)
+                e.target.value = ''
+              }}
+              className="sr-only"
+            />
+            <Paperclip size={18} className="text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground">Attach quotes, invoices or photos</span>
+            <span className="text-xs text-muted-foreground">Tap to choose files · uploaded when you save</span>
+          </label>
+
+          {files.length > 0 && (
+            <ul className="space-y-2">
+              {files.map((f, i) => (
+                <li
+                  key={`${f.name}-${i}`}
+                  className="flex items-center gap-2.5 rounded-lg border border-border bg-background/40 px-3 py-2.5"
+                >
+                  <Paperclip size={14} className="shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate text-sm text-foreground">{f.name}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    {(f.size / 1024).toFixed(0)} KB
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((list) => list.filter((_, idx) => idx !== i))}
+                    disabled={isSubmitting}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
+                    aria-label={`Remove ${f.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {uploading && (
+            <p className="text-xs font-medium text-muted-foreground">
+              Uploading {uploading.index + 1} of {uploading.total} · {uploading.percent}%
+            </p>
+          )}
+        </div>
       </Panel>
 
       {/* Resubmission Comment (when sent back) */}

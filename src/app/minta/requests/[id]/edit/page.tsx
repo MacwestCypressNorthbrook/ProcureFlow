@@ -5,7 +5,7 @@ import { getActiveProjects, getProjectsForUser } from '@/lib/projects'
 import { PageContainer, PageHeader, EmptyState } from '@/components/shared/ui-kit'
 import { extractRequisition } from '@/lib/requisitions'
 import type { SupplierOption } from '@/components/shared/SupplierPicker'
-import type { Project } from '@/lib/types'
+import type { Project, RequestAttachment } from '@/lib/types'
 import { Lock, FileText } from 'lucide-react'
 import Link from 'next/link'
 import EditRequestForm from './EditRequestForm'
@@ -26,9 +26,10 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
     created_at: string
     stage?: string | null
   } | null = null
+  let attachments: RequestAttachment[] = []
 
   try {
-    const [requestData, itemRows, projectList, supplierList, sendBackRow] = await Promise.all([
+    const [requestData, itemRows, projectList, supplierList, sendBackRow, attachmentRows] = await Promise.all([
       queryOne<Record<string, unknown>>(
         `SELECT r.*, pr.name AS project_name
            FROM public.requests r
@@ -59,6 +60,13 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
           LIMIT 1`,
         [id]
       ),
+      query<RequestAttachment>(
+        `SELECT id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at
+           FROM public.request_attachments
+          WHERE request_id = $1
+          ORDER BY created_at DESC`,
+        [id]
+      ),
     ])
 
     request = requestData
@@ -66,6 +74,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
     projects = projectList
     suppliers = supplierList
     sendBackInfo = sendBackRow
+    attachments = attachmentRows
   } catch (err) {
     console.error('Failed to load request for editing from Neon:', err)
   }
@@ -211,6 +220,7 @@ export default async function EditRequestPage({ params }: { params: Promise<{ id
         projects={projects}
         suppliers={suppliers}
         sendBackInfo={sendBackInfo}
+        attachments={attachments}
       />
     </PageContainer>
   )
