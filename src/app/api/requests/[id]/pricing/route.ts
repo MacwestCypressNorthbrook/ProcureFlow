@@ -4,6 +4,7 @@ import { canActAt, currentStage } from '@/lib/workflow'
 import { formatQuantity } from '@/lib/utils'
 import { NextResponse } from 'next/server'
 import type { Request as DbRequest } from '@/lib/types'
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
 
 interface IncomingItemPrice {
   id?: string
@@ -74,10 +75,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     quantity: string
     unit: string | null
     unit_price: string
+    supplier_id: string | null
     category: string | null
     is_subcontractor: boolean | null
   }>(
-    `SELECT id, description, quantity, unit, unit_price, category, is_subcontractor
+    `SELECT id, description, quantity, unit, unit_price, supplier_id, category, is_subcontractor
        FROM public.request_items
       WHERE request_id = $1
       ORDER BY position ASC`,
@@ -160,6 +162,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       0
     )
   const discountAmount = toNumber(body.discountAmount)
+
+  // What each surviving line will look like once this save lands: a field the
+  // form sent replaces the stored one, a field it left out stays as it is.
+  const incomingSupplier = new Map(items.map((i) => [i.id!, i.supplierId || null]))
+  const unsourced = owned
+    .filter((r) => !removing.has(r.id))
+    .find((r) =>
+      lineNeedsSupplier({
+        category: r.category,
+        quantity: incomingQuantity.get(r.id) ?? Number(r.quantity),
+        unitPrice: incomingPrice.get(r.id) ?? Number(r.unit_price),
+      }) && !(incomingSupplier.has(r.id) ? incomingSupplier.get(r.id) : r.supplier_id)
+    )
+  if (unsourced) {
+    return NextResponse.json({ error: supplierRequiredMessage(unsourced.description) }, { status: 400 })
+  }
 
   if (discountAmount > subtotal) {
     return NextResponse.json(

@@ -7,6 +7,7 @@ import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { formatCurrency } from '@/lib/utils'
 import type { Request as DbRequest, User } from '@/lib/types'
 import { STAGES, statusForStage, nextStage } from '@/lib/workflow'
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
 
 /** The stage a freshly submitted requisition lands on. */
 const FIRST_REVIEW_STAGE = nextStage('requester')!
@@ -87,6 +88,11 @@ export async function POST(request: Request) {
   }
   if (items.length > MAX_ITEMS) {
     return NextResponse.json({ error: `A requisition may hold at most ${MAX_ITEMS} lines` }, { status: 400 })
+  }
+
+  const unsourced = items.find((i) => !i.supplierId && lineNeedsSupplier(i))
+  if (unsourced) {
+    return NextResponse.json({ error: supplierRequiredMessage(unsourced.description) }, { status: 400 })
   }
 
   // Money is computed here, never trusted from the client.

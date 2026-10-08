@@ -7,6 +7,7 @@ import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Paperclip, ShoppingBag } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { QueueRow } from '@/lib/review'
+import { writeQueueOrder } from '@/lib/queue-order'
 import Link from 'next/link'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
@@ -192,6 +193,7 @@ export default function QueueTable({
   return (
     <DataView
       rows={rows}
+      onVisibleRows={(visible) => writeQueueOrder(hrefBase, visible.map((r) => r.id))}
       getRowId={(r) => r.id}
       columns={columns}
       facets={facets}

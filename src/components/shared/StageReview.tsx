@@ -17,6 +17,7 @@ import { currentStage, STAGES, canActAt } from '@/lib/workflow'
 import { isElevated, can } from '@/lib/roles'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
 import type { ResolvedUser } from '@/lib/auth/server'
+import RecordNavigator from '@/components/shared/RecordNavigator'
 import { ArrowLeft, ShoppingBag, RotateCcw, CheckCircle2, StickyNote, Calculator } from 'lucide-react'
 import {
   CostControlInvoicesSection,
@@ -36,11 +37,14 @@ export default async function StageReview({
   user,
   backHref,
   backLabel = 'Back to queue',
+  queueBase = backHref,
 }: {
   requestId: string
   user: ResolvedUser
   backHref: string
   backLabel?: string
+  /** The queue's route, where the Previous / Next order was recorded. Defaults to `backHref`. */
+  queueBase?: string
 }) {
   const bundle = await getReviewBundle(requestId)
   if (!bundle) notFound()
@@ -141,13 +145,16 @@ export default async function StageReview({
   return (
     <>
       <PageContainer className="space-y-6">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft size={14} />
-          {backLabel}
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link
+            href={backHref}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft size={14} />
+            {backLabel}
+          </Link>
+          <RecordNavigator base={queueBase} currentId={request.id} />
+        </div>
 
         <PageHeader
           title={request.purpose}
@@ -409,6 +416,7 @@ export default async function StageReview({
                   requestId={request.id}
                   stage={stage}
                   canAct={holdsStage}
+                  queueBase={queueBase}
                   isRequester={false}
                   sentBack={request.status === 'sent_back'}
                   documents={documents}
@@ -687,6 +695,7 @@ export default async function StageReview({
                 requestId={request.id}
                 stage={stage}
                 canAct={holdsStage}
+                queueBase={queueBase}
                 isRequester={stage === 'requester'}
                 sentBack={request.status === 'sent_back'}
                 documents={documents}

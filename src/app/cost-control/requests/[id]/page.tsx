@@ -7,5 +7,5 @@ export default async function CostControlReviewPage({ params }: { params: Promis
   const { id } = await params
   const user = await requirePageRole('cost_control')
 
-  return <StageReview requestId={id} user={user} backHref="/cost-control" backLabel="Back to review queue" />
+  return <StageReview requestId={id} user={user} backHref="/cost-control" backLabel="Back to review queue" queueBase="/cost-control/requests" />
 }

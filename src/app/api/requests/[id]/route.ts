@@ -1,4 +1,5 @@
 import { query, queryOne, execute, transaction } from '@/lib/db'
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
 import { getRequestItems } from '@/lib/requests'
 import { requireCapability } from '@/lib/auth-guard'
 import { isElevated, normalizeRole } from '@/lib/roles'
@@ -131,6 +132,11 @@ export async function PUT(
         { error: 'At least one material or labour line with a description is required' },
         { status: 400 }
       )
+    }
+
+    const unsourced = items.find((i) => !i.supplierId && lineNeedsSupplier(i))
+    if (unsourced) {
+      return NextResponse.json({ error: supplierRequiredMessage(unsourced.description) }, { status: 400 })
     }
 
     const totalAmount = items.reduce((sum, item) => {

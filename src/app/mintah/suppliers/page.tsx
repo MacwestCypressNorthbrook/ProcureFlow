@@ -17,7 +17,12 @@ export default async function SupplyChainSuppliersPage() {
     suppliers = await query<SupplierRow>(
       `SELECT s.id, s.name, s.category, s.contact_name, s.phone, s.email, s.address,
               s.is_active, s.created_at,
-              (SELECT COUNT(*)::int FROM public.request_items ri WHERE ri.supplier_id = s.id) AS usage_count
+              (SELECT COUNT(*)::int FROM public.request_items ri WHERE ri.supplier_id = s.id) AS usage_count,
+              COALESCE((SELECT SUM(ri.line_total)
+                          FROM public.request_items ri
+                          JOIN public.requests r ON r.id = ri.request_id
+                         WHERE ri.supplier_id = s.id
+                           AND r.status NOT IN ('draft', 'rejected', 'cancelled')), 0)::float8 AS requisitioned
          FROM public.suppliers s
         ORDER BY s.created_at DESC`
     )
@@ -32,7 +37,7 @@ export default async function SupplyChainSuppliersPage() {
         <p className="mb-3 flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
           <Info size={14} className="mt-0.5 shrink-0" />
           <span>
-            The supplier directory, for picking and contacting vendors while you price a requisition. Suppliers are
+            The supplier directory, for picking and contacting vendors while you price a requisition. Open a supplier to see what has been requisitioned from them and the prices paid. Suppliers are
             maintained by the Administrator, so this list is read-only &mdash; a vendor that is missing can still be
             added from the supplier picker on the requisition itself.
           </span>

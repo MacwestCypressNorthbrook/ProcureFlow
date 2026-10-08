@@ -1,6 +1,6 @@
 'use client'
 
-import { useId, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -191,6 +191,7 @@ export default function DataView<T>({
   emptyTitle = 'Nothing to show',
   emptyMessage = 'No records match your filters.',
   toolbarExtra,
+  onVisibleRows,
   compact = false,
   initialTerm = '',
 }: {
@@ -218,6 +219,8 @@ export default function DataView<T>({
    * an export can match the screen instead of dumping the raw list.
    */
   toolbarExtra?: React.ReactNode | ((visibleRows: T[]) => React.ReactNode)
+  /** Told the rows the viewer is looking at, in order, whenever they change. */
+  onVisibleRows?: (rows: T[]) => void
   /** Dashboard preview mode: no toolbar, no pagination, renders every row given. */
   compact?: boolean
   /** Pre-filled search, used to focus a record arrived at from a deep link. */
@@ -328,6 +331,11 @@ export default function DataView<T>({
 
     return out
   }, [rows, facets, facetValues, term, searchText, sort, columns])
+
+  useEffect(() => {
+    onVisibleRows?.(processed)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- callers pass a fresh closure each render
+  }, [processed])
 
   const total = processed.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))

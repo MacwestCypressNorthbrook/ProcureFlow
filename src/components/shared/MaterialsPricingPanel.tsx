@@ -1,5 +1,6 @@
 'use client'
 
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertCircle, Check, Loader2, RotateCcw, Save, Tag, Trash2 } from 'lucide-react'
@@ -100,6 +101,18 @@ export default function MaterialsPricingPanel({
   const removedCount = rows.length - kept.length
   const missingPrices = canEdit && kept.some((r) => !(Number(r.unitPrice) > 0))
   const badQuantity = canEdit && kept.some((r) => !(Number(r.quantity) > 0))
+  const itemById = new Map(items.map((i) => [i.id, i]))
+  const unsourced = canEdit
+    ? kept.find(
+        (r) =>
+          !r.supplierId &&
+          lineNeedsSupplier({
+            category: itemById.get(r.id)?.category,
+            quantity: Number(r.quantity) || 0,
+            unitPrice: Number(r.unitPrice) || 0,
+          })
+      )
+    : undefined
 
   const save = async () => {
     setSaving(true)
@@ -334,6 +347,10 @@ export default function MaterialsPricingPanel({
               <span className="flex items-center gap-1.5 font-medium text-destructive">
                 <AlertCircle size={13} /> Every quantity must be more than zero — remove a line instead of zeroing it.
               </span>
+            ) : unsourced ? (
+              <span className="flex items-center gap-1.5 font-medium text-destructive">
+                <AlertCircle size={13} /> {supplierRequiredMessage(itemById.get(unsourced.id)?.description ?? '')}
+              </span>
             ) : dirty ? (
               // Approving is a separate button, and it does not carry anything
               // typed here — so say plainly that these edits are not saved yet.
@@ -358,7 +375,7 @@ export default function MaterialsPricingPanel({
           <button
             type="button"
             onClick={save}
-            disabled={saving || !dirty || badQuantity}
+            disabled={saving || !dirty || badQuantity || Boolean(unsourced)}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}

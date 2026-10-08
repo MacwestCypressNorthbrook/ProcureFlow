@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SupplierPicker, { type SupplierOption } from '@/components/shared/SupplierPicker'
@@ -147,7 +148,13 @@ export default function RequestForm({
   const [files, setFiles] = useState<File[]>([])
   const [notifyEmail, setNotifyEmail] = useState(requester.email)
 
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting, setSubmittingState] = useState(false)
+  // State alone is not a lock: two clicks in the same frame both see it false.
+  const submitLock = useRef(false)
+  const setSubmitting = (value: boolean) => {
+    submitLock.current = value
+    setSubmittingState(value)
+  }
   const [uploading, setUploading] = useState<{ index: number; total: number; percent: number } | null>(null)
   const [submitted, setSubmitted] = useState<{ total: number; lines: number } | null>(null)
   const [error, setError] = useState('')
@@ -218,6 +225,7 @@ export default function RequestForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submitLock.current) return
     setError('')
 
     const payloadLines = lines.filter((l) => l.description.trim())
@@ -237,6 +245,14 @@ export default function RequestForm({
     const noAmount = payloadLines.find((l) => isLumpSum(l) && !(Number(l.unitPrice) > 0))
     if (noAmount) {
       setError('Every expense and sub-contractor line needs an amount greater than zero.')
+      return
+    }
+
+    const unsourced = payloadLines.find(
+      (l) => !l.supplierId && lineNeedsSupplier({ category: l.category, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })
+    )
+    if (unsourced) {
+      setError(supplierRequiredMessage(unsourced.description))
       return
     }
 
@@ -655,7 +671,9 @@ export default function RequestForm({
                               ? 'Sub-contractor (optional)'
                               : line.category === 'labour'
                                 ? 'Contractor (optional)'
-                                : 'Supplier (optional)'}
+                                : Number(line.unitPrice) > 0
+                                  ? 'Supplier (required once priced)'
+                                  : 'Supplier (optional)'}
                         </Label>
                         <SupplierPicker
                           value={line.supplierId}

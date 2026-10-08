@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -95,7 +96,13 @@ export default function EditRequestForm({
 }: EditRequestFormProps) {
   const router = useRouter()
   const [suppliers, setSuppliers] = useState<SupplierOption[]>(initialSuppliers)
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitting, setIsSubmittingState] = useState(false)
+  // State alone is not a lock: two clicks in the same frame both see it false.
+  const submitLock = useRef(false)
+  const setIsSubmitting = (value: boolean) => {
+    submitLock.current = value
+    setIsSubmittingState(value)
+  }
   const [submitMode, setSubmitMode] = useState<'save' | 'resubmit'>('save')
   const [error, setError] = useState('')
 
@@ -239,6 +246,7 @@ export default function EditRequestForm({
   }
 
   const handleSave = async (shouldResubmit: boolean) => {
+    if (submitLock.current) return
     setError('')
 
     const payloadLines = lines.filter((l) => l.description.trim())
@@ -256,6 +264,14 @@ export default function EditRequestForm({
     const noAmount = payloadLines.find((l) => isLumpSum(l) && !(Number(l.unitPrice) > 0))
     if (noAmount) {
       setError(`"${noAmount.description || 'Expense'}" requires an amount greater than zero.`)
+      return
+    }
+
+    const unsourced = payloadLines.find(
+      (l) => !l.supplierId && lineNeedsSupplier({ category: l.category, quantity: Number(l.quantity) || 0, unitPrice: Number(l.unitPrice) || 0 })
+    )
+    if (unsourced) {
+      setError(supplierRequiredMessage(unsourced.description))
       return
     }
 
@@ -603,7 +619,7 @@ export default function EditRequestForm({
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
                     <div className="sm:col-span-5">
-                      <label className="mb-1 block text-xs font-medium text-muted-foreground">Supplier (optional)</label>
+                      <label className="mb-1 block text-xs font-medium text-muted-foreground">{line.category === 'material' && Number(line.unitPrice) > 0 ? 'Supplier (required once priced)' : 'Supplier (optional)'}</label>
                       <SupplierPicker
                         value={line.supplierId}
                         suppliers={suppliers}

@@ -1,7 +1,9 @@
 'use client'
 
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
+import Link from 'next/link'
 import { formatDate, formatDateShort } from '@/lib/utils'
+import { statMoney } from '@/components/shared/stat-presets'
 import { Mail, Phone } from 'lucide-react'
 
 export interface SupplierRow {
@@ -16,6 +18,8 @@ export interface SupplierRow {
   created_at: string
   /** How many requisition lines have been placed against this supplier. */
   usage_count: number
+  /** Value of the live requisition lines naming this supplier. */
+  requisitioned?: number
 }
 
 /**
@@ -35,7 +39,13 @@ export default function SupplierDirectory({ suppliers }: { suppliers: SupplierRo
       sortValue: (s) => s.name,
       cell: (s) => (
         <div className="min-w-0 max-w-[220px]">
-          <p className="truncate text-sm font-medium text-foreground">{s.name}</p>
+          <Link
+            href={`/mintah/suppliers/${s.id}`}
+            className="block truncate text-sm font-medium text-foreground outline-none hover:underline focus-visible:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {s.name}
+          </Link>
           {s.contact_name && <p className="truncate text-xs text-muted-foreground">{s.contact_name}</p>}
         </div>
       ),
@@ -85,6 +95,20 @@ export default function SupplierDirectory({ suppliers }: { suppliers: SupplierRo
       sortable: true,
       sortValue: (s) => s.usage_count,
       cell: (s) => <span className="tabular-nums text-sm text-foreground">{s.usage_count}</span>,
+    },
+    {
+      id: 'requisitioned',
+      label: 'Requisitioned',
+      align: 'right',
+      hideBelow: 'lg',
+      sortable: true,
+      sortValue: (s) => s.requisitioned ?? 0,
+      cell: (s) =>
+        s.requisitioned ? (
+          <span className="tabular-nums text-sm text-foreground">{statMoney(s.requisitioned)}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
     },
     {
       id: 'created_at',

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Paperclip,
@@ -31,6 +31,7 @@ import AttachPODrawer from '@/components/admin/AttachPODrawer'
 import UrgentEscalationDialog from '@/components/shared/UrgentEscalationDialog'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { queueNeighbours } from '@/lib/queue-order'
 
 export interface ReviewDocument {
   id: string
@@ -109,6 +110,7 @@ export default function ApprovalPanel({
   requestSummary,
   isUrgent = false,
   canEscalate = false,
+  queueBase,
 }: {
   requestId: string
   stage: Stage | null
@@ -131,10 +133,24 @@ export default function ApprovalPanel({
   isUrgent?: boolean
   /** The Project Lead alone may escalate; resolved server-side from the role. */
   canEscalate?: boolean
+  /**
+   * The queue this requisition was opened from. When set, approving or sending
+   * back moves on to the next requisition in it rather than staying on one that
+   * has just left the reviewer's queue.
+   */
+  queueBase?: string
 }) {
   const router = useRouter()
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  // `busy` covers the request itself; `isPending` covers the navigation or
+  // refresh that follows it, so the buttons stay off until the page has moved
+  // on rather than coming back to life while it is still showing the old state.
+  const [isPending, startTransition] = useTransition()
+  const [lastAction, setLastAction] = useState<string | null>(null)
+  const actLock = useRef(false)
+  const locked = busy !== null || isPending
+  const shown = busy ?? (isPending ? lastAction : null)
   const [error, setError] = useState<string | null>(null)
 
   // Document preview modal state
@@ -193,6 +209,9 @@ export default function ApprovalPanel({
   }
 
   const act = async (action: 'approve' | 'send_back' | 'resubmit') => {
+    if (actLock.current) return
+    actLock.current = true
+    setLastAction(action)
     setBusy(action)
     setError(null)
     try {
@@ -207,10 +226,15 @@ export default function ApprovalPanel({
         return
       }
       setComment('')
-      router.refresh()
+      const next = action !== 'resubmit' && queueBase ? queueNeighbours(queueBase, requestId)?.nextId : null
+      startTransition(() => {
+        if (next) router.push(`${queueBase}/${next}`)
+        else router.refresh()
+      })
     } catch {
       setError('Network error — nothing was changed.')
     } finally {
+      actLock.current = false
       setBusy(null)
     }
   }
@@ -491,19 +515,19 @@ export default function ApprovalPanel({
                     <button
                       type="button"
                       onClick={() => act('approve')}
-                      disabled={busy !== null}
+                      disabled={locked}
                       className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                     >
-                      {busy === 'approve' ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
+                      {shown === 'approve' ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
                       Authorize &amp; complete
                     </button>
                     <button
                       type="button"
                       onClick={() => act('send_back')}
-                      disabled={busy !== null}
+                      disabled={locked}
                       className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
                     >
-                      {busy === 'send_back' ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+                      {shown === 'send_back' ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
                       Send back
                     </button>
                   </div>
@@ -542,10 +566,10 @@ export default function ApprovalPanel({
                     <button
                       type="button"
                       onClick={() => act('send_back')}
-                      disabled={busy !== null}
+                      disabled={locked}
                       className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
                     >
-                      {busy === 'send_back' ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
+                      {shown === 'send_back' ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />}
                       Send back to Cost Control
                     </button>
                   </div>
@@ -644,10 +668,10 @@ export default function ApprovalPanel({
                               <button
                                 type="button"
                                 onClick={() => act('resubmit')}
-                                disabled={busy !== null}
+                                disabled={locked}
                                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-60 cursor-pointer @lg:w-auto @lg:min-w-[220px]"
                               >
-                                {busy === 'resubmit' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                                {shown === 'resubmit' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                                 {stage === 'supply_chain' ? 'Resubmit to Cost Control' : 'Resubmit for review'}
                               </button>
                               {/* Whoever a requisition was returned to may not
@@ -658,10 +682,10 @@ export default function ApprovalPanel({
                                 <button
                                   type="button"
                                   onClick={() => act('send_back')}
-                                  disabled={busy !== null}
+                                  disabled={locked}
                                   className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer @lg:w-auto"
                                 >
-                                  {busy === 'send_back' ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+                                  {shown === 'send_back' ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                                   {sendBackLabel}
                                 </button>
                               )}
@@ -671,20 +695,20 @@ export default function ApprovalPanel({
                               <button
                                 type="button"
                                 onClick={() => act('approve')}
-                                disabled={busy !== null || allDocsDeclined}
+                                disabled={locked || allDocsDeclined}
                                 title={allDocsDeclined ? 'All vendor invoices are declined. Send back or accept a valid quote.' : undefined}
                                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer @lg:w-auto @lg:min-w-[220px]"
                               >
-                                {busy === 'approve' ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                                {shown === 'approve' ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
                                 {approveLabel}
                               </button>
                               <button
                                 type="button"
                                 onClick={() => act('send_back')}
-                                disabled={busy !== null}
+                                disabled={locked}
                                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer @lg:w-auto"
                               >
-                                {busy === 'send_back' ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                                {shown === 'send_back' ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
                                 {sendBackLabel}
                               </button>
 
@@ -705,7 +729,7 @@ export default function ApprovalPanel({
                                         requestId={requestId}
                                         purpose={requestSummary?.purpose ?? 'this requisition'}
                                         nextStageLabel={next && STAGES[next] ? STAGES[next].label : 'Supply Chain'}
-                                        disabled={busy !== null}
+                                        disabled={locked}
                                       />
                                       <p className="mt-1.5 text-center text-[11px] text-muted-foreground">
                                         Approves and flags it, notifying {next && STAGES[next] ? STAGES[next].label : 'Supply Chain'} immediately.
