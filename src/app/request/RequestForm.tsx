@@ -1,7 +1,8 @@
 'use client'
 
 import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import FormErrorBanner from '@/components/shared/FormErrorBanner'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import SupplierPicker, { type SupplierOption } from '@/components/shared/SupplierPicker'
@@ -158,12 +159,28 @@ export default function RequestForm({
   const [uploading, setUploading] = useState<{ index: number; total: number; percent: number } | null>(null)
   const [submitted, setSubmitted] = useState<{ total: number; lines: number } | null>(null)
   const [error, setError] = useState('')
+  // The line a supplier error is about, so it can be taken to and outlined.
+  const [errorLineId, setErrorLineId] = useState<string | null>(null)
 
   const grandTotal = useMemo(() => lines.reduce((sum, l) => sum + lineTotal(l), 0), [lines])
   const filledLines = lines.filter((l) => l.description.trim()).length
 
-  const updateLine = (id: string, patch: Partial<Line>) =>
+  const updateLine = (id: string, patch: Partial<Line>) => {
+    if (patch.supplierId) setErrorLineId((current) => (current === id ? null : current))
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  }
+
+  // Take the engineer to the line the error is about. Both the card and the
+  // table row exist in the page (one is hidden by breakpoint), so pick the visible one.
+  useEffect(() => {
+    if (!errorLineId) return
+    // The supplier field itself, not the card around it: on a phone the card is
+    // taller than the screen, and centring it can leave the field out of sight.
+    const visible = (selector: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>(selector)).find((el) => el.offsetParent !== null)
+    const target = visible(`[data-line-error="${errorLineId}"]`) ?? visible(`[data-line="${errorLineId}"]`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [errorLineId])
 
   // Switching category nudges the unit toward what that category usually
   // needs, but only when the engineer hasn't already picked something else.
@@ -227,6 +244,7 @@ export default function RequestForm({
     e.preventDefault()
     if (submitLock.current) return
     setError('')
+    setErrorLineId(null)
 
     const payloadLines = lines.filter((l) => l.description.trim())
     if (payloadLines.length === 0) {
@@ -253,6 +271,12 @@ export default function RequestForm({
     )
     if (unsourced) {
       setError(supplierRequiredMessage(unsourced.description))
+      setErrorLineId(unsourced.id)
+      setCollapsedLines((prev) => {
+        const next = new Set(prev)
+        next.delete(unsourced.id)
+        return next
+      })
       return
     }
 
@@ -422,6 +446,7 @@ export default function RequestForm({
   return (
     <form onSubmit={handleSubmit} className="pb-36 sm:pb-28">
       <div className="w-full space-y-5 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
+        <FormErrorBanner message={error} />
 
         {/* Requester — prefilled, read-only */}
         <section className="surface rounded-xl p-4 sm:p-5">
@@ -517,7 +542,11 @@ export default function RequestForm({
             {lines.map((line, i) => {
               const isCollapsed = lines.length > 1 && collapsedLines.has(line.id)
               return (
-                <div key={line.id} className="rounded-md border border-border bg-background/40 p-4">
+                <div
+                  key={line.id}
+                  data-line={line.id}
+                  className={`rounded-md border bg-background/40 p-4 ${errorLineId === line.id ? 'border-destructive ring-2 ring-destructive/40' : 'border-border'}`}
+                >
                   <div className={`flex items-center justify-between gap-2 ${isCollapsed ? '' : 'mb-3'}`}>
                     <button
                       type="button"
@@ -681,6 +710,9 @@ export default function RequestForm({
                           onChange={(supplierId) => updateLine(line.id, { supplierId })}
                           onCreated={registerSupplier}
                         />
+                        {errorLineId === line.id && (
+                          <p data-line-error={line.id} className="mt-1.5 text-xs font-semibold text-destructive">Choose a supplier for this line.</p>
+                        )}
                       </div>
 
                       <div>
@@ -727,7 +759,11 @@ export default function RequestForm({
                 </thead>
                 <tbody>
                   {lines.map((line, i) => (
-                    <tr key={line.id} className="border-t border-border align-top">
+                    <tr
+                      key={line.id}
+                      data-line={line.id}
+                      className={`border-t border-border align-top ${errorLineId === line.id ? 'bg-destructive/10 outline outline-2 -outline-offset-2 outline-destructive' : ''}`}
+                    >
                       <td className="px-3 py-2.5 text-center text-sm tabular-nums text-muted-foreground">{i + 1}</td>
                       <td className="px-2 py-2">
                         {/* A select, not the segmented toggle: three options do not
@@ -831,6 +867,9 @@ export default function RequestForm({
                           onChange={(supplierId) => updateLine(line.id, { supplierId })}
                           onCreated={registerSupplier}
                         />
+                        {errorLineId === line.id && (
+                          <p data-line-error={line.id} className="mt-1.5 text-xs font-semibold text-destructive">Choose a supplier for this line.</p>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-right text-sm font-semibold tabular-nums text-foreground">
                         <span className="inline-block pt-2.5">{ghs(lineTotal(line))}</span>
@@ -930,16 +969,6 @@ export default function RequestForm({
             />
           </div>
         </section>
-
-        {error && (
-          <div
-            role="alert"
-            className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          >
-            <Info size={16} className="mt-0.5 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
 
       </div>
 

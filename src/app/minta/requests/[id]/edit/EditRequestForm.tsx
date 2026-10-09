@@ -1,7 +1,8 @@
 'use client'
 
 import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import FormErrorBanner from '@/components/shared/FormErrorBanner'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,6 @@ import {
   Package,
   Users,
   Receipt,
-  AlertCircle,
   CheckCircle2,
   Building2,
   FileText,
@@ -105,6 +105,8 @@ export default function EditRequestForm({
   }
   const [submitMode, setSubmitMode] = useState<'save' | 'resubmit'>('save')
   const [error, setError] = useState('')
+  // The line a supplier error is about, so it can be taken to and outlined.
+  const [errorLineId, setErrorLineId] = useState<string | null>(null)
 
   const [purpose, setPurpose] = useState(initialData.purpose)
   const [projectId, setProjectId] = useState(initialData.projectId)
@@ -184,8 +186,19 @@ export default function EditRequestForm({
   const filledLinesCount = lines.filter((l) => l.description.trim()).length
 
   const updateLine = (id: string, patch: Partial<FormLine>) => {
+    if (patch.supplierId) setErrorLineId((current) => (current === id ? null : current))
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...patch } : l)))
   }
+
+  // Take the engineer to the line the error is about.
+  useEffect(() => {
+    if (!errorLineId) return
+    // The supplier field itself, not the card around it, so it is what ends up on screen.
+    const target =
+      document.querySelector<HTMLElement>(`[data-line-error="${errorLineId}"]`) ??
+      document.querySelector<HTMLElement>(`[data-line="${errorLineId}"]`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [errorLineId])
 
   const setLineCategory = (id: string, category: LineCategory) => {
     setLines((ls) =>
@@ -248,6 +261,7 @@ export default function EditRequestForm({
   const handleSave = async (shouldResubmit: boolean) => {
     if (submitLock.current) return
     setError('')
+    setErrorLineId(null)
 
     const payloadLines = lines.filter((l) => l.description.trim())
     if (payloadLines.length === 0) {
@@ -272,6 +286,7 @@ export default function EditRequestForm({
     )
     if (unsourced) {
       setError(supplierRequiredMessage(unsourced.description))
+      setErrorLineId(unsourced.id)
       return
     }
 
@@ -391,12 +406,7 @@ export default function EditRequestForm({
         </section>
       )}
 
-      {error && (
-        <div className="flex items-center gap-2 rounded-xl border border-destructive/25 bg-destructive/[0.08] px-4 py-3 text-sm font-medium text-destructive">
-          <AlertCircle size={16} className="shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      <FormErrorBanner message={error} />
 
       {/* Requisition Details */}
       <Panel title="Requisition Details" icon={<FileText size={16} />}>
@@ -464,7 +474,8 @@ export default function EditRequestForm({
             return (
               <div
                 key={line.id}
-                className="rounded-xl border border-border bg-card/60 p-4 transition-all hover:border-ring/50 space-y-3.5"
+                data-line={line.id}
+                className={`rounded-xl border bg-card/60 p-4 transition-all space-y-3.5 ${errorLineId === line.id ? 'border-destructive ring-2 ring-destructive/40' : 'border-border hover:border-ring/50'}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2.5">
                   <div className="flex items-center gap-2">
@@ -627,6 +638,9 @@ export default function EditRequestForm({
                         onCreated={registerSupplier}
                         compact
                       />
+                      {errorLineId === line.id && (
+                          <p data-line-error={line.id} className="mt-1.5 text-xs font-semibold text-destructive">Choose a supplier for this line.</p>
+                        )}
                     </div>
                     <div className="sm:col-span-7">
                       <label className="mb-1 block text-xs font-medium text-muted-foreground">Remarks / Specifications</label>
