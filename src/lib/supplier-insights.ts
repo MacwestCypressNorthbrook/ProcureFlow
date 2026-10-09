@@ -1,4 +1,5 @@
 import { query, queryOne } from '@/lib/db'
+import { isMissingTable } from '@/lib/supplier-invoices'
 
 /**
  * What a supplier has been asked to supply, drawn from the requisition lines
@@ -71,12 +72,35 @@ export interface SupplierRequisition {
   lines: number
 }
 
+export interface InvoiceSummary {
+  count: number
+  verified: number
+  invoiced: number
+  /** Requisitions past Supply Chain, with priced lines from this supplier and no invoice recorded. */
+  awaiting: number
+  /** Requisitions where this supplier's invoices total more than its lines asked for. */
+  overInvoiced: number
+  recent: Array<{
+    id: string
+    request_id: string
+    purpose: string
+    invoice_number: string
+    invoice_date: string
+    amount: number
+    status: 'recorded' | 'verified'
+    requisitioned: number
+    requisition_invoiced: number
+  }>
+}
+
 export interface SupplierInsights {
   profile: SupplierProfile
   totals: SupplierTotals
   months: MonthPoint[]
   items: ItemPrice[]
   recent: SupplierRequisition[]
+  /** `null` when migration 016 has not been applied, so the page can say so. */
+  invoices: InvoiceSummary | null
 }
 
 export async function getSupplierInsights(id: string): Promise<SupplierInsights | null> {
@@ -179,6 +203,7 @@ export async function getSupplierInsights(id: string): Promise<SupplierInsights 
     months: fillMonths(months),
     items,
     recent,
+    invoices: await getInvoiceSummary(id),
   }
 }
 
@@ -193,4 +218,75 @@ function fillMonths(found: MonthPoint[]): MonthPoint[] {
     out.push({ month: key, value: byMonth.get(key) ?? 0 })
   }
   return out
+}
+
+/** Statuses after Supply Chain has priced the requisition, when an invoice is expected. */
+const PAST_PRICING = `('pending_cost_control', 'pending_admin', 'pending_finance', 'completed')`
+
+async function getInvoiceSummary(id: string): Promise<InvoiceSummary | null> {
+  try {
+    const [totals, awaiting, over, recent] = await Promise.all([
+      queryOne<{ count: number; verified: number; invoiced: number }>(
+        `SELECT COUNT(*)::int AS count,
+                COUNT(*) FILTER (WHERE i.status = 'verified')::int AS verified,
+                COALESCE(SUM(i.amount), 0)::float8 AS invoiced
+           FROM public.supplier_invoices i
+           JOIN public.requests r ON r.id = i.request_id
+          WHERE i.supplier_id = $1 AND ${LIVE}`,
+        [id]
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM (
+           SELECT DISTINCT r.id
+             FROM public.request_items ri
+             JOIN public.requests r ON r.id = ri.request_id
+            WHERE ri.supplier_id = $1 AND ri.unit_price > 0 AND r.status IN ${PAST_PRICING}
+              AND NOT EXISTS (
+                SELECT 1 FROM public.supplier_invoices i WHERE i.request_id = r.id AND i.supplier_id = $1
+              )
+         ) x`,
+        [id]
+      ),
+      queryOne<{ count: number }>(
+        `SELECT COUNT(*)::int AS count FROM (
+           SELECT i.request_id
+             FROM public.supplier_invoices i
+             JOIN public.requests r ON r.id = i.request_id
+            WHERE i.supplier_id = $1 AND ${LIVE}
+            GROUP BY i.request_id
+           HAVING SUM(i.amount) > COALESCE((
+                    SELECT SUM(ri.line_total) FROM public.request_items ri
+                     WHERE ri.request_id = i.request_id AND ri.supplier_id = $1
+                  ), 0) + 0.005
+         ) x`,
+        [id]
+      ),
+      query<InvoiceSummary['recent'][number]>(
+        `SELECT i.id, i.request_id, r.purpose, i.invoice_number,
+                to_char(i.invoice_date, 'YYYY-MM-DD') AS invoice_date,
+                i.amount::float8 AS amount, i.status,
+                COALESCE((SELECT SUM(ri.line_total) FROM public.request_items ri
+                           WHERE ri.request_id = i.request_id AND ri.supplier_id = i.supplier_id), 0)::float8 AS requisitioned,
+                (SELECT SUM(x.amount) FROM public.supplier_invoices x
+                  WHERE x.request_id = i.request_id AND x.supplier_id = i.supplier_id)::float8 AS requisition_invoiced
+           FROM public.supplier_invoices i
+           JOIN public.requests r ON r.id = i.request_id
+          WHERE i.supplier_id = $1 AND ${LIVE}
+          ORDER BY i.invoice_date DESC, i.created_at DESC
+          LIMIT 15`,
+        [id]
+      ),
+    ])
+    return {
+      count: totals?.count ?? 0,
+      verified: totals?.verified ?? 0,
+      invoiced: totals?.invoiced ?? 0,
+      awaiting: awaiting?.count ?? 0,
+      overInvoiced: over?.count ?? 0,
+      recent,
+    }
+  } catch (err) {
+    if (isMissingTable(err)) return null
+    throw err
+  }
 }

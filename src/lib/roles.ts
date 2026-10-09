@@ -161,6 +161,8 @@ export type Capability =
   | 'request:review'
   | 'request:convert'
   | 'request:urgent'
+  | 'invoice:record'
+  | 'invoice:verify'
   | 'po:view'
   | 'po:approve'
   | 'po:pay'
@@ -195,6 +197,12 @@ export const CAPABILITIES: Record<Capability, RoleId[]> = {
   // site, so the red button is theirs alone — if every stage could raise an
   // urgent flag, nothing would be urgent.
   'request:urgent': ['project_lead'],
+
+  // Supplier invoices are recorded by whoever handles the vendor paperwork —
+  // Supply Chain as it sources the materials, Cost Control as it audits them —
+  // and verified against the document by Cost Control alone.
+  'invoice:record': ['supply_chain', 'cost_control'],
+  'invoice:verify': ['cost_control'],
 
   // Everyone in the chain can read a PO and discuss it.
   'po:view': ['engineer', 'supply_chain', 'project_lead', 'cost_control', 'finance', 'administrator'],

@@ -6,7 +6,7 @@ import { PageContainer, PageHeader, Panel, StatGrid, EmptyState } from '@/compon
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate, formatDateShort } from '@/lib/utils'
 import { statMoney } from '@/components/shared/stat-presets'
-import { FileText, Wallet, CheckCircle2, Layers, Info, Mail, Phone } from 'lucide-react'
+import { FileText, Wallet, CheckCircle2, Layers, Info, Mail, Phone, Receipt, AlertTriangle, BadgeCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,7 @@ export default async function SupplierInsightsPage({ params }: { params: Promise
   const data = await getSupplierInsights(id)
   if (!data) notFound()
 
-  const { profile, totals, months, items, recent } = data
+  const { profile, totals, months, items, recent, invoices } = data
   const peak = Math.max(...months.map((m) => m.value), 0)
   const average = totals.requisitions > 0 ? totals.requisitioned / totals.requisitions : 0
 
@@ -182,13 +182,67 @@ export default async function SupplierInsightsPage({ params }: { params: Promise
         </>
       )}
 
+      {invoices && (
+        <Panel title="Invoices" icon={<Receipt size={15} />} bodyClassName="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: 'Invoiced', value: statMoney(invoices.invoiced), hint: `${invoices.count} invoice${invoices.count === 1 ? '' : 's'}` },
+              { label: 'Verified', value: `${invoices.verified} of ${invoices.count}`, hint: 'Checked by Cost Control' },
+              { label: 'Awaiting an invoice', value: String(invoices.awaiting), hint: 'Requisitions past pricing with none recorded', warn: invoices.awaiting > 0 },
+              { label: 'Over-invoiced', value: String(invoices.overInvoiced), hint: 'Invoiced above what was requisitioned', warn: invoices.overInvoiced > 0 },
+            ].map((s) => (
+              <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.warn ? 'border-amber-500/40 bg-amber-500/5' : 'border-border'}`}>
+                <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  {s.warn && <AlertTriangle size={12} className="text-amber-600" />}
+                  {s.label}
+                </p>
+                <p className="mt-0.5 text-lg font-semibold tabular-nums text-foreground">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground">{s.hint}</p>
+              </div>
+            ))}
+          </div>
+          {invoices.recent.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No invoices recorded for this supplier yet. Supply Chain or Cost Control records them from a requisition&rsquo;s review page.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60 rounded-xl border border-border">
+              {invoices.recent.map((i) => {
+                const over = i.requisition_invoiced > i.requisitioned + 0.005
+                return (
+                  <li key={i.id}>
+                    <Link href={`/mintah/requests/${i.request_id}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3 transition-colors hover:bg-muted/40">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {i.invoice_number} <span className="font-normal text-muted-foreground">· {formatDateShort(i.invoice_date)}</span>
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">{i.purpose}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {over && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-destructive">
+                            <AlertTriangle size={12} /> above requisition
+                          </span>
+                        )}
+                        {i.status === 'verified' && <BadgeCheck size={15} className="text-emerald-600" aria-label="Verified" />}
+                        <span className="text-sm font-semibold tabular-nums">{formatCurrency(i.amount)}</span>
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </Panel>
+      )}
+
       <p className="flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
         <Info size={14} className="mt-0.5 shrink-0" />
         <span>
           Drawn from requisition lines assigned to this supplier; drafts, rejected and cancelled requisitions are
           excluded. Labour and anything without a supplier does not appear. &ldquo;Paid&rdquo; is allocated: a purchase
           order covers a whole requisition, so each supplier on it is credited with its share of the value. Invoices
-          are not recorded against suppliers yet.
+          are the ones recorded on requisitions, not a complete ledger.
         </span>
       </p>
     </PageContainer>

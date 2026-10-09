@@ -18,6 +18,8 @@ import { isElevated, can } from '@/lib/roles'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
 import type { ResolvedUser } from '@/lib/auth/server'
 import RecordNavigator from '@/components/shared/RecordNavigator'
+import SupplierInvoicesPanel, { type InvoiceSupplier } from '@/components/shared/SupplierInvoicesPanel'
+import { getRequestInvoices } from '@/lib/supplier-invoices'
 import { ArrowLeft, ShoppingBag, RotateCcw, CheckCircle2, StickyNote, Calculator } from 'lucide-react'
 import {
   CostControlInvoicesSection,
@@ -74,6 +76,20 @@ export default async function StageReview({
   const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
   const payments = po ? await listPayments(po.id) : []
   const canPay = stage === 'finance' && holdsStage
+
+  // Supplier invoices: who the requisition asks to supply, against what has been
+  // invoiced. `null` means migration 016 is not applied, so the panel stays out.
+  const invoices = await getRequestInvoices(requestId)
+  const invoiceSuppliers: InvoiceSupplier[] = []
+  for (const item of items) {
+    if (!item.supplier_id) continue
+    const found = invoiceSuppliers.find((s) => s.id === item.supplier_id)
+    const amount = Number(item.line_total) || 0
+    if (found) found.requisitioned += amount
+    else invoiceSuppliers.push({ id: item.supplier_id, name: item.supplier_name ?? 'Supplier', requisitioned: amount })
+  }
+  const canRecordInvoice =
+    holdsStage && can(user.role, 'invoice:record') && (stage === 'supply_chain' || stage === 'cost_control' || isElevated(user.role))
 
   /**
    * Does the right-hand rail have anything in it?
@@ -716,6 +732,19 @@ export default async function StageReview({
               />
             </div>
           </div>
+        )}
+
+        {invoices && (invoiceSuppliers.length > 0 || invoices.length > 0) && (
+          <SupplierInvoicesPanel
+            requestId={request.id}
+            invoices={invoices}
+            suppliers={invoiceSuppliers}
+            documents={documents.filter((d) => d.source === 'request').map((d) => ({ id: d.id, file_name: d.file_name }))}
+            canRecord={canRecordInvoice}
+            canVerify={can(user.role, 'invoice:verify')}
+            viewerId={user.id}
+            viewerIsElevated={isElevated(user.role)}
+          />
         )}
       </PageContainer>
     </>
