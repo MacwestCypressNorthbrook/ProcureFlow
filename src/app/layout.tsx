@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import PostHogIdentify from "@/components/shared/PostHogIdentify";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -58,6 +59,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background antialiased`}
       >
         <TooltipProvider>{children}</TooltipProvider>
+        <PostHogIdentify />
       </body>
     </html>
   );

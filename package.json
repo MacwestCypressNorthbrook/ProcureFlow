@@ -28,6 +28,8 @@
     "next": "16.2.10",
     "nodemailer": "^10.0.10",
     "pg": "^8.22.0",
+    "posthog-js": "^1.438.6",
+    "posthog-node": "^5.55.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-hook-form": "^7.81.0",

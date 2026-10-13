@@ -23,7 +23,22 @@ const securityHeaders = [
   },
 ]
 
+// PostHog is reached through same-origin /ingest rewrites so ad-blockers don't
+// drop events. Region follows NEXT_PUBLIC_POSTHOG_HOST (US by default).
+const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com'
+const posthogAssetsHost = posthogHost.replace('.i.posthog.com', '-assets.i.posthog.com')
+
 const nextConfig: NextConfig = {
+  // PostHog's API paths are trailing-slash sensitive.
+  skipTrailingSlashRedirect: true,
+
+  async rewrites() {
+    return [
+      { source: '/ingest/static/:path*', destination: `${posthogAssetsHost}/static/:path*` },
+      { source: '/ingest/:path*', destination: `${posthogHost}/:path*` },
+    ]
+  },
+
   // Ship only the icons actually used instead of whole icon barrels. On a slow
   // connection this is the difference between a few KB and a few hundred.
   experimental: {
