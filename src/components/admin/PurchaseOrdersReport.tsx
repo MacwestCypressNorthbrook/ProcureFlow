@@ -336,23 +336,28 @@ export default function PurchaseOrdersReport({
 
   /* ── Exports ────────────────────────────────────────────────────────── */
   const describe = (list: PoRow[]) => {
-    // A dimension every exported row shares is a filter in effect; say so.
-    const single = (key: (r: PoRow) => string) => {
-      const values = [...new Set(list.map(key))]
+    // Whatever the exported rows have in common is a filter in effect, so the
+    // file says so. A few ticked values are named outright; more than a few
+    // would be a paragraph, so those are left to the row count.
+    const distinct = (key: (r: PoRow) => string) => [...new Set(list.map(key))].sort()
+    const named = (key: (r: PoRow) => string, label: string) => {
+      const values = distinct(key)
+      return values.length > 0 && values.length <= 3 ? `${label}: ${values.join(', ')}` : null
+    }
+    const only = (key: (r: PoRow) => string) => {
+      const values = distinct(key)
       return values.length === 1 ? values[0] : null
     }
-    const project = single((r) => r.project)
-    const engineer = single((r) => r.engineer)
-    const supplier = single((r) => r.vendor)
-    const status = single((r) => PO_STATUS_CONFIG[r.status]?.label ?? r.status)
     const filters = [
-      project && `Project: ${project}`,
-      engineer && `Engineer: ${engineer}`,
-      supplier && `Supplier: ${supplier}`,
-      status && `Status: ${status}`,
+      named((r) => r.project, 'Project'),
+      named((r) => r.engineer, 'Engineer'),
+      named((r) => r.vendor, 'Supplier'),
+      named((r) => PO_STATUS_CONFIG[r.status]?.label ?? r.status, 'Status'),
     ].filter(Boolean) as string[]
     if (list.length < rows.length) filters.push(`${list.length} of ${rows.length} purchase orders`)
-    const subject = list.length < rows.length ? project ?? engineer ?? supplier : null
+    // The filename can only carry one name, so it takes a lone project,
+    // engineer or supplier and otherwise stays generic.
+    const subject = list.length < rows.length ? only((r) => r.project) ?? only((r) => r.engineer) ?? only((r) => r.vendor) : null
     return {
       filters,
       title: subject ? `Purchase orders — ${subject}` : 'Purchase orders',

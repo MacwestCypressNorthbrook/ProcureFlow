@@ -76,7 +76,11 @@ interface Prefs {
  */
 interface Session {
   term?: string
-  facets?: Record<string, string>
+  /**
+   * Selected values per filter. A session written before filters became
+   * multi-select holds a bare string, which is read as a single selection.
+   */
+  facets?: Record<string, string[] | string>
   sort?: { id: string; dir: SortDir } | null
   page?: number
 }
@@ -175,6 +179,139 @@ function SelectShell({ children, className = '' }: { children: React.ReactNode; 
   )
 }
 
+/**
+ * One filter, as a list of tick boxes.
+ *
+ * Several values can be ticked, because the real questions are plural: these
+ * three sites, those two engineers. Single-choice dropdowns could only ask
+ * about one at a time, which meant exporting one project, then the next.
+ *
+ * Long lists get a search box — a supplier filter can run to hundreds of names,
+ * and scrolling to find one defeats the point.
+ */
+function FacetPicker<T>({
+  facet,
+  selected,
+  onChange,
+}: {
+  facet: DataFacet<T>
+  selected: string[]
+  onChange: (next: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const wrapRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  const searchable = facet.options.length > 8
+  const needle = query.trim().toLowerCase()
+  const shown = needle ? facet.options.filter((o) => o.label.toLowerCase().includes(needle)) : facet.options
+
+  const toggle = (value: string) =>
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value])
+
+  const summary =
+    selected.length === 0
+      ? 'All'
+      : selected.length === 1
+        ? facet.options.find((o) => o.value === selected[0])?.label ?? '1 selected'
+        : `${selected.length} selected`
+
+  return (
+    <div ref={wrapRef} className="relative w-full lg:w-auto">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="true"
+        aria-expanded={open}
+        title={selected.length > 1 ? selected.map((v) => facet.options.find((o) => o.value === v)?.label ?? v).join(', ') : undefined}
+        className={`${controlClass} inline-flex w-full items-center justify-between gap-2 pr-2.5 font-medium lg:w-auto ${
+          selected.length > 0 ? 'border-primary/50 bg-primary/[0.04]' : ''
+        }`}
+      >
+        <span className="truncate">
+          <span className="text-muted-foreground">{facet.label}:</span> {summary}
+        </span>
+        <ChevronDown size={15} aria-hidden="true" className="shrink-0 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-50 mt-1.5 w-full min-w-[240px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl lg:w-[260px]">
+          {searchable && (
+            <div className="border-b border-border p-2">
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={`Search ${facet.label.toLowerCase()}…`}
+                aria-label={`Search ${facet.label}`}
+                className="h-8 w-full rounded-lg border border-input bg-card px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+          )}
+
+          <div className="max-h-64 overflow-y-auto p-1">
+            {shown.length === 0 ? (
+              <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">Nothing matches that.</p>
+            ) : (
+              shown.map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-foreground transition-colors hover:bg-muted"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(option.value)}
+                    onChange={() => toggle(option.value)}
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-[var(--primary)]"
+                  />
+                  <span className="min-w-0 flex-1 truncate" title={option.label}>
+                    {option.label}
+                  </span>
+                </label>
+              ))
+            )}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-2 py-1.5">
+            <button
+              type="button"
+              onClick={() => onChange(shown.map((o) => o.value))}
+              disabled={shown.length === 0}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              {needle ? `Select these ${shown.length}` : 'Select all'}
+            </button>
+            <button
+              type="button"
+              onClick={() => onChange([])}
+              disabled={selected.length === 0}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DataView<T>({
   rows,
   getRowId,
@@ -257,10 +394,12 @@ export default function DataView<T>({
   // since left the list, or a column that is gone — so a stale filter can never
   // silently hide every row behind a select that reads "All".
   const facetValues = useMemo(() => {
-    const out: Record<string, string> = {}
+    const out: Record<string, string[]> = {}
     for (const facet of facets) {
-      const value = session.facets?.[facet.id]
-      if (value && facet.options.some((o) => o.value === value)) out[facet.id] = value
+      const stored = session.facets?.[facet.id]
+      const list = typeof stored === 'string' ? [stored] : Array.isArray(stored) ? stored : []
+      const valid = list.filter((value) => facet.options.some((o) => o.value === value))
+      if (valid.length > 0) out[facet.id] = valid
     }
     return out
   }, [session.facets, facets])
@@ -287,22 +426,30 @@ export default function DataView<T>({
     setPage(1)
   }
   const setTerm = (next: string) => updateSession({ term: next, page: 1 })
-  const setFacetValues = (next: Record<string, string>) => updateSession({ facets: next, page: 1 })
+  const setFacetValues = (next: Record<string, string[]>) => {
+    // A filter with nothing ticked is not a filter; drop it so "Clear" and the
+    // active count stay honest.
+    const pruned: Record<string, string[]> = {}
+    for (const [id, values] of Object.entries(next)) if (values.length > 0) pruned[id] = values
+    updateSession({ facets: pruned, page: 1 })
+  }
 
   const sortableColumns = useMemo(
     () => columns.filter((c) => c.sortable && c.sortValue),
     [columns]
   )
 
-  const activeFacetCount = Object.values(facetValues).filter(Boolean).length
+  const activeFacetCount = Object.values(facetValues).filter((v) => v.length > 0).length
 
   /* ── filter → search → sort ─────────────────────────────────────────── */
   const processed = useMemo(() => {
     let out = rows
 
+    // Within one filter the ticked values are alternatives (project A OR B);
+    // across filters they narrow each other (project A AND engineer B).
     for (const facet of facets) {
-      const value = facetValues[facet.id]
-      if (value) out = out.filter((row) => facet.matches(row, value))
+      const values = facetValues[facet.id]
+      if (values?.length) out = out.filter((row) => values.some((value) => facet.matches(row, value)))
     }
 
     const q = term.trim().toLowerCase()
@@ -425,25 +572,20 @@ export default function DataView<T>({
             {/* Facets: inline from lg, collapsed behind the Filters button below it */}
             <div className={`${showFilters ? 'flex' : 'hidden'} w-full flex-col gap-2 sm:flex-row lg:flex lg:w-auto`}>
               {facets.map((facet) => (
-                <SelectShell key={facet.id} className="w-full lg:w-auto">
-                  <select
-                    value={facetValues[facet.id] ?? ''}
-                    onChange={(e) => setFacetValues({ ...facetValues, [facet.id]: e.target.value })}
-                    aria-label={facet.label}
-                    className={`${controlClass} w-full appearance-none pr-9 font-medium`}
-                  >
-                    <option value="">{facet.label}: All</option>
-                    {facet.options.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </SelectShell>
+                <FacetPicker
+                  key={facet.id}
+                  facet={facet}
+                  selected={facetValues[facet.id] ?? []}
+                  onChange={(next) => setFacetValues({ ...facetValues, [facet.id]: next })}
+                />
               ))}
 
-              {/* Grid mode has no column headers to click, so sorting moves here. */}
-              {view === 'grid' && sortableColumns.length > 0 && (
+              {/*
+                Sorting lives here in both views. Grid mode has no column
+                headers to click at all, and in table mode a long table's
+                headers are scrolled off by the time you want to re-sort.
+              */}
+              {sortableColumns.length > 0 && (
                 <SelectShell className="w-full lg:w-auto">
                   <select
                     value={sort ? `${sort.id}:${sort.dir}` : ''}
@@ -505,6 +647,52 @@ export default function DataView<T>({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/*
+        What is ticked, spelled out. The filter buttons can only say "3
+        selected", and a list narrowed by several filters at once needs to say
+        which — especially before an export, which takes exactly these rows.
+      */}
+      {activeFacetCount > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {facets.flatMap((facet) =>
+            (facetValues[facet.id] ?? []).map((value) => {
+              const label = facet.options.find((o) => o.value === value)?.label ?? value
+              return (
+                <span
+                  key={`${facet.id}:${value}`}
+                  className="inline-flex max-w-full items-center gap-1 rounded-lg border border-border bg-muted/50 py-1 pl-2.5 pr-1 text-xs"
+                >
+                  <span className="truncate">
+                    <span className="text-muted-foreground">{facet.label}:</span>{' '}
+                    <span className="font-medium text-foreground">{label}</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFacetValues({
+                        ...facetValues,
+                        [facet.id]: (facetValues[facet.id] ?? []).filter((v) => v !== value),
+                      })
+                    }
+                    aria-label={`Remove the ${facet.label} filter ${label}`}
+                    className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )
+            })
+          )}
+          <button
+            type="button"
+            onClick={clearAll}
+            className="rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            Clear all
+          </button>
         </div>
       )}
 

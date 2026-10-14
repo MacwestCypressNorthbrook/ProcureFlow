@@ -254,18 +254,23 @@ export default function InvoicesReport({
   ]
 
   const exportOptions = (list: InvoiceRow[]): ReportExportOption[] => {
-    const single = (key: (r: InvoiceRow) => string) => {
-      const values = [...new Set(list.map(key))]
+    const distinct = (key: (r: InvoiceRow) => string) => [...new Set(list.map(key))].sort()
+    const named = (key: (r: InvoiceRow) => string, label: string) => {
+      const values = distinct(key)
+      return values.length > 0 && values.length <= 3 ? `${label}: ${values.join(', ')}` : null
+    }
+    const only = (key: (r: InvoiceRow) => string) => {
+      const values = distinct(key)
       return values.length === 1 ? values[0] : null
     }
-    const supplier = single((r) => r.supplier_name)
-    const project = single((r) => r.project)
-    const engineer = single((r) => r.engineer)
-    const filters = [supplier && `Supplier: ${supplier}`, project && `Project: ${project}`, engineer && `Engineer: ${engineer}`].filter(
-      Boolean
-    ) as string[]
+    const filters = [
+      named((r) => r.supplier_name, 'Supplier'),
+      named((r) => r.project, 'Project'),
+      named((r) => r.engineer, 'Engineer'),
+    ].filter(Boolean) as string[]
     if (list.length < rows.length) filters.push(`${list.length} of ${rows.length} invoices`)
-    const subject = list.length < rows.length ? supplier ?? project ?? engineer : null
+    const subject =
+      list.length < rows.length ? only((r) => r.supplier_name) ?? only((r) => r.project) ?? only((r) => r.engineer) : null
     const title = subject ? `Supplier invoices — ${subject}` : 'Supplier invoices'
     const section = subject ? `invoices-${slug(subject)}` : 'invoices'
     const meta = [
