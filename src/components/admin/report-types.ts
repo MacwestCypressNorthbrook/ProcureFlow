@@ -30,19 +30,43 @@ export interface AdminPurchaseOrder extends PurchaseOrder {
   supplier_requisitioned: number | string | null
 }
 
-/** A recorded supplier invoice, with the requisition and purchase orders it belongs to. */
+/**
+ * A row of the Invoices report — either a recorded invoice or an invoice
+ * document that nobody has recorded yet.
+ *
+ * Both belong on the page. An invoice enters this system as a file: Engineers
+ * and Supply Chain both upload them, and that happens weeks before, or instead
+ * of, anyone keying in its number and amount. A report that listed only the
+ * keyed-in records showed nothing at all while 25 invoice documents sat in the
+ * system — so the document is a row in its own right, in the state it is
+ * actually in.
+ *
+ * `kind` says which, and the fields a document cannot have are null on it: an
+ * unrecorded invoice has no number, no date and no amount, and its supplier is
+ * known only when the requisition names exactly one.
+ */
 export interface AdminInvoice {
+  kind: 'invoice' | 'document'
   id: string
   request_id: string
-  supplier_id: string
-  supplier_name: string
-  invoice_number: string
-  invoice_date: string
-  amount: number | string
-  status: 'recorded' | 'verified' | string
+  /** Null on a document whose requisition names no single supplier. */
+  supplier_id: string | null
+  supplier_name: string | null
+  /** Null on a document: the number is printed on the file, not in the system. */
+  invoice_number: string | null
+  invoice_date: string | null
+  amount: number | string | null
+  status: 'recorded' | 'verified' | 'document' | string
   notes: string | null
   created_at: string
   verified_at: string | null
+  /** Documents only: who attached the file, and when. */
+  uploaded_by_name: string | null
+  uploaded_at: string | null
+  /** Documents only: Cost Control's review mark on the file itself. */
+  document_review_status: string | null
+  /** Documents only: how many suppliers the requisition names, when not exactly one. */
+  supplier_candidates: number | null
   request_purpose: string | null
   request_status: string | null
   project_name: string | null

@@ -733,7 +733,9 @@ export default async function StageReview({
             requestId={request.id}
             invoices={invoices}
             suppliers={invoiceSuppliers}
-            documents={documents.filter((d) => d.source === 'request').map((d) => ({ id: d.id, file_name: d.file_name }))}
+            documents={documents
+              .filter((d) => d.source === 'request')
+              .map((d) => ({ id: d.id, file_name: d.file_name, is_invoice: d.is_invoice ?? null }))}
             canRecord={canRecordInvoice}
             canVerify={can(user.role, 'invoice:verify')}
             viewerId={user.id}

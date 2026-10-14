@@ -1,4 +1,5 @@
 import { query, queryOne } from '@/lib/db'
+import { attachmentsHaveInvoiceFlag } from '@/lib/supplier-invoices'
 import { uploadFile } from '@/lib/storage'
 import { requireRole } from '@/lib/auth-guard'
 import { NextResponse } from 'next/server'
@@ -85,6 +86,10 @@ export async function POST(
   let fileUrl: string
   let fileSize: number | null = null
   let fileMime: string | null = null
+  // Did the uploader say this is a supplier invoice? Absent means they were
+  // not asked — an older client — and is stored as NULL so the Invoices report
+  // falls back to the filename rather than treating silence as "no".
+  let isInvoice: boolean | null = null
 
   if (contentType.includes('multipart/form-data')) {
     const formData = await request.formData()
@@ -92,6 +97,9 @@ export async function POST(
     if (!file || file.size === 0) {
       return NextResponse.json({ error: 'A file is required' }, { status: 400 })
     }
+
+    const flag = formData.get('is_invoice')
+    if (flag === 'true' || flag === 'false') isInvoice = flag === 'true'
 
     const check = checkUpload(file)
     if (!check.ok) {
@@ -138,13 +146,24 @@ export async function POST(
 
     fileSize = typeof body.file_size === 'number' ? body.file_size : null
     fileMime = typeof body.file_type === 'string' ? body.file_type : null
+    if (typeof body.is_invoice === 'boolean') isInvoice = body.is_invoice
   }
 
+  // `is_invoice` arrives with migration 019. Until it is applied the flag is
+  // simply not stored and the filename fallback carries on, so the upload
+  // never fails for want of a column.
+  const withFlag = await attachmentsHaveInvoiceFlag()
   const inserted = await queryOne<RequestAttachment>(
-    `INSERT INTO public.request_attachments (request_id, file_name, file_url, file_size, file_type, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at`,
-    [id, fileName, fileUrl, fileSize, fileMime, guard.user.id]
+    withFlag
+      ? `INSERT INTO public.request_attachments (request_id, file_name, file_url, file_size, file_type, uploaded_by, is_invoice)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at`
+      : `INSERT INTO public.request_attachments (request_id, file_name, file_url, file_size, file_type, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, request_id, file_name, file_url, file_size, file_type, uploaded_by, created_at`,
+    withFlag
+      ? [id, fileName, fileUrl, fileSize, fileMime, guard.user.id, isInvoice]
+      : [id, fileName, fileUrl, fileSize, fileMime, guard.user.id]
   )
 
   // Who hears about a new document: the person who raised the requisition, and

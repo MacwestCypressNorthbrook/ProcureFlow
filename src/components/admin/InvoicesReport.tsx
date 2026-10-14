@@ -20,6 +20,13 @@ interface InvoiceRow extends AdminInvoice {
   engineer: string
   month: string
   hasDocument: boolean
+  /** An invoice document nobody has recorded yet: no number, no amount. */
+  isDocument: boolean
+  supplier: string
+  /** What the row is dated by: the invoice date if recorded, else when the file arrived. */
+  effectiveDate: string
+  /** The invoice number if recorded, else the document's filename. */
+  label: string
 }
 
 const num = (v: unknown) => {
@@ -37,15 +44,28 @@ const monthName = (ym: string) => {
 
 const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
-const STATUS_LABEL: Record<string, string> = { recorded: 'Awaiting verification', verified: 'Verified' }
+const STATUS_LABEL: Record<string, string> = {
+  document: 'Not recorded',
+  recorded: 'Awaiting verification',
+  verified: 'Verified',
+}
+
+const UNIDENTIFIED = 'Supplier not identified'
 
 /**
- * Every supplier invoice recorded against a requisition, in one place.
+ * Every supplier invoice in the system, in one place — at whatever stage it has
+ * reached.
  *
- * Invoices are recorded per requisition by Supply Chain and Cost Control; this
- * is where they are seen together — filtered by supplier, project, engineer or
- * month — and downloaded, either as a workbook or as the invoice documents
- * themselves, bundled into one archive.
+ * An invoice arrives as a file, uploaded by an Engineer or by Supply Chain, and
+ * becomes a record when someone keys in its number, date and amount; Cost
+ * Control then verifies it against the document. All three states are rows
+ * here, because a page that listed only the keyed-in records showed nothing at
+ * all while the documents piled up — and an invoice the business has received
+ * is an invoice whether or not anyone has typed it in yet.
+ *
+ * Money is counted from recorded invoices alone. An unrecorded document has no
+ * amount to count, so it shows a blank rather than a zero: a zero would read as
+ * a settled total, and quietly understate what is owed.
  */
 export default function InvoicesReport({
   invoices,
@@ -58,14 +78,20 @@ export default function InvoicesReport({
   const rows = useMemo<InvoiceRow[]>(
     () =>
       invoices.map((inv) => {
-        const d = new Date(inv.invoice_date)
+        const isDocument = inv.kind === 'document'
+        const effectiveDate = inv.invoice_date ?? inv.uploaded_at ?? inv.created_at
+        const d = new Date(effectiveDate)
         return {
           ...inv,
-          value: num(inv.amount),
+          value: isDocument ? 0 : num(inv.amount),
           project: inv.project_name || 'Unassigned',
           engineer: inv.engineer_name || 'Unknown',
           month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
           hasDocument: Boolean(inv.attachment_id),
+          isDocument,
+          supplier: inv.supplier_name || UNIDENTIFIED,
+          effectiveDate,
+          label: isDocument ? (inv.attachment_name ?? 'Invoice document') : `#${inv.invoice_number ?? '—'}`,
         }
       }),
     [invoices]
@@ -73,12 +99,15 @@ export default function InvoicesReport({
   const [visible, setVisible] = useState<InvoiceRow[]>(rows)
 
   const stats = useMemo(() => {
-    const total = visible.reduce((s, r) => s + r.value, 0)
-    const verified = visible.filter((r) => r.status === 'verified')
+    // Only recorded invoices carry money. Documents are counted as a backlog.
+    const recorded = visible.filter((r) => !r.isDocument)
+    const documents = visible.filter((r) => r.isDocument)
+    const total = recorded.reduce((s, r) => s + r.value, 0)
+    const verified = recorded.filter((r) => r.status === 'verified')
     // Invoiced against what each requisition priced for that supplier — counted
     // once per requisition and supplier, however many invoices it took.
     const pairs = new Map<string, { invoiced: number; requisitioned: number }>()
-    for (const r of visible) {
+    for (const r of recorded) {
       const key = `${r.request_id}|${r.supplier_id}`
       const entry = pairs.get(key) ?? { invoiced: 0, requisitioned: num(r.supplier_requisitioned) }
       entry.invoiced += r.value
@@ -87,26 +116,30 @@ export default function InvoicesReport({
     const overBilled = [...pairs.values()].filter((p) => p.requisitioned > 0 && p.invoiced > p.requisitioned * 1.005)
     return {
       total,
-      count: visible.length,
+      count: recorded.length,
       verifiedValue: verified.reduce((s, r) => s + r.value, 0),
       verifiedCount: verified.length,
-      awaiting: visible.length - verified.length,
-      noDocument: visible.filter((r) => !r.hasDocument).length,
-      noPo: visible.filter((r) => !r.po_numbers).length,
+      awaiting: recorded.length - verified.length,
+      unrecorded: documents.length,
+      unidentified: documents.filter((r) => !r.supplier_id).length,
+      noDocument: recorded.filter((r) => !r.hasDocument).length,
+      noPo: recorded.filter((r) => !r.po_numbers).length,
       overBilled: overBilled.length,
       overBilledBy: overBilled.reduce((s, p) => s + (p.invoiced - p.requisitioned), 0),
-      suppliers: new Set(visible.map((r) => r.supplier_id)).size,
+      suppliers: new Set(recorded.map((r) => r.supplier_id)).size,
     }
   }, [visible])
 
-  const charts = useMemo(
-    () => ({
-      supplier: rankRows(summarize(visible, (r) => r.supplier_name, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
-      project: rankRows(summarize(visible, (r) => r.project, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
-      months: monthSeries(visible, (r) => r.invoice_date, (r) => r.value),
-    }),
-    [visible]
-  )
+  // Charts plot money, so they plot recorded invoices. A document would
+  // otherwise enter every ranking as a zero-value bar for its supplier.
+  const charts = useMemo(() => {
+    const recorded = visible.filter((r) => !r.isDocument)
+    return {
+      supplier: rankRows(summarize(recorded, (r) => r.supplier, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
+      project: rankRows(summarize(recorded, (r) => r.project, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
+      months: monthSeries(recorded, (r) => r.effectiveDate, (r) => r.value),
+    }
+  }, [visible])
 
   // Memoized: DataView re-filters and re-sorts whenever these change identity.
   const columns: DataColumn<InvoiceRow>[] = useMemo(() => [
@@ -114,12 +147,21 @@ export default function InvoicesReport({
       id: 'number',
       label: 'Invoice',
       sortable: true,
-      sortValue: (r) => r.invoice_number,
+      sortValue: (r) => r.label,
       cell: (r) => (
         <div className="min-w-0 max-w-[220px]">
-          <p className="truncate text-sm font-semibold text-foreground">#{r.invoice_number}</p>
-          <p className="truncate text-xs text-muted-foreground" title={r.supplier_name}>
-            {r.supplier_name}
+          <p
+            className={cn('truncate text-sm font-semibold', r.isDocument ? 'text-foreground/90' : 'text-foreground')}
+            title={r.isDocument ? (r.attachment_name ?? undefined) : undefined}
+          >
+            {r.isDocument && <FileText size={12} className="mr-1 inline-block align-[-1px] text-muted-foreground" />}
+            {r.label}
+          </p>
+          <p
+            className={cn('truncate text-xs', r.supplier_id ? 'text-muted-foreground' : 'italic text-amber-700 dark:text-amber-500')}
+            title={r.supplier_id ? r.supplier : `This requisition names ${r.supplier_candidates ?? 0} suppliers — open it to say which issued this invoice`}
+          >
+            {r.supplier}
           </p>
         </div>
       ),
@@ -143,7 +185,14 @@ export default function InvoicesReport({
       align: 'right',
       sortable: true,
       sortValue: (r) => r.value,
-      cell: (r) => <span className="font-semibold tabular-nums text-foreground">{ghsFull(r.value)}</span>,
+      cell: (r) =>
+        r.isDocument ? (
+          <span className="text-xs text-muted-foreground" title="Not recorded — this amount is in no total">
+            Not recorded
+          </span>
+        ) : (
+          <span className="font-semibold tabular-nums text-foreground">{ghsFull(r.value)}</span>
+        ),
     },
     {
       id: 'po',
@@ -169,8 +218,11 @@ export default function InvoicesReport({
             'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold',
             r.status === 'verified'
               ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-              : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+              : r.isDocument
+                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
           )}
+          title={r.isDocument ? 'The document is attached but its number, date and amount have not been recorded' : undefined}
         >
           {r.status === 'verified' ? <BadgeCheck size={11} /> : <AlertTriangle size={11} />}
           {STATUS_LABEL[r.status] ?? r.status}
@@ -199,11 +251,16 @@ export default function InvoicesReport({
     },
     {
       id: 'date',
-      label: 'Invoice date',
+      label: 'Date',
       hideBelow: 'sm',
       sortable: true,
-      sortValue: (r) => r.invoice_date,
-      cell: (r) => <span className="whitespace-nowrap text-xs text-muted-foreground">{dateOnly(r.invoice_date)}</span>,
+      sortValue: (r) => r.effectiveDate,
+      cell: (r) => (
+        <span className="whitespace-nowrap text-xs text-muted-foreground">
+          {r.isDocument && <span className="text-muted-foreground/70">Attached </span>}
+          {dateOnly(r.effectiveDate)}
+        </span>
+      ),
     },
   ], [])
 
@@ -224,21 +281,24 @@ export default function InvoicesReport({
   }), [rows])
 
   const facets: DataFacet<InvoiceRow>[] = useMemo(() => [
-    facet('supplier', 'Supplier', (r) => r.supplier_name),
+    facet('supplier', 'Supplier', (r) => r.supplier),
     facet('project', 'Project', (r) => r.project),
     facet('engineer', 'Engineer', (r) => r.engineer),
     facet('status', 'Status', (r) => r.status, (v) => STATUS_LABEL[v] ?? v),
-    facet('month', 'Invoice month', (r) => r.month, monthName, (a, b) => b.localeCompare(a)),
+    facet('month', 'Month', (r) => r.month, monthName, (a, b) => b.localeCompare(a)),
     facet('document', 'Document', (r) => (r.hasDocument ? 'yes' : 'no'), (v) => (v === 'yes' ? 'Has document' : 'No document')),
     facet('po', 'PO', (r) => (r.po_numbers ? 'yes' : 'no'), (v) => (v === 'yes' ? 'Matched to a PO' : 'No matching PO')),
   ], [facet])
 
 
+  // An unrecorded document leaves the number, date and amount blank rather than
+  // writing a zero: Excel's SUM skips a blank, so the totals row stays a total
+  // of what was actually invoiced.
   const detail: XlsxColumn<InvoiceRow>[] = [
-    { header: 'Invoice number', value: (r) => r.invoice_number, width: 16 },
+    { header: 'Invoice number', value: (r) => r.invoice_number ?? 'Not recorded', width: 16 },
     { header: 'Invoice date', value: (r) => r.invoice_date, format: 'date', width: 14 },
-    { header: 'Supplier', value: (r) => r.supplier_name, width: 28 },
-    { header: 'Amount', value: (r) => r.value, format: 'money', width: 16, total: true },
+    { header: 'Supplier', value: (r) => r.supplier, width: 28 },
+    { header: 'Amount', value: (r) => (r.isDocument ? null : r.value), format: 'money', width: 16, total: true },
     { header: 'Status', value: (r) => STATUS_LABEL[r.status] ?? r.status, width: 20 },
     { header: 'Against PO', value: (r) => r.po_numbers, width: 18 },
     { header: 'Requisitioned for supplier', value: (r) => num(r.supplier_requisitioned), format: 'money', width: 18 },
@@ -246,7 +306,9 @@ export default function InvoicesReport({
     { header: 'Engineer', value: (r) => r.engineer, width: 22 },
     { header: 'Requisition', value: (r) => r.request_purpose, width: 34 },
     { header: 'Recorded by', value: (r) => r.recorded_by_name, width: 20 },
-    { header: 'Recorded on', value: (r) => r.created_at, format: 'date', width: 14 },
+    { header: 'Recorded on', value: (r) => (r.isDocument ? null : r.created_at), format: 'date', width: 14 },
+    { header: 'Attached by', value: (r) => r.uploaded_by_name, width: 20 },
+    { header: 'Attached on', value: (r) => r.uploaded_at, format: 'date', width: 14 },
     { header: 'Verified by', value: (r) => r.verified_by_name, width: 20 },
     { header: 'Verified on', value: (r) => r.verified_at, format: 'date', width: 14 },
     { header: 'Document', value: (r) => r.attachment_name ?? 'Not attached', width: 30 },
@@ -264,20 +326,29 @@ export default function InvoicesReport({
       return values.length === 1 ? values[0] : null
     }
     const filters = [
-      named((r) => r.supplier_name, 'Supplier'),
+      named((r) => r.supplier, 'Supplier'),
       named((r) => r.project, 'Project'),
       named((r) => r.engineer, 'Engineer'),
     ].filter(Boolean) as string[]
     if (list.length < rows.length) filters.push(`${list.length} of ${rows.length} invoices`)
     const subject =
-      list.length < rows.length ? only((r) => r.supplier_name) ?? only((r) => r.project) ?? only((r) => r.engineer) : null
+      list.length < rows.length ? only((r) => r.supplier) ?? only((r) => r.project) ?? only((r) => r.engineer) : null
     const title = subject ? `Supplier invoices — ${subject}` : 'Supplier invoices'
     const section = subject ? `invoices-${slug(subject)}` : 'invoices'
+    const unrecorded = list.filter((r) => r.isDocument).length
     const meta = [
       `Exported ${new Date().toLocaleString('en-GB')}${exportedBy ? ` by ${exportedBy}` : ''} · ${list.length} invoice${list.length === 1 ? '' : 's'} · amounts in Ghana cedis (GHS)`,
+      ...(unrecorded > 0
+        ? [
+            `${unrecorded} of these ${unrecorded === 1 ? 'is a document that has' : 'are documents that have'} not been recorded, so ${unrecorded === 1 ? 'its' : 'their'} amount is blank and is not in any total.`,
+          ]
+        : []),
       ...(filters.length ? [`Filters: ${filters.join(' · ')}`] : []),
     ]
     const withDocs = list.filter((r) => r.hasDocument)
+    // The by-supplier/project/engineer sheets total money, so they cover the
+    // recorded invoices alone.
+    const recorded = list.filter((r) => !r.isDocument)
     type Group = ReturnType<typeof summarize<InvoiceRow>>[number]
     const group = (name: string, label: string, key: (r: InvoiceRow) => string) =>
       sheet<Group>({
@@ -285,7 +356,7 @@ export default function InvoicesReport({
         title: `${title} — by ${label.toLowerCase()}`,
         subtitle: `Invoiced value by ${label.toLowerCase()}, largest first.`,
         meta,
-        rows: summarize(list, key, (r) => r.value),
+        rows: summarize(recorded, key, (r) => r.value),
         columns: [
           { header: label, value: (g) => g.name, width: 32 },
           { header: 'Invoices', value: (g) => g.count, format: 'int', width: 10, total: true },
@@ -307,12 +378,13 @@ export default function InvoicesReport({
               sheet<InvoiceRow>({
                 name: 'Invoices',
                 title,
-                subtitle: 'Every recorded supplier invoice, with the purchase order and requisition it belongs to.',
+                subtitle:
+                  'Every supplier invoice, recorded or still only a document, with the purchase order and requisition it belongs to.',
                 meta,
                 rows: list,
                 columns: detail,
               }),
-              group('By Supplier', 'Supplier', (r) => r.supplier_name),
+              group('By Supplier', 'Supplier', (r) => r.supplier),
               group('By Project', 'Project site', (r) => r.project),
               group('By Engineer', 'Engineer', (r) => r.engineer),
             ]),
@@ -328,13 +400,13 @@ export default function InvoicesReport({
         icon: <FileText size={16} className="text-rose-600 dark:text-rose-400" />,
         run: () => {
           const cols: ExportColumn<InvoiceRow>[] = [
-            { header: 'Invoice', value: (r) => r.invoice_number },
-            { header: 'Date', value: (r) => dateOnly(r.invoice_date) },
-            { header: 'Supplier', value: (r) => r.supplier_name },
+            { header: 'Invoice', value: (r) => (r.isDocument ? (r.attachment_name ?? 'Document') : r.invoice_number) },
+            { header: 'Date', value: (r) => dateOnly(r.effectiveDate) },
+            { header: 'Supplier', value: (r) => r.supplier },
             { header: 'Project', value: (r) => r.project },
             { header: 'PO', value: (r) => r.po_numbers ?? '—' },
             { header: 'Status', value: (r) => STATUS_LABEL[r.status] ?? r.status },
-            { header: 'Amount (GHS)', value: (r) => r.value, total: true },
+            { header: 'Amount (GHS)', value: (r) => (r.isDocument ? '—' : r.value), total: true },
           ]
           if (!downloadPdf(list, cols, { title, subtitle: 'Supplier invoices as filtered.', exportedBy, filters })) {
             throw new Error('Allow pop-ups for this site to export a PDF.')
@@ -374,18 +446,25 @@ export default function InvoicesReport({
           const result = await downloadDocumentBundle(
             withDocs.map((r) => {
               const ext = r.attachment_name?.match(/\.[a-z0-9]+$/i)?.[0] ?? '.pdf'
+              // A recorded invoice is filed under its number; an unrecorded one
+              // has none, so it keeps the filename it arrived with.
+              const base = r.isDocument
+                ? (r.attachment_name?.replace(/\.[a-z0-9]+$/i, '') ?? 'document')
+                : `INV ${r.invoice_number}`
               return {
                 id: r.attachment_id!,
-                fileName: `${dateOnly(r.invoice_date)} - INV ${r.invoice_number}${ext}`,
-                folder: r.supplier_name,
+                fileName: `${dateOnly(r.effectiveDate)} - ${base}${ext}`,
+                folder: r.supplier,
                 index: {
-                  'Invoice number': r.invoice_number,
-                  'Invoice date': dateOnly(r.invoice_date),
-                  Supplier: r.supplier_name,
-                  'Amount (GHS)': r.value,
+                  'Invoice number': r.invoice_number ?? 'Not recorded',
+                  'Invoice date': r.invoice_date ? dateOnly(r.invoice_date) : '',
+                  Supplier: r.supplier,
+                  'Amount (GHS)': r.isDocument ? '' : r.value,
                   'Against PO': r.po_numbers,
                   Project: r.project,
                   Status: STATUS_LABEL[r.status] ?? r.status,
+                  'Attached by': r.uploaded_by_name ?? r.recorded_by_name,
+                  'Attached on': dateOnly(r.uploaded_at ?? r.created_at),
                 },
               }
             }),
@@ -410,7 +489,7 @@ export default function InvoicesReport({
             value: ghsFull(stats.total),
             icon: <Receipt size={18} />,
             tone: 'purple',
-            compare: `${stats.count} invoice${stats.count === 1 ? '' : 's'} from ${stats.suppliers} supplier${stats.suppliers === 1 ? '' : 's'}`,
+            compare: `${stats.count} recorded invoice${stats.count === 1 ? '' : 's'} from ${stats.suppliers} supplier${stats.suppliers === 1 ? '' : 's'}`,
           },
           {
             label: 'Verified by Cost Control',
@@ -431,11 +510,14 @@ export default function InvoicesReport({
                 : 'No supplier has invoiced more than was requisitioned',
           },
           {
-            label: 'Missing paperwork',
-            value: stats.noDocument,
-            icon: <AlertTriangle size={18} />,
-            tone: stats.noDocument > 0 ? 'amber' : 'emerald',
-            compare: `${stats.noDocument} without a document · ${stats.noPo} with no matching PO`,
+            label: 'Not recorded yet',
+            value: stats.unrecorded,
+            icon: <FileText size={18} />,
+            tone: stats.unrecorded > 0 ? 'amber' : 'emerald',
+            compare:
+              stats.unrecorded > 0
+                ? `Invoice document${stats.unrecorded === 1 ? '' : 's'} attached but never recorded, so ${stats.unrecorded === 1 ? 'its value is' : 'their value is'} in no total${stats.unidentified > 0 ? ` · ${stats.unidentified} with no supplier identified` : ''}`
+                : `Every invoice document is recorded · ${stats.noDocument} record${stats.noDocument === 1 ? '' : 's'} with no document · ${stats.noPo} with no matching PO`,
           },
         ]}
       />
@@ -459,13 +541,13 @@ export default function InvoicesReport({
         facets={facets}
         onVisibleRows={setVisible}
         onRowClick={(r) => router.push(`/admin/requests/${r.request_id}`)}
-        searchPlaceholder="Search invoice number, supplier, project, PO…"
-        searchText={(r) => [r.invoice_number, r.supplier_name, r.project, r.engineer, r.po_numbers, r.request_purpose]}
+        searchPlaceholder="Search invoice number, document, supplier, project, PO…"
+        searchText={(r) => [r.invoice_number, r.attachment_name, r.supplier, r.project, r.engineer, r.po_numbers, r.request_purpose]}
         defaultSort={{ id: 'date', dir: 'desc' }}
         storageKey="admin-invoice-report"
         toolbarExtra={(list) => <ReportExportMenu count={list.length} noun="invoice" options={exportOptions(list)} />}
-        emptyTitle="No supplier invoices recorded"
-        emptyMessage="Invoices appear here once Supply Chain or Cost Control records them on a requisition."
+        emptyTitle="No supplier invoices yet"
+        emptyMessage="Invoice documents appear here as soon as they are attached to a requisition, and become full records once Supply Chain or Cost Control keys in the number, date and amount."
       />
     </div>
   )

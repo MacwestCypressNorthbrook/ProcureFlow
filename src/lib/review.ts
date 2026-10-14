@@ -3,6 +3,7 @@ import { statusForStage, type Stage, type RequestStatus } from '@/lib/workflow'
 import type { PurchaseOrder, Request as DbRequest } from '@/lib/types'
 import type { ApprovalEntry, ReviewDocument } from '@/components/shared/ApprovalPanel'
 import { documentHref } from '@/lib/resolve-file-url'
+import { attachmentsHaveInvoiceFlag } from '@/lib/supplier-invoices'
 
 export interface QueueRow extends DbRequest {
   sent_back_to: string | null
@@ -212,6 +213,8 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
     )
     if (!request) return null
 
+    const hasInvoiceFlag = await attachmentsHaveInvoiceFlag()
+
     const [items, pos, requestDocs, history] = await Promise.all([
       query<RequestItemRow>(
         `SELECT ri.id, ri.position, ri.description, ri.quantity, ri.unit,
@@ -239,9 +242,14 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
         reviewed_at: string | null
         reviewer_name: string | null
         review_notes: string | null
+        is_invoice: boolean | null
       }>(
+        // `is_invoice` arrives with migration 019; selected through a column
+        // list that tolerates its absence so the review page keeps working
+        // either side of the migration.
         `SELECT ra.id, ra.file_name, ra.file_url, ra.file_size, ra.status,
                 ra.reviewed_by, ra.reviewed_at, ra.review_notes,
+                ${hasInvoiceFlag ? 'ra.is_invoice' : 'NULL::boolean AS is_invoice'},
                 u.name AS reviewer_name
            FROM public.request_attachments ra
            LEFT JOIN public.users u ON u.id = ra.reviewed_by
@@ -273,6 +281,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
       reviewed_at: d.reviewed_at,
       reviewer_name: d.reviewer_name,
       review_notes: d.review_notes,
+      is_invoice: d.is_invoice,
     }))
 
     const po = pos.length > 0 ? pos[pos.length - 1] : null

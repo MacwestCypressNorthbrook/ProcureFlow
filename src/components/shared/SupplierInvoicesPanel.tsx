@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { AlertCircle, BadgeCheck, FileText, Loader2, Plus, Receipt, Trash2, Undo2 } from 'lucide-react'
 import { Panel } from '@/components/shared/ui-kit'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
-import type { SupplierInvoice } from '@/lib/supplier-invoices'
+import { INVOICE_FILENAME_RE, type SupplierInvoice } from '@/lib/supplier-invoices'
 
 export interface InvoiceSupplier {
   id: string
@@ -17,6 +17,8 @@ export interface InvoiceSupplier {
 export interface InvoiceDocument {
   id: string
   file_name: string
+  /** What the uploader said. Null on files attached before they were asked. */
+  is_invoice?: boolean | null
 }
 
 const field =
@@ -116,18 +118,25 @@ export default function SupplierInvoicesPanel({
   /**
    * Attached documents that read as invoices but have no invoice record.
    *
-   * Before these records existed an invoice was only ever a file, so the whole
-   * backlog sits in the attachments: a PDF with a supplier, a number, a date
-   * and an amount printed on its face and stored nowhere. No migration can
-   * lift those out — a filename carries no amount — so the panel points at
-   * them and prefills the form with the document, leaving a person to read off
-   * the four figures that matter. That keeps the ledger something a human
-   * asserted rather than something a script guessed.
+   * An invoice still arrives here as a file — Engineers and Supply Chain both
+   * upload them — so the backlog sits in the attachments: a PDF with a
+   * supplier, a number, a date and an amount printed on its face and stored
+   * nowhere. No migration can lift those out, because a filename carries no
+   * amount, so the panel points at them and prefills the form with the
+   * document, leaving a person to read off the four figures that matter. That
+   * keeps the ledger something a human asserted rather than something a script
+   * guessed.
+   *
+   * What counts as an invoice is the uploader's own answer where they gave
+   * one, and the filename only for files attached before the question was
+   * asked — the same rule the admin Invoices report applies, in SQL.
    */
   const linked = new Set(invoices.map((i) => i.attachment_id).filter((id): id is string => Boolean(id)))
   const unrecorded =
     canRecord && suppliers.length > 0
-      ? documents.filter((d) => !linked.has(d.id) && /invoice|\binv[\s._-]*\d/i.test(d.file_name))
+      ? documents.filter(
+          (d) => !linked.has(d.id) && (d.is_invoice ?? INVOICE_FILENAME_RE.test(d.file_name))
+        )
       : []
 
   const rows = suppliers.map((s) => {

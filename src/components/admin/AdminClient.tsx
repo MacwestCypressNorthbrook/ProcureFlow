@@ -673,7 +673,7 @@ export default function AdminClient({
     suppliers: { title: 'Suppliers', sub: 'Vendors engineers can pick on a requisition' },
     requests: { title: 'Requisitions Raised', sub: 'Every request raised across the organization' },
     pos: { title: 'Purchase Orders', sub: 'Committed spend by project, supplier and engineer — filter, then export exactly what you see' },
-    invoices: { title: 'Invoices', sub: 'Every supplier invoice recorded on a requisition — filter, export, or download the documents' },
+    invoices: { title: 'Invoices', sub: 'Every supplier invoice — recorded or still only an attached document — filter, export, or download the files' },
     audit: { title: 'Audit Trail', sub: 'Track all actions across the procurement pipeline' },
     emails: { title: 'Email Notification Studio', sub: 'Preview and test transactional email templates tailored to active workflows' },
     settings: { title: 'Workspace Preferences', sub: 'Preferences, role distribution and system information' },

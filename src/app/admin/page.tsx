@@ -6,6 +6,7 @@ import { getNotificationSettings } from '@/lib/notification-settings'
 import AdminClient, { type AuditEntry, type AdminRequestRow } from '@/components/admin/AdminClient'
 import type { AdminPurchaseOrder, AdminInvoice } from '@/components/admin/report-types'
 import { poHasSupplierColumn } from '@/lib/po-supplier'
+import { INVOICE_FILENAME_SQL, attachmentsHaveInvoiceFlag, invoiceAttachmentSql } from '@/lib/supplier-invoices'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
 import type {
   ProjectWithMemberCount,
@@ -35,8 +36,11 @@ export default async function AdminPage() {
   // Supplier invoices live in a table that migration 016 adds; until it is
   // applied the Invoices tab simply shows nothing rather than breaking the page.
   const invoicesPromise = query<AdminInvoice>(
-    `SELECT si.id, si.request_id, si.supplier_id, si.invoice_number, si.invoice_date, si.amount,
+    `SELECT 'invoice' AS kind,
+            si.id, si.request_id, si.supplier_id, si.invoice_number, si.invoice_date, si.amount,
             si.status, si.notes, si.created_at, si.verified_at,
+            NULL AS uploaded_by_name, NULL AS uploaded_at,
+            NULL AS document_review_status, NULL::int AS supplier_candidates,
             s.name AS supplier_name,
             r.purpose AS request_purpose,
             r.status AS request_status,
@@ -65,6 +69,80 @@ export default async function AdminPage() {
       LIMIT 2000`
   ).catch((err) => {
     console.error('Supplier invoices unavailable for the admin report:', err)
+    return [] as AdminInvoice[]
+  })
+
+  /**
+   * Invoice documents nobody has recorded yet.
+   *
+   * An invoice arrives here as a file — Engineers and Supply Chain both attach
+   * them — and becomes a record only when someone keys in its number, date and
+   * amount. Listing only the records meant the page showed nothing while the
+   * documents piled up, so these are rows too, marked `document`.
+   *
+   * What counts as an invoice document is the uploader's own answer once
+   * migration 019 is applied, and the filename only for rows predating it —
+   * see `invoiceAttachmentSql`. Before 019 it is the filename alone, which
+   * misses an invoice photographed as `IMG_0985.png`.
+   *
+   * The supplier is taken from the requisition's lines when they name exactly
+   * one, which is the ordinary case; where they name several, the file alone
+   * cannot say which issued it, so it is left null for a person to resolve.
+   *
+   * Declined documents are left out: Cost Control has already rejected the
+   * file, so it is not an invoice awaiting entry. Documents already tied to a
+   * record are out too — they are on the page as the record.
+   */
+  const invoiceDocumentsPromise = query<AdminInvoice>(
+    `SELECT 'document' AS kind,
+            'doc:' || ra.id AS id, ra.request_id,
+            sup.supplier_id, sup.supplier_name,
+            NULL AS invoice_number, NULL AS invoice_date, NULL AS amount,
+            'document' AS status, ra.review_notes AS notes,
+            ra.created_at, NULL AS verified_at,
+            ub.name AS uploaded_by_name, ra.created_at AS uploaded_at,
+            ra.status AS document_review_status, sup.candidates AS supplier_candidates,
+            r.purpose AS request_purpose,
+            r.status AS request_status,
+            pr.name AS project_name,
+            COALESCE(eu.name, r.guest_name) AS engineer_name,
+            NULL AS recorded_by_name,
+            NULL AS verified_by_name,
+            ra.id AS attachment_id,
+            ra.file_name AS attachment_name,
+            ra.file_url AS attachment_url,
+            (SELECT string_agg(po.po_number, ', ' ORDER BY po.created_at)
+               FROM public.purchase_orders po
+              WHERE po.request_id = ra.request_id) AS po_numbers,
+            sup.requisitioned AS supplier_requisitioned
+       FROM public.request_attachments ra
+       JOIN public.requests r ON r.id = ra.request_id
+       LEFT JOIN public.projects pr ON pr.id = r.project_id
+       LEFT JOIN public.users eu ON eu.id = r.created_by
+       LEFT JOIN public.users ub ON ub.id = ra.uploaded_by
+       CROSS JOIN LATERAL (
+         SELECT COUNT(*)::int AS candidates,
+                CASE WHEN COUNT(*) = 1 THEN MIN(x.supplier_id::text) END AS supplier_id,
+                CASE WHEN COUNT(*) = 1 THEN MIN(x.name) END AS supplier_name,
+                CASE WHEN COUNT(*) = 1 THEN MIN(x.requisitioned) END AS requisitioned
+           FROM (SELECT ri.supplier_id, s.name, SUM(ri.line_total) AS requisitioned
+                   FROM public.request_items ri
+                   JOIN public.suppliers s ON s.id = ri.supplier_id
+                  WHERE ri.request_id = ra.request_id AND ri.supplier_id IS NOT NULL
+                  GROUP BY ri.supplier_id, s.name) x
+       ) sup
+      WHERE ${invoiceAttachmentSql(await attachmentsHaveInvoiceFlag())}
+        AND COALESCE(ra.status, 'pending') <> 'declined'
+        AND NOT EXISTS (
+          SELECT 1 FROM public.supplier_invoices si WHERE si.attachment_id = ra.id
+        )
+      ORDER BY ra.created_at DESC
+      LIMIT 2000`,
+    [INVOICE_FILENAME_SQL]
+  ).catch((err) => {
+    // `supplier_invoices` may not exist yet; without it every invoice document
+    // is unrecorded, which is exactly what the fallback query returns.
+    console.error('Unrecorded invoice documents unavailable for the admin report:', err)
     return [] as AdminInvoice[]
   })
 
@@ -201,7 +279,8 @@ export default async function AdminPage() {
   ])
 
 
-  const invoices = await invoicesPromise
+  const [recordedInvoices, invoiceDocuments] = await Promise.all([invoicesPromise, invoiceDocumentsPromise])
+  const invoices = [...recordedInvoices, ...invoiceDocuments]
 
   return (
     <AdminClient

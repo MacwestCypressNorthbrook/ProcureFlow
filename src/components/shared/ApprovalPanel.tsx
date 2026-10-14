@@ -46,6 +46,8 @@ export interface ReviewDocument {
   reviewed_at?: string | null
   reviewer_name?: string | null
   review_notes?: string | null
+  /** Did the uploader say this is a supplier invoice? Null on rows predating migration 019. */
+  is_invoice?: boolean | null
 }
 
 export interface ApprovalEntry {
@@ -169,6 +171,15 @@ export default function ApprovalPanel({
   const [historyOpen, setHistoryOpen] = useState(stage !== 'cost_control')
 
   const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+  /**
+   * Is the next file an invoice?
+   *
+   * Asked here rather than inferred from the filename later: a photographed
+   * invoice saved as `IMG_0985.png` says nothing, and two thirds of the
+   * invoices in this system arrived looking exactly like that. The answer
+   * stays ticked between uploads, because invoices arrive in batches.
+   */
+  const [markAsInvoice, setMarkAsInvoice] = useState(false)
 
   const uploadDocument = async (file: File | undefined) => {
     if (!file) return
@@ -177,6 +188,7 @@ export default function ApprovalPanel({
     try {
       const form = new FormData()
       form.append('file', file)
+      form.append('is_invoice', markAsInvoice ? 'true' : 'false')
       const res = await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -278,6 +290,20 @@ export default function ApprovalPanel({
             </h2>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">{documents.length}</span>
+              {canAct && !isAdminStage && (
+                <label
+                  className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg px-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  title="Tick this before attaching a supplier invoice, so it reaches the Invoices report whatever the file is called"
+                >
+                  <input
+                    type="checkbox"
+                    checked={markAsInvoice}
+                    onChange={(e) => setMarkAsInvoice(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-input accent-primary"
+                  />
+                  It&rsquo;s an invoice
+                </label>
+              )}
               {canAct && !isAdminStage && (
                 <label className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted">
                   {uploadingDoc ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}

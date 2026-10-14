@@ -147,6 +147,16 @@ export default function RequestForm({
   const [collapsedLines, setCollapsedLines] = useState<Set<string>>(new Set())
   const [notes, setNotes] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  /**
+   * Which of the chosen files are supplier invoices.
+   *
+   * Tracked by a key off the file itself, not by position, so ticking one and
+   * then removing another above it does not move the tick. Asked here because
+   * a filename cannot be trusted to say it: most invoices on site are
+   * photographed, and arrive called `IMG_0985.png`.
+   */
+  const [invoiceKeys, setInvoiceKeys] = useState<Set<string>>(new Set())
+  const fileKey = (f: File) => `${f.name}:${f.size}:${f.lastModified}`
   const [notifyEmail, setNotifyEmail] = useState(requester.email)
 
   const [submitting, setSubmittingState] = useState(false)
@@ -361,9 +371,11 @@ export default function RequestForm({
                 setUploading({ index, total: files.length, percent }),
             })
 
+            const isInvoice = invoiceKeys.has(fileKey(file))
             if (uploaded.viaServer) {
               const form = new FormData()
               form.append('file', file)
+              form.append('is_invoice', isInvoice ? 'true' : 'false')
               await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
             } else {
               await fetch(`/api/requests/${requestId}/attachments`, {
@@ -374,6 +386,7 @@ export default function RequestForm({
                   file_url: uploaded.key,
                   file_size: uploaded.fileSize,
                   file_type: uploaded.contentType,
+                  is_invoice: isInvoice,
                 }),
               })
             }
@@ -943,6 +956,25 @@ export default function RequestForm({
                       <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                         {(f.size / 1024).toFixed(0)} KB
                       </span>
+                      <label
+                        className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                        title="Tick if this file is a supplier invoice, so it reaches the Invoices report whatever it is called"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={invoiceKeys.has(fileKey(f))}
+                          onChange={(e) =>
+                            setInvoiceKeys((prev) => {
+                              const next = new Set(prev)
+                              if (e.target.checked) next.add(fileKey(f))
+                              else next.delete(fileKey(f))
+                              return next
+                            })
+                          }
+                          className="h-3.5 w-3.5 rounded border-input accent-primary"
+                        />
+                        Invoice
+                      </label>
                       <button
                         type="button"
                         onClick={() => setFiles((list) => list.filter((_, idx) => idx !== i))}

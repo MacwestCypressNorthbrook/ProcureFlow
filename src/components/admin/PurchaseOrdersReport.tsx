@@ -67,8 +67,11 @@ function deriveRows(pos: AdminPurchaseOrder[], invoices: AdminInvoice[]): PoRow[
   // same supplier — by supplier id when the PO carries one, by name otherwise.
   const poKey = (po: AdminPurchaseOrder) =>
     po.supplier_id ? `${po.request_id}|id:${po.supplier_id}` : `${po.request_id}|name:${vendorKey(po.vendor_name)}`
+  // Recorded invoices only. The Invoices report also carries attached-but-
+  // unrecorded documents, which have no amount — they say an invoice exists,
+  // not what it is for, so they cannot count towards what a PO has been billed.
   const invoicedBy = new Map<string, number>()
-  for (const inv of invoices) {
+  for (const inv of invoices.filter((i) => i.kind === 'invoice')) {
     for (const key of [`${inv.request_id}|id:${inv.supplier_id}`, `${inv.request_id}|name:${vendorKey(inv.supplier_name)}`]) {
       invoicedBy.set(key, (invoicedBy.get(key) ?? 0) + num(inv.amount))
     }
