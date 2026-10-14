@@ -36,8 +36,9 @@ function reconcile(requisitioned: number, invoiced: number, count: number) {
 
 /**
  * The supplier invoices recorded against a requisition, and the form to record
- * another. Shown to every stage; only Supply Chain and Cost Control, while the
- * requisition is with them, may add one, and Cost Control verifies.
+ * another. Shown to every stage; Supply Chain and Cost Control may add one from
+ * the moment the requisition reaches pricing — including after it closes, which
+ * is when most invoices actually arrive — and Cost Control verifies.
  */
 export default function SupplierInvoicesPanel({
   requestId,
@@ -70,6 +71,13 @@ export default function SupplierInvoicesPanel({
     attachmentId: '',
     notes: '',
   })
+
+  /** Open the form against a document already attached to the requisition. */
+  const openWith = (attachmentId: string) => {
+    setForm((f) => ({ ...f, attachmentId }))
+    setError('')
+    setOpen(true)
+  }
 
   const send = async (key: string, init: RequestInit, url = `/api/requests/${requestId}/invoices`) => {
     if (busy) return false
@@ -105,6 +113,23 @@ export default function SupplierInvoicesPanel({
     }
   }
 
+  /**
+   * Attached documents that read as invoices but have no invoice record.
+   *
+   * Before these records existed an invoice was only ever a file, so the whole
+   * backlog sits in the attachments: a PDF with a supplier, a number, a date
+   * and an amount printed on its face and stored nowhere. No migration can
+   * lift those out — a filename carries no amount — so the panel points at
+   * them and prefills the form with the document, leaving a person to read off
+   * the four figures that matter. That keeps the ledger something a human
+   * asserted rather than something a script guessed.
+   */
+  const linked = new Set(invoices.map((i) => i.attachment_id).filter((id): id is string => Boolean(id)))
+  const unrecorded =
+    canRecord && suppliers.length > 0
+      ? documents.filter((d) => !linked.has(d.id) && /invoice|\binv[\s._-]*\d/i.test(d.file_name))
+      : []
+
   const rows = suppliers.map((s) => {
     const mine = invoices.filter((i) => i.supplier_id === s.id)
     const invoiced = mine.reduce((sum, i) => sum + i.amount, 0)
@@ -132,6 +157,34 @@ export default function SupplierInvoicesPanel({
           <p role="alert" className="flex items-start gap-2 rounded-lg border-2 border-destructive bg-destructive/10 px-3 py-2.5 text-sm font-semibold text-destructive">
             <AlertCircle size={16} className="mt-0.5 shrink-0" /> {error}
           </p>
+        )}
+
+        {unrecorded.length > 0 && !open && (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+            <p className="flex items-start gap-2 text-sm font-medium text-foreground">
+              <FileText size={15} className="mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              {unrecorded.length === 1
+                ? 'One attached document looks like an invoice but has not been recorded as one.'
+                : `${unrecorded.length} attached documents look like invoices but have not been recorded as ones.`}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Recording one reads its supplier, number, date and amount into the ledger, so it counts towards supplier
+              spend and the same invoice cannot be paid twice.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {unrecorded.map((d) => (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => openWith(d.id)}
+                  className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted"
+                >
+                  <Plus size={13} className="shrink-0" />
+                  <span className="truncate">{d.file_name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {open && canRecord && (
@@ -234,7 +287,12 @@ export default function SupplierInvoicesPanel({
 
         {/* Per supplier: what was asked for against what has been invoiced. */}
         <div className="divide-y divide-border/60 rounded-xl border border-border">
-          {rows.length === 0 && <p className="p-4 text-sm text-muted-foreground">No supplier is assigned to a line yet.</p>}
+          {rows.length === 0 && (
+            <p className="p-4 text-sm text-muted-foreground">
+              No supplier is assigned to a line yet
+              {canRecord ? ' — assign one on the requisition’s lines before recording its invoice.' : '.'}
+            </p>
+          )}
           {rows.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-3">
               <p className="min-w-0 truncate text-sm font-medium text-foreground">{r.name}</p>

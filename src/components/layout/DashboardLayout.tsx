@@ -1,10 +1,11 @@
 'use client'
 
-import { useSyncExternalStore, useState } from 'react'
+import { useSyncExternalStore, useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import ThemeToggle from '@/components/layout/ThemeToggle'
 import NotificationBell from '@/components/layout/NotificationBell'
+import MobileTabBar, { type TabBarItem } from '@/components/layout/MobileTabBar'
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet'
 import { normalizeRole, roleLabel, roleDefinition } from '@/lib/roles'
 import { cn } from '@/lib/utils'
@@ -33,8 +34,10 @@ import {
   Lock,
   SlidersHorizontal,
   Search,
-  ChevronDown,
   ClipboardList,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
 } from 'lucide-react'
 
 interface NavItem {
@@ -308,11 +311,15 @@ roleNavSections.superuser = roleNavSections.super_user
 roleNavSections.admin = roleNavSections.administrator
 roleNavSections.adminstrator = roleNavSections.administrator
 
-/** Collapsed 84px rail and pinned 264px panel sit 24px from the edge. */
-// Only reserved on pointer devices, where the rail is actually rendered; on a
-// touch device the drawer floats over the content and reserves nothing.
-const RAIL_PAD = 'pointer-fine:md:grid-cols-[116px_minmax(0,1fr)]'
-const PINNED_PAD = 'pointer-fine:md:grid-cols-[300px_minmax(0,1fr)]'
+/*
+  The rail and the open panel, both 24px off the edge.
+
+  The grid column reserves the space on pointer devices, where the sidebar is
+  always on screen. A touch device gets the drawer and the tab bar instead, so
+  it reserves nothing.
+*/
+const RAIL_PAD = 'pointer-fine:md:grid-cols-[112px_minmax(0,1fr)]'
+const OPEN_PAD = 'pointer-fine:md:grid-cols-[300px_minmax(0,1fr)]'
 
 /*
   The four footer actions: a vertical stack on the collapsed rail, a single row
@@ -335,20 +342,36 @@ const actionBox =
   // drawer would squeeze the 44px squares into slivers rather than wrapping.
   'grid h-11 w-11 shrink-0 place-items-center rounded-[10px] bg-muted text-muted-foreground hover:bg-primary hover:text-primary-foreground press-active'
 
-const PIN_KEY = 'pf-sidebar-pinned'
+/*
+  The sidebar's open state, remembered per browser.
 
-function subscribePinned(callback: () => void) {
-  window.addEventListener('pf-sidebar-pin', callback)
+  It used to be a `pinned` flag on top of a hover-to-expand rail: the panel
+  opened because the pointer happened to cross it and closed when it left. That
+  reads as the chrome reacting to the mouse rather than to the person — and it
+  cost labels, since a collapsed rail showed bare icons until you hovered it.
+  Two CSS pseudo-classes (`hover:` and `focus-within:`) drove the width, so a
+  clicked link kept the panel open through its own focus, which took a
+  `suppressHover` flag and a manual `blur()` to work around.
+
+  Now the person decides, once, with a button; `collapsed` is the only state and
+  nothing reopens behind their back. Expanded is the default — labels visible
+  until someone asks for more room.
+*/
+const COLLAPSE_KEY = 'pf-sidebar-collapsed'
+const COLLAPSE_EVENT = 'pf-sidebar-collapse'
+
+function subscribeCollapsed(callback: () => void) {
+  window.addEventListener(COLLAPSE_EVENT, callback)
   window.addEventListener('storage', callback)
   return () => {
-    window.removeEventListener('pf-sidebar-pin', callback)
+    window.removeEventListener(COLLAPSE_EVENT, callback)
     window.removeEventListener('storage', callback)
   }
 }
 
-function readPinned() {
+function readCollapsed() {
   try {
-    return localStorage.getItem(PIN_KEY) === '1'
+    return localStorage.getItem(COLLAPSE_KEY) === '1'
   } catch {
     return false
   }
@@ -370,19 +393,8 @@ export default function DashboardLayout({
   const currentTab = searchParams.get('tab')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [query, setQuery] = useState('')
-  /**
-   * Hold the rail closed after a navigation, until the pointer actually leaves.
-   *
-   * Two things conspired to keep it open after a click. The clicked link keeps
-   * DOM focus, so `focus-within:w-[264px]` held the panel open indefinitely —
-   * until you clicked somewhere else entirely. And the pointer is normally
-   * still over the sidebar at that moment, so `hover:w-[264px]` held it open
-   * too. Neither can be cleared by React state alone, because both are CSS
-   * pseudo-classes; the fix is to blur the link and then stop matching those
-   * variants at all until the pointer genuinely leaves.
-   */
-  const [suppressHover, setSuppressHover] = useState(false)
-  const pinned = useSyncExternalStore(subscribePinned, readPinned, () => false)
+  const collapsed = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => false)
+  const searchRef = useRef<HTMLInputElement>(null)
   const routeMeta = titleForPath(pathname)
   const headerTitle = title ?? routeMeta.title
   const headerSubtitle = subtitle ?? routeMeta.subtitle
@@ -391,31 +403,38 @@ export default function DashboardLayout({
   const role = serverRole ?? null
   const user = serverUser ?? null
 
-  /**
-   * What a sidebar item does after it has done its navigating.
-   *
-   * A pinned sidebar stays open: pinning is an explicit request to keep it
-   * that way, and collapsing it would quietly override the user. Everything
-   * else collapses back to the rail so the page they just asked for is not
-   * sitting behind a 264px panel.
-   */
-  const closeAfterNavigate = () => {
-    setQuery('')
-    if (pinned) return
-    // Drop focus off the clicked link, or `focus-within` re-opens the panel
-    // the moment the pointer leaves.
-    if (typeof document !== 'undefined') {
-      const active = document.activeElement
-      if (active instanceof HTMLElement) active.blur()
-    }
-    setSuppressHover(true)
-  }
+  /** Clearing the menu filter is all a navigation needs to do now. */
+  const afterNavigate = () => setQuery('')
 
-  const togglePin = () => {
+  /*
+    ⌘\ (Ctrl+\ on Windows) collapses and expands the sidebar, the way every
+    editor and Apple's own apps do it. Ignored while typing, so it can never
+    swallow a backslash someone meant to enter.
+  */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== '\\' || !(e.metaKey || e.ctrlKey)) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      e.preventDefault()
+      try {
+        localStorage.setItem(COLLAPSE_KEY, readCollapsed() ? '0' : '1')
+      } catch {
+        /* nothing to remember in private mode */
+      }
+      window.dispatchEvent(new Event(COLLAPSE_EVENT))
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const toggleCollapsed = () => {
     try {
-      localStorage.setItem(PIN_KEY, pinned ? '0' : '1')
-    } catch {}
-    window.dispatchEvent(new Event('pf-sidebar-pin'))
+      localStorage.setItem(COLLAPSE_KEY, collapsed ? '0' : '1')
+    } catch {
+      /* private mode: the sidebar still toggles, it just will not be remembered */
+    }
+    window.dispatchEvent(new Event(COLLAPSE_EVENT))
   }
 
   // Normalizing first means a legacy value such as `sam` or `mintah` still
@@ -466,6 +485,23 @@ export default function DashboardLayout({
     currentTab
   )
 
+  /*
+    The phone's tabs: the first four destinations of the role's leading section,
+    which is the work that role came to do. Taken from the same menu the
+    sidebar renders, so a role's navigation is never defined twice.
+  */
+  const tabItems: TabBarItem[] = sections
+    .flatMap((section) => section.items)
+    .filter((item): item is SidebarItem & { href: string } => Boolean(item.href))
+    .slice(0, 4)
+    .map((item) => ({
+      href: item.href,
+      label: item.label.replace(/^(All|My) /, ''),
+      icon: item.icon,
+      badge: navBadges?.[item.href],
+    }))
+  const activeIsTab = tabItems.some((t) => t.href === activeHref)
+
   const trimmedQuery = query.trim()
   const searchTerm = trimmedQuery.toLowerCase()
   const visibleSections = searchTerm
@@ -477,68 +513,113 @@ export default function DashboardLayout({
         .filter((s) => s.items.length > 0)
     : sections
 
-  const forceOpen = pinned || searchTerm.length > 0
+  /*
+    Searching the menu always shows labels — a filtered list of anonymous icons
+    answers nothing. Otherwise the person's own choice stands.
+  */
+  const open = !collapsed || searchTerm.length > 0
 
-  const renderInner = (open: boolean, onNavigate?: () => void) => {
-    const reveal = (visible: boolean) =>
-      visible
-        ? 'opacity-100'
-        : 'opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100'
-
+  const renderInner = (open: boolean, onNavigate?: () => void, onToggle?: () => void) => {
     const isEngineer = resolvedRole === 'engineer'
     const createItem = isEngineer
       ? { href: '/request', label: 'New Request', icon: <FilePlus2 size={20} /> }
       : { href: '/', label: 'Home', icon: <ArrowLeft size={20} /> }
 
     return (
-      <div className="flex h-full flex-col gap-4 p-5">
-        <button
-          type="button"
-          onClick={togglePin}
-          aria-pressed={pinned}
-          title={pinned ? 'Unpin sidebar' : 'Keep sidebar open'}
-          className="relative flex h-11 w-full shrink-0 items-center gap-4 rounded-xl text-left press-active"
-        >
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-            {userInitials}
-          </span>
-          <span className={cn('flex min-w-0 flex-1 flex-col', reveal(open))}>
-            <span className="truncate text-[15px] font-medium text-foreground">
-              {user?.name || user?.email || 'ProcureFlow'}
+      <div className="flex h-full flex-col gap-3 p-4">
+        {/*
+          Who is signed in, and the one control that opens and closes the
+          sidebar. Identity is a link to Settings — the obvious destination when
+          you tap your own name — rather than the hidden pin toggle it was.
+        */}
+        {/*
+          Open, identity and the toggle share a row. On the rail there is only
+          room for one 44px square per line, so they stack — otherwise the
+          toggle falls outside the panel and `overflow-hidden` eats the one
+          control that brings the sidebar back.
+        */}
+        <div className={cn('flex shrink-0 gap-2', open ? 'items-center' : 'flex-col items-center')}>
+          <Link
+            href="/settings"
+            onClick={onNavigate}
+            title={open ? undefined : `${user?.name || user?.email || 'Account'} · ${roleLabel(resolvedRole)}`}
+            className="group/id flex h-11 min-w-0 flex-1 items-center gap-3 rounded-xl text-left press-active"
+          >
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+              {userInitials}
             </span>
-            <span className="truncate text-[13px] text-muted-foreground">{roleLabel(resolvedRole)}</span>
-          </span>
-          <ChevronDown
-            size={18}
-            className={cn(
-              'shrink-0 text-muted-foreground transition-all duration-300',
-              reveal(open),
-              pinned && 'rotate-180'
+            {open && (
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[15px] font-medium leading-tight text-foreground">
+                  {user?.name || user?.email || 'ProcureFlow'}
+                </span>
+                <span className="truncate text-[13px] leading-tight text-muted-foreground">
+                  {roleLabel(resolvedRole)}
+                </span>
+              </span>
             )}
-          />
-        </button>
+          </Link>
 
-        <div
-          className={cn(
-            'relative flex h-11 shrink-0 items-center rounded-[10px] border border-border transition-all duration-300',
-            open ? 'w-full' : 'w-11 group-hover:w-full group-focus-within:w-full'
+          {/* Hidden on touch: the drawer has no rail to collapse to. */}
+          {onToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-pressed={!open}
+              aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
+              title={`${open ? 'Collapse' : 'Expand'} sidebar  ⌘\\`}
+              className="hidden h-11 w-11 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-muted hover:text-foreground press-active pointer-fine:md:grid"
+            >
+              {open ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+            </button>
           )}
-        >
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            aria-label="Search menu"
-            placeholder="Search menu"
-            className={cn(
-              'absolute inset-0 h-full w-full rounded-[inherit] bg-transparent pl-3.5 pr-11 text-sm text-foreground outline-none placeholder:text-muted-foreground',
-              reveal(open)
-            )}
-          />
-          <Search size={18} className="pointer-events-none absolute right-[11px] top-[13px] text-muted-foreground" />
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto" aria-label="Main navigation">
+        {open ? (
+          <div className="relative flex h-11 shrink-0 items-center rounded-xl border border-border bg-background/60 focus-within:border-ring">
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search menu"
+              placeholder="Search menu"
+              className="h-full w-full rounded-[inherit] bg-transparent pl-3.5 pr-10 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            />
+            {query ? (
+              <button
+                type="button"
+                onClick={() => setQuery('')}
+                aria-label="Clear menu search"
+                className="absolute right-1.5 grid h-8 w-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X size={15} />
+              </button>
+            ) : (
+              <Search size={17} aria-hidden className="pointer-events-none absolute right-3 text-muted-foreground" />
+            )}
+          </div>
+        ) : (
+          /* Collapsed: searching needs the labels, so this opens the panel and
+             puts the cursor in the field in one move. */
+          <button
+            type="button"
+            onClick={() => {
+              onToggle?.()
+              requestAnimationFrame(() => searchRef.current?.focus())
+            }}
+            aria-label="Search menu"
+            title="Search menu"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground press-active"
+          >
+            <Search size={17} />
+          </button>
+        )}
+
+        <nav
+          className="-mx-1 min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-1"
+          aria-label="Main navigation"
+        >
           {navSkeleton && (
             <div className="space-y-6" aria-hidden>
               {[4, 3].map((count, gi) => (
@@ -548,7 +629,7 @@ export default function DashboardLayout({
                     {Array.from({ length: count }).map((_, i) => (
                       <div key={i} className="flex items-center gap-3 rounded-xl px-1 py-2">
                         <div className="h-[18px] w-[18px] shrink-0 animate-pulse rounded bg-muted" />
-                        <div className={cn('h-3 flex-1 animate-pulse rounded bg-muted', reveal(open))} />
+                        {open && <div className="h-3 flex-1 animate-pulse rounded bg-muted" />}
                       </div>
                     ))}
                   </div>
@@ -559,14 +640,16 @@ export default function DashboardLayout({
           {!navSkeleton &&
             visibleSections.map((section, si) => (
               <div key={si}>
-                <p
-                  className={cn(
-                    'whitespace-nowrap px-1 pb-1 pt-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70',
-                    reveal(open)
-                  )}
-                >
-                  {section.label}
-                </p>
+                {open ? (
+                  <p className="whitespace-nowrap px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                    {section.label}
+                  </p>
+                ) : (
+                  // Collapsed, the group's name cannot be shown — but the
+                  // grouping still can, so the rail keeps its rhythm instead of
+                  // becoming one undifferentiated column of glyphs.
+                  si > 0 && <div aria-hidden className="mx-3 my-2 border-t border-border/70" />
+                )}
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const href = item.href
@@ -574,38 +657,29 @@ export default function DashboardLayout({
                     const badgeCount = href ? navBadges?.[href] : undefined
                     const disabledReason = href ? disabledNav?.[href] : undefined
 
+                    // The selected row's tint. One element, sized to the row,
+                    // so there is no geometry to re-aim when the width changes.
                     const pill = isActive ? (
-                      <span
-                        aria-hidden
-                        className={cn(
-                          'pointer-events-none absolute rounded-xl bg-primary/10 transition-all duration-300',
-                          open
-                            ? 'left-0 top-0 h-14 w-full'
-                            : 'left-0 top-[6px] h-11 w-11 group-hover:top-0 group-hover:h-14 group-hover:w-full'
-                        )}
-                      />
+                      <span aria-hidden className="pointer-events-none absolute inset-0 rounded-xl bg-primary/10" />
                     ) : null
 
                     const body = (
                       <>
-                        <span
-                          className={cn(
-                            'relative z-10 flex w-11 shrink-0 justify-center transition-transform duration-200',
-                            isActive ? 'scale-110' : 'group-hover/item:scale-105'
-                          )}
-                        >
+                        <span className="relative z-10 grid w-11 shrink-0 place-items-center">
                           {item.icon}
                         </span>
-                        <span className={cn('relative z-10 flex-1 whitespace-nowrap', reveal(open))}>
-                          {item.label}
-                        </span>
+                        {open && (
+                          <span className="relative z-10 min-w-0 flex-1 truncate whitespace-nowrap">
+                            {item.label}
+                          </span>
+                        )}
                         {badgeCount !== undefined && badgeCount > 0 && (
                           <span
                             className={cn(
-                              'absolute z-10 grid h-[22px] min-w-[22px] place-items-center rounded-full bg-primary px-1.5 text-[11px] font-semibold text-primary-foreground transition-all duration-200',
+                              'absolute z-10 grid place-items-center rounded-full bg-primary font-semibold text-primary-foreground',
                               open
-                                ? 'right-2 top-[17px]'
-                                : 'right-1.5 top-1.5 group-hover:right-2 group-hover:top-[17px]'
+                                ? 'right-2.5 h-[20px] min-w-[20px] px-1.5 text-[11px]'
+                                : 'right-1.5 top-1.5 h-[16px] min-w-[16px] px-1 text-[10px]'
                             )}
                           >
                             {badgeCount > 99 ? '99+' : badgeCount}
@@ -617,13 +691,18 @@ export default function DashboardLayout({
                       </>
                     )
 
+                    // 44px: Apple's minimum target, and short enough that a
+                    // ten-item menu no longer needs scrolling to see it all.
                     const rowClass = cn(
-                      'group/item relative flex h-14 w-full items-center gap-4 rounded-xl text-left text-[15px] font-medium',
+                      'relative flex h-11 w-full items-center gap-3 rounded-xl text-left text-[15px] transition-colors duration-150',
                       disabledReason ? 'cursor-not-allowed opacity-50' : 'press-active',
                       isActive
-                        ? 'text-primary'
-                        : 'text-muted-foreground hover:text-primary'
+                        ? 'font-semibold text-primary'
+                        : 'font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground'
                     )
+                    // On the rail the label is gone, so the icon carries a
+                    // tooltip and an accessible name of its own.
+                    const railLabel = open ? undefined : item.label
 
                     if (item.onClick) {
                       const handleClick = item.onClick
@@ -634,6 +713,8 @@ export default function DashboardLayout({
                             handleClick()
                             onNavigate?.()
                           }}
+                          title={railLabel}
+                          aria-label={railLabel}
                           className={rowClass}
                         >
                           {pill}
@@ -644,7 +725,13 @@ export default function DashboardLayout({
 
                     if (disabledReason) {
                       return (
-                        <span key={href} title={disabledReason} aria-disabled="true" className={rowClass}>
+                        <span
+                          key={href}
+                          title={open ? disabledReason : `${item.label} — ${disabledReason}`}
+                          aria-disabled="true"
+                          aria-label={railLabel}
+                          className={rowClass}
+                        >
                           {pill}
                           {body}
                         </span>
@@ -660,6 +747,9 @@ export default function DashboardLayout({
                         onClick={() => {
                           onNavigate?.()
                         }}
+                        title={railLabel}
+                        aria-label={railLabel}
+                        aria-current={isActive ? 'page' : undefined}
                         className={rowClass}
                       >
                         {pill}
@@ -671,18 +761,17 @@ export default function DashboardLayout({
               </div>
             ))}
           {!navSkeleton && visibleSections.length === 0 && (
-            <p className={cn('whitespace-nowrap px-1 pt-4 text-xs text-muted-foreground', reveal(open))}>
-              No matches
-            </p>
+            <p className="px-3 pt-4 text-xs text-muted-foreground">No matches</p>
           )}
         </nav>
 
         <div
           className={cn(
             // Height is auto and the children are in normal flow, so no button
-            // can be pushed outside the box and clipped. Only the width moves.
-            'flex shrink-0 flex-wrap gap-2 transition-[width] duration-300',
-            open ? 'w-full' : 'w-11 group-hover:w-full group-focus-within:w-full'
+            // can be pushed outside the box and clipped. At rail width one
+            // 44px square fits per line, so the four stack; open, they form a row.
+            'flex shrink-0 flex-wrap gap-2 border-t border-border/60 pt-3',
+            open ? 'w-full' : 'w-11'
           )}
         >
           <ThemeToggle className={actionBox} />
@@ -724,9 +813,11 @@ export default function DashboardLayout({
 
   return (
     <div
+      // 56px of tab bar on touch; nothing to clear on a pointer device.
+      style={{ '--pf-tabbar-h': tabItems.length > 0 ? '56px' : '0px' } as React.CSSProperties}
       className={cn(
         'min-h-screen bg-background transition-[grid-template-columns] duration-300 pointer-fine:md:grid',
-        pinned ? PINNED_PAD : RAIL_PAD
+        collapsed ? RAIL_PAD : OPEN_PAD
       )}
     >
       <div aria-hidden className="hidden pointer-fine:md:block" />
@@ -742,30 +833,42 @@ export default function DashboardLayout({
       */}
       <aside
         aria-label="Sidebar"
-        onMouseLeave={() => setSuppressHover(false)}
         className={cn(
-          'fixed bottom-8 left-6 top-6 z-40 hidden flex-col overflow-hidden rounded-3xl border border-border/70 bg-card/90 shadow-xl backdrop-blur-xl transition-[width] duration-300 ease-out pointer-fine:md:flex',
-          // Dropping `group` while suppressed stops every `group-hover:` child
-          // utility matching too, so the labels, the pill and the action row
-          // collapse with the width instead of lingering inside an 84px rail.
-          !suppressHover && 'group',
-          forceOpen
-            ? 'w-[264px]'
-            : suppressHover
-              ? 'w-[84px]'
-              : 'w-[84px] hover:w-[264px] focus-within:w-[264px]'
+          'fixed bottom-6 left-6 top-6 z-40 hidden flex-col overflow-hidden rounded-3xl pointer-fine:md:flex',
+          // The material: a frosted panel the page scrolls beneath, lifted off
+          // the background by layered shadow rather than a heavy border.
+          'border border-border/60 bg-card/80 shadow-[0_4px_6px_rgba(0,0,0,0.02),0_12px_24px_rgba(0,0,0,0.04),0_24px_48px_rgba(0,0,0,0.06)] backdrop-blur-2xl backdrop-saturate-150',
+          'transition-[width] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]',
+          open ? 'w-[252px]' : 'w-[76px]'
         )}
       >
-        {renderInner(forceOpen, closeAfterNavigate)}
+        {renderInner(open, afterNavigate, toggleCollapsed)}
       </aside>
 
       <div className="flex min-h-screen min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md sm:px-6">
+        {/* Keyboard users land here first and can jump the whole menu. */}
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+        >
+          Skip to content
+        </a>
+
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md backdrop-saturate-150 sm:px-6">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground pointer-fine:md:hidden">
-              <Menu size={18} />
+            {/* 44×44, the HIG minimum — it was 36 and sat under the thumb's
+                accuracy on a phone. */}
+            <SheetTrigger
+              aria-label="Open navigation"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground press-active pointer-fine:md:hidden"
+            >
+              <Menu size={20} />
             </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] border-r border-border bg-card p-0">
+            <SheetContent
+              side="left"
+              className="w-[min(86vw,320px)] border-r border-border bg-card p-0"
+              style={{ paddingTop: 'env(safe-area-inset-top, 0px)', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
+            >
               <SheetTitle className="sr-only">Dashboard Navigation</SheetTitle>
               {renderInner(true, () => {
                 setMobileOpen(false)
@@ -797,7 +900,23 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        {/*
+          `--pf-tabbar-h` is published here so a page with its own bottom-pinned
+          action bar can sit above the tab bar instead of underneath it.
+        */}
+        <main
+          id="main"
+          className="flex-1 overflow-y-auto pb-[calc(var(--pf-tabbar-h)+env(safe-area-inset-bottom,0px))] pointer-fine:md:pb-0"
+        >
+          {children}
+        </main>
+
+        <MobileTabBar
+          items={tabItems}
+          activeHref={activeHref}
+          moreActive={!activeIsTab}
+          onMore={() => setMobileOpen(true)}
+        />
       </div>
     </div>
   )

@@ -1,7 +1,7 @@
 import { query, queryOne, execute } from '@/lib/db'
 import { requireRole, requireCapability } from '@/lib/auth-guard'
 import { isElevated } from '@/lib/roles'
-import { canActAt, currentStage } from '@/lib/workflow'
+import { canRecordInvoiceOn } from '@/lib/workflow'
 import { getRequestInvoices, isMissingTable, type SupplierInvoice } from '@/lib/supplier-invoices'
 import { NextResponse } from 'next/server'
 
@@ -38,10 +38,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 /**
  * Record a supplier invoice against a requisition.
  *
- * Only while the requisition is with Supply Chain or Cost Control (elevated
- * roles may at any stage), and only for a supplier that actually appears on
- * one of its lines — an invoice from someone the requisition never named is a
- * mismatch to resolve by fixing the lines first, not to record.
+ * Only once the requisition has reached Supply Chain, so there is a real
+ * purchase behind the invoice (see `canRecordInvoiceOn`), and only for a
+ * supplier that actually appears on one of its lines — an invoice from someone
+ * the requisition never named is a mismatch to resolve by fixing the lines
+ * first, not to record.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -54,11 +55,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   )
   if (!req) return NextResponse.json({ error: 'Request not found' }, { status: 404 })
 
-  const stage = currentStage(req.status, req.sent_back_to)
-  const atMyStage = stage !== null && (stage === 'supply_chain' || stage === 'cost_control') && canActAt(guard.user.role, stage)
-  if (!isElevated(guard.user.role) && !atMyStage) {
+  if (!canRecordInvoiceOn(guard.user.role, req.status, req.sent_back_to)) {
     return NextResponse.json(
-      { error: 'Invoices can only be recorded while the requisition is with your stage.' },
+      { error: 'An invoice can only be recorded once the requisition has reached Supply Chain pricing.' },
       { status: 409 }
     )
   }

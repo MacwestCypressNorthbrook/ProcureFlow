@@ -1,5 +1,5 @@
 import type { RoleId } from '@/lib/roles'
-import { normalizeRole, isElevated } from '@/lib/roles'
+import { normalizeRole, isElevated, can } from '@/lib/roles'
 
 /**
  * The approval chain, in order.
@@ -202,6 +202,62 @@ export function canActAt(role: string | null | undefined, stage: Stage): boolean
   if (isElevated(role)) return true
   const mine = normalizeRole(role)
   return mine ? STAGES[stage].roles.includes(mine) : false
+}
+
+/**
+ * Statuses at or past Supply Chain pricing — the window in which a supplier
+ * invoice can exist at all.
+ *
+ * `supplier-insights.ts` counts a requisition as "awaiting an invoice" from
+ * `pending_cost_control` onward; this set is the same window one stage earlier,
+ * because Supply Chain attaches vendor invoices while it still holds the
+ * requisition. Anything before `pending_supply_chain` has been priced by nobody
+ * and ordered from nobody, so there is nothing for a supplier to invoice.
+ */
+const INVOICEABLE_STATUSES: ReadonlySet<string> = new Set<RequestStatus>([
+  'pending_supply_chain',
+  'pending_cost_control',
+  'pending_admin',
+  'pending_finance',
+  'completed',
+])
+
+/**
+ * May this role record a supplier invoice against a requisition in this state?
+ *
+ * Invoices arrive with the goods or weeks behind them — long after the
+ * requisition has left Supply Chain, and usually after the Administrator has
+ * closed it. So the question is not "do you hold this stage right now" but
+ * "has this requisition been sourced yet": once it reaches Supply Chain there
+ * is a real purchase to invoice, and whoever handles vendor paperwork may
+ * record against it from then on, closed or not.
+ *
+ * Gating on stage tenancy instead is what left the Invoices report empty.
+ * `currentStage` returns `null` for a completed requisition, so a tenancy test
+ * refused the recording form on exactly the requisitions whose invoices had
+ * already arrived — while the supplier page went on reporting them as awaiting
+ * one.
+ *
+ * A sent-back requisition is held by `sent_back_to`, so one bounced to the
+ * requester or the Project Lead falls out of the window until it comes forward
+ * again: its pricing is being reworked, and an invoice recorded against a
+ * figure under revision is a figure nobody agreed. Rejected and cancelled
+ * requisitions take nothing, there being no purchase.
+ *
+ * Elevated roles bypass the window, as they do every other rule here.
+ */
+export function canRecordInvoiceOn(
+  role: string | null | undefined,
+  status: string,
+  sentBackTo?: string | null
+): boolean {
+  if (!can(role, 'invoice:record')) return false
+  if (isElevated(role)) return true
+  if (status === 'sent_back') {
+    const stage = currentStage(status, sentBackTo)
+    return stage !== null && INVOICEABLE_STATUSES.has(statusForStage(stage))
+  }
+  return INVOICEABLE_STATUSES.has(status)
 }
 
 /** Stages this role is responsible for. Elevated roles get the whole chain. */

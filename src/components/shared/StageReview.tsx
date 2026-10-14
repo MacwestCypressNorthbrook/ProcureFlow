@@ -15,7 +15,7 @@ import { extractRequisition } from '@/lib/requisitions'
 import { query } from '@/lib/db'
 import type { SupplierOption } from '@/components/shared/SupplierPicker'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate, cn } from '@/lib/utils'
-import { currentStage, STAGES, canActAt } from '@/lib/workflow'
+import { currentStage, STAGES, canActAt, canRecordInvoiceOn } from '@/lib/workflow'
 import { isElevated, can } from '@/lib/roles'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
 import type { ResolvedUser } from '@/lib/auth/server'
@@ -90,8 +90,11 @@ export default async function StageReview({
     if (found) found.requisitioned += amount
     else invoiceSuppliers.push({ id: item.supplier_id, name: item.supplier_name ?? 'Supplier', requisitioned: amount })
   }
-  const canRecordInvoice =
-    holdsStage && can(user.role, 'invoice:record') && (stage === 'supply_chain' || stage === 'cost_control' || isElevated(user.role))
+  // Deliberately not gated on `holdsStage`: an invoice turns up after the
+  // requisition has moved on, so the window is the requisition's lifecycle
+  // position, not who is holding it this minute. The API applies the same
+  // predicate, so the form is offered exactly where the save will be accepted.
+  const canRecordInvoice = canRecordInvoiceOn(user.role, request.status, request.sent_back_to)
 
   /**
    * Does the right-hand rail have anything in it?
@@ -530,9 +533,11 @@ export default async function StageReview({
             */}
             {holdsStage && (
               <>
-                <div aria-hidden className="h-20 lg:hidden" />
+                <div aria-hidden className="h-[calc(5rem+var(--pf-tabbar-h,0px))] lg:hidden" />
                 <div
-                  className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-background/85 px-4 pt-3 backdrop-blur-xl lg:hidden pointer-fine:md:left-[116px]"
+                  // Sits on top of the phone's tab bar, never beneath it:
+                  // `--pf-tabbar-h` is published by the dashboard shell.
+                  className="fixed inset-x-0 bottom-[var(--pf-tabbar-h,0px)] z-20 border-t border-border bg-background/85 px-4 pt-3 backdrop-blur-xl lg:hidden pointer-fine:md:bottom-0 pointer-fine:md:left-[112px]"
                   style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
                 >
                   <div className="mx-auto flex max-w-3xl items-center justify-between gap-4">
@@ -723,7 +728,7 @@ export default async function StageReview({
           </div>
         )}
 
-        {invoices && (invoiceSuppliers.length > 0 || invoices.length > 0) && (
+        {invoices && (invoiceSuppliers.length > 0 || invoices.length > 0 || canRecordInvoice) && (
           <SupplierInvoicesPanel
             requestId={request.id}
             invoices={invoices}
