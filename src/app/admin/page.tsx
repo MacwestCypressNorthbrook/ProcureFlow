@@ -5,6 +5,7 @@ import { getRequestWindowSettings } from '@/lib/settings'
 import { getNotificationSettings } from '@/lib/notification-settings'
 import AdminClient, { type AuditEntry, type AdminRequestRow } from '@/components/admin/AdminClient'
 import type { AdminPurchaseOrder, AdminInvoice } from '@/components/admin/report-types'
+import { poHasSupplierColumn } from '@/lib/po-supplier'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
 import type {
   ProjectWithMemberCount,
@@ -22,6 +23,14 @@ export default async function AdminPage() {
   const maySeeUsers = can(user.role, 'admin:users')
   const maySeeAudit = can(user.role, 'admin:audit')
   const maySeePreferences = can(user.role, 'admin:preferences')
+
+  // Which supplier a PO covers: its supplier_id once migration 017 is applied
+  // and the PO carries one; otherwise its vendor name, normalized. Built here
+  // because the column may not exist yet on a database the code reaches first.
+  const nameMatch = `regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(COALESCE(s.name, '')), '[^a-z0-9]', '', 'g') AND regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') <> ''`
+  const poMatchesSupplier = (await poHasSupplierColumn())
+    ? `(CASE WHEN po.supplier_id IS NOT NULL THEN po.supplier_id = s.id ELSE ${nameMatch} END)`
+    : `(${nameMatch})`
 
   // Supplier invoices live in a table that migration 016 adds; until it is
   // applied the Invoices tab simply shows nothing rather than breaking the page.
@@ -41,7 +50,7 @@ export default async function AdminPage() {
             (SELECT string_agg(po.po_number, ', ' ORDER BY po.created_at)
                FROM public.purchase_orders po
               WHERE po.request_id = si.request_id
-                AND regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(COALESCE(s.name, '')), '[^a-z0-9]', '', 'g')) AS po_numbers,
+                AND ${poMatchesSupplier}) AS po_numbers,
             (SELECT COALESCE(SUM(ri.line_total), 0) FROM public.request_items ri
               WHERE ri.request_id = si.request_id AND ri.supplier_id = si.supplier_id) AS supplier_requisitioned
        FROM public.supplier_invoices si
@@ -170,8 +179,7 @@ export default async function AdminPage() {
                 FROM public.request_items ri
                 JOIN public.suppliers s ON s.id = ri.supplier_id
                WHERE ri.request_id = po.request_id
-                 AND regexp_replace(lower(COALESCE(s.name, '')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g')
-                 AND regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') <> ''
+                 AND ${poMatchesSupplier}
          ) sl ON true
         ORDER BY po.created_at DESC
         LIMIT 2000`

@@ -7,10 +7,13 @@ import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { checkUpload, isOwnStorageKey } from '@/lib/uploads'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
+import { poHasSupplierColumn, resolvePoSupplier } from '@/lib/po-supplier'
 
 /** One purchase order in a submission, before it is stored. */
 interface OrderInput {
   poNumber: string
+  /** The supplier picked in the drawer; resolved from the vendor name when absent. */
+  supplierId: string | null
   vendorName: string | null
   amount: number | null
   fileName: string | null
@@ -39,6 +42,7 @@ const amountOf = (v: unknown): number | null => {
 function orderFromJson(o: Record<string, unknown>): OrderInput {
   return {
     poNumber: text(o.po_number) ?? '',
+    supplierId: text(o.supplier_id),
     vendorName: text(o.vendor_name),
     amount: amountOf(o.total_amount),
     fileName: text(o.file_name),
@@ -154,6 +158,7 @@ export async function POST(
     } else {
       const single: OrderInput = {
         poNumber: text(formData.get('po_number')) ?? '',
+        supplierId: text(formData.get('supplier_id')),
         vendorName: text(formData.get('vendor_name')),
         amount: amountOf(formData.get('total_amount')),
         fileName: text(formData.get('file_name')),
@@ -258,8 +263,17 @@ export async function POST(
       : null
   const poStatus = approveImmediately ? 'approved' : 'pending_admin'
   const saved: PurchaseOrder[] = []
+  const linkSuppliers = await poHasSupplierColumn()
 
   for (const order of orders) {
+    // Link the order to its supplier. The vendor name defaults to the
+    // supplier's own, so a picked supplier never leaves the PO unnamed.
+    const supplier = await resolvePoSupplier(id, order.supplierId, order.vendorName)
+    if (order.supplierId && !supplier) {
+      return NextResponse.json({ error: `The supplier chosen for PO #${order.poNumber} no longer exists.` }, { status: 400 })
+    }
+    if (supplier && !order.vendorName) order.vendorName = supplier.name
+
     // With a single order the requisition total is a safe default; split
     // across several, there is no honest default and the amount stays blank.
     const amount = order.amount ?? (orders.length === 1 ? requestTotal : null)
@@ -310,17 +324,27 @@ export async function POST(
                   file_path = COALESCE($5, file_path),
                   status = $6,
                   notes = COALESCE($7, notes),
+                  ${linkSuppliers ? 'supplier_id = COALESCE($8, supplier_id),' : ''}
                   updated_at = now()
             WHERE id = $1
             RETURNING *`,
-          [prior.id, order.vendorName, amount, order.fileName, order.fileUrl, poStatus, comment]
+          [
+            prior.id,
+            order.vendorName,
+            amount,
+            order.fileName,
+            order.fileUrl,
+            poStatus,
+            comment,
+            ...(linkSuppliers ? [supplier?.id ?? null] : []),
+          ]
         )
       : await queryOne<PurchaseOrder>(
           `INSERT INTO public.purchase_orders (
              po_number, request_id, purpose, description, vendor_name, quantity, unit_rate, total_amount,
-             file_name, file_path, created_by, status, notes
+             file_name, file_path, created_by, status, notes${linkSuppliers ? ', supplier_id' : ''}
            )
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13${linkSuppliers ? ', $14' : ''})
            RETURNING *`,
           [
             order.poNumber,
@@ -336,6 +360,7 @@ export async function POST(
             guard.user.id,
             poStatus,
             comment,
+            ...(linkSuppliers ? [supplier?.id ?? null] : []),
           ]
         )
 

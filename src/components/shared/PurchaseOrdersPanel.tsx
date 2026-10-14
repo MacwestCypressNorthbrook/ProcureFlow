@@ -26,6 +26,7 @@ export default function PurchaseOrdersPanel({
   action,
   manageRequestId,
   requestCompleted = false,
+  suppliers = [],
 }: {
   pos: PurchaseOrder[]
   /** PO documents; matched to their order by `po_id`. */
@@ -35,6 +36,8 @@ export default function PurchaseOrdersPanel({
   /** Set when the viewer may edit and delete these orders (the Administrator). */
   manageRequestId?: string
   requestCompleted?: boolean
+  /** The requisition's suppliers, offered when re-linking a PO. */
+  suppliers?: { id: string; name: string }[]
 }) {
   if (pos.length === 0) return null
 
@@ -80,10 +83,12 @@ export default function PurchaseOrdersPanel({
                         id: po.id,
                         po_number: po.po_number ?? null,
                         vendor_name: po.vendor_name ?? null,
+                        supplier_id: po.supplier_id ?? null,
                         total_amount: po.total_amount != null ? Number(po.total_amount) : null,
                         file_name: doc?.file_name ?? po.file_name ?? null,
                       }}
                       isLastOnCompleted={requestCompleted && pos.length === 1}
+                      suppliers={suppliers}
                     />
                   )}
                 </div>

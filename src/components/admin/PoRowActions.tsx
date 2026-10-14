@@ -6,11 +6,13 @@ import { AlertCircle, FileCheck2, FileText, FileUp, Loader2, Pencil, Save, Trash
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 import { Input } from '@/components/ui/input'
 import { uploadDocument } from '@/lib/upload-client'
+import PoSupplierField, { type PoSupplierOption, type PoSupplierValue } from './PoSupplierField'
 
 export interface EditablePo {
   id: string
   po_number: string | null
   vendor_name: string | null
+  supplier_id: string | null
   total_amount: number | null
   file_name: string | null
 }
@@ -23,9 +25,12 @@ export default function PoRowActions({
   requestId,
   po,
   isLastOnCompleted,
+  suppliers = [],
 }: {
   requestId: string
   po: EditablePo
+  /** The requisition's suppliers, for re-linking the PO. */
+  suppliers?: PoSupplierOption[]
   /** Deleting it sends the requisition back to the Administrator's queue. */
   isLastOnCompleted: boolean
 }) {
@@ -79,16 +84,29 @@ export default function PoRowActions({
       </div>
       {error && <p role="alert" className="text-[11px] font-medium text-destructive">{error}</p>}
       {editing && (
-        <EditPoDrawer requestId={requestId} po={po} onClose={() => setEditing(false)} />
+        <EditPoDrawer requestId={requestId} po={po} suppliers={suppliers} onClose={() => setEditing(false)} />
       )}
     </div>
   )
 }
 
-function EditPoDrawer({ requestId, po, onClose }: { requestId: string; po: EditablePo; onClose: () => void }) {
+function EditPoDrawer({
+  requestId,
+  po,
+  suppliers,
+  onClose,
+}: {
+  requestId: string
+  po: EditablePo
+  suppliers: PoSupplierOption[]
+  onClose: () => void
+}) {
   const router = useRouter()
   const [poNumber, setPoNumber] = useState(po.po_number ?? '')
-  const [vendorName, setVendorName] = useState(po.vendor_name ?? '')
+  const [vendor, setVendor] = useState<PoSupplierValue>({
+    supplierId: po.supplier_id,
+    vendorName: po.vendor_name ?? '',
+  })
   const [amount, setAmount] = useState(po.total_amount != null ? String(po.total_amount) : '')
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -105,7 +123,9 @@ function EditPoDrawer({ requestId, po, onClose }: { requestId: string; po: Edita
     try {
       const body: Record<string, unknown> = {
         po_number: poNumber.trim(),
-        vendor_name: vendorName.trim(),
+        vendor_name: vendor.vendorName.trim(),
+        // '' means "another supplier": the server links it by name if it can.
+        supplier_id: vendor.supplierId ?? '',
         total_amount: amount.trim(),
       }
       let res: Response
@@ -177,8 +197,8 @@ function EditPoDrawer({ requestId, po, onClose }: { requestId: string; po: Edita
             </div>
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">Supplier / Vendor</label>
-                <Input value={vendorName} onChange={(e) => setVendorName(e.target.value)} className="h-9 text-xs" />
+                <label className="text-xs font-semibold text-foreground">Supplier</label>
+                <PoSupplierField suppliers={suppliers} value={vendor} onChange={setVendor} />
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-foreground">Committed PO Amount (GHS)</label>

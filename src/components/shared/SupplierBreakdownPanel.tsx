@@ -21,6 +21,15 @@ export interface SupplierGroup {
 export const vendorKey = (name: string | null | undefined) =>
   (name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
 
+/**
+ * Does this purchase order cover that supplier? By id when the PO carries one
+ * (migration 017); by name for older POs and before the migration.
+ */
+export function poCoversSupplier(po: Pick<PurchaseOrder, 'supplier_id' | 'vendor_name'>, supplier: { id?: string; name: string }) {
+  if (po.supplier_id && supplier.id) return po.supplier_id === supplier.id
+  return vendorKey(po.vendor_name) !== '' && vendorKey(po.vendor_name) === vendorKey(supplier.name)
+}
+
 /** The requisition's lines, grouped by who supplies them, largest first. */
 export function groupBySupplier(items: Line[]): { groups: SupplierGroup[]; unassigned: SupplierGroup | null } {
   const map = new Map<string, SupplierGroup>()
@@ -69,11 +78,11 @@ export default function SupplierBreakdownPanel({
 
   const total = groups.reduce((s, g) => s + g.value, 0) + (unassigned?.value ?? 0)
   const multiple = groups.length > 1
-  const posFor = (g: SupplierGroup) => pos.filter((po) => vendorKey(po.vendor_name) === vendorKey(g.name))
+  const posFor = (g: SupplierGroup) => pos.filter((po) => poCoversSupplier(po, { id: g.key, name: g.name }))
   const covered = groups.filter((g) => posFor(g).length > 0).length
   // Orders whose vendor matches no supplier on the requisition — usually a
   // name typed differently in Odoo, sometimes a genuinely different vendor.
-  const strayPos = pos.filter((po) => !groups.some((g) => vendorKey(g.name) === vendorKey(po.vendor_name)))
+  const strayPos = pos.filter((po) => !groups.some((g) => poCoversSupplier(po, { id: g.key, name: g.name })))
 
   return (
     <Panel
@@ -153,8 +162,8 @@ export default function SupplierBreakdownPanel({
           <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-500" />
           <span>
             {strayPos.map((po) => `PO #${po.po_number} (${po.vendor_name || 'no vendor'})`).join(', ')}{' '}
-            {strayPos.length === 1 ? 'does' : 'do'} not match a supplier on this requisition by name — check the
-            vendor on the PO.
+            {strayPos.length === 1 ? 'is' : 'are'} not linked to any supplier on this requisition — edit the PO
+            and pick its supplier.
           </span>
         </p>
       )}

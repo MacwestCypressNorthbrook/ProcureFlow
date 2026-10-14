@@ -63,29 +63,30 @@ const monthName = (ym: string) => {
 const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 function deriveRows(pos: AdminPurchaseOrder[], invoices: AdminInvoice[]): PoRow[] {
-  // Invoices belong to a PO when they are on the same requisition from the same supplier.
+  // Invoices belong to a PO when they are on the same requisition from the
+  // same supplier — by supplier id when the PO carries one, by name otherwise.
+  const poKey = (po: AdminPurchaseOrder) =>
+    po.supplier_id ? `${po.request_id}|id:${po.supplier_id}` : `${po.request_id}|name:${vendorKey(po.vendor_name)}`
   const invoicedBy = new Map<string, number>()
   for (const inv of invoices) {
-    const key = `${inv.request_id}|${vendorKey(inv.supplier_name)}`
-    invoicedBy.set(key, (invoicedBy.get(key) ?? 0) + num(inv.amount))
+    for (const key of [`${inv.request_id}|id:${inv.supplier_id}`, `${inv.request_id}|name:${vendorKey(inv.supplier_name)}`]) {
+      invoicedBy.set(key, (invoicedBy.get(key) ?? 0) + num(inv.amount))
+    }
   }
 
   // Several POs to one supplier on one requisition share its invoices in
   // proportion to their value, so the invoice is never counted twice.
   const committedBy = new Map<string, number>()
-  for (const po of pos) {
-    const key = `${po.request_id}|${vendorKey(po.vendor_name)}`
-    committedBy.set(key, (committedBy.get(key) ?? 0) + num(po.total_amount))
-  }
   const siblingsBy = new Map<string, number>()
   for (const po of pos) {
-    const key = `${po.request_id}|${vendorKey(po.vendor_name)}`
+    const key = poKey(po)
+    committedBy.set(key, (committedBy.get(key) ?? 0) + num(po.total_amount))
     siblingsBy.set(key, (siblingsBy.get(key) ?? 0) + 1)
   }
 
   return pos.map((po) => {
     const amount = num(po.total_amount)
-    const invoiceKey = `${po.request_id}|${vendorKey(po.vendor_name)}`
+    const invoiceKey = poKey(po)
     const pool = invoicedBy.get(invoiceKey) ?? 0
     const committed = committedBy.get(invoiceKey) ?? 0
     const invoiced = committed > 0 ? pool * (amount / committed) : pool / (siblingsBy.get(invoiceKey) ?? 1)

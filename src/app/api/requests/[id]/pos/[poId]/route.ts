@@ -8,6 +8,7 @@ import { NextResponse } from 'next/server'
 import { rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { checkUpload, isOwnStorageKey } from '@/lib/uploads'
 import type { Request as DbRequest, PurchaseOrder } from '@/lib/types'
+import { poHasSupplierColumn, resolvePoSupplier } from '@/lib/po-supplier'
 
 /**
  * Correct or remove a purchase order the Administrator already attached.
@@ -74,6 +75,8 @@ export async function PATCH(
 
   let poNumber: string | null = null
   let vendorName: string | null | undefined
+  /** undefined: not sent; '': "another supplier", link by name; otherwise a supplier id. */
+  let supplierParam: string | undefined
   let amount: number | null | undefined
   let fileName: string | null = null
   let fileUrl: string | null = null
@@ -87,6 +90,7 @@ export async function PATCH(
     const form = await request.formData()
     poNumber = text(form.get('po_number'))
     if (form.has('vendor_name')) vendorName = text(form.get('vendor_name')) || null
+    if (form.has('supplier_id')) supplierParam = text(form.get('supplier_id')) ?? ''
     if (form.has('total_amount')) {
       const raw = text(form.get('total_amount'))
       amount = raw ? Number(raw) : null
@@ -104,6 +108,7 @@ export async function PATCH(
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>
     poNumber = text(body.po_number)
     if ('vendor_name' in body) vendorName = text(body.vendor_name) || null
+    if ('supplier_id' in body) supplierParam = text(body.supplier_id) ?? ''
     if ('total_amount' in body) {
       const raw = body.total_amount
       amount = raw === null || raw === '' || raw === undefined ? null : Number(raw)
@@ -135,6 +140,20 @@ export async function PATCH(
     }
   }
 
+  // Re-link the supplier when it was chosen, or when the vendor name changed.
+  const linkSuppliers = await poHasSupplierColumn()
+  let supplierChange: { id: string | null; name: string | null } | undefined
+  if (linkSuppliers && (supplierParam !== undefined || vendorName !== undefined)) {
+    const resolved = await resolvePoSupplier(id, supplierParam || null, vendorName ?? po.vendor_name)
+    if (supplierParam && !resolved) {
+      return NextResponse.json({ error: 'That supplier no longer exists.' }, { status: 400 })
+    }
+    if (resolved && !vendorName) vendorName = resolved.name
+    if ((resolved?.id ?? null) !== (po.supplier_id ?? null)) {
+      supplierChange = { id: resolved?.id ?? null, name: resolved?.name ?? null }
+    }
+  }
+
   if (fileBuffer && fileName) {
     const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
     fileUrl = `po-docs/${id}/${Date.now()}-${safeName}`
@@ -158,6 +177,7 @@ export async function PATCH(
       `Amount: ${po.total_amount != null ? formatCurrency(Number(po.total_amount)) : '—'} → ${amount != null ? formatCurrency(amount) : '—'}`
     )
   }
+  if (supplierChange) changes.push(supplierChange.name ? `Linked to supplier ${supplierChange.name}` : 'Unlinked from its supplier')
   if (replacingFile) changes.push(`Document replaced with ${fileName}`)
 
   if (changes.length === 0) {
@@ -177,6 +197,7 @@ export async function PATCH(
               total_amount = CASE WHEN $5::boolean THEN $6::numeric ELSE total_amount END,
               file_name = COALESCE($7, file_name),
               file_path = COALESCE($8, file_path),
+              ${supplierChange ? 'supplier_id = $9,' : ''}
               description = CASE WHEN $2::text IS NULL THEN description
                                  ELSE regexp_replace(COALESCE(description, ''), '^\\[Odoo PO#: [^]]*\\]', '[Odoo PO#: ' || $2 || ']') END,
               updated_at = now()
@@ -190,6 +211,7 @@ export async function PATCH(
         amount ?? null,
         replacingFile ? fileName : null,
         replacingFile ? fileUrl : null,
+        ...(supplierChange ? [supplierChange.id] : []),
       ],
     ],
     // A replaced document replaces — the old file stops being listed rather

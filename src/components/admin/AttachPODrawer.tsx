@@ -26,6 +26,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { formatCurrency } from '@/lib/utils'
 import { uploadDocument } from '@/lib/upload-client'
+import PoSupplierField, { type PoSupplierOption } from './PoSupplierField'
 
 export interface AttachPODrawerProps {
   isOpen: boolean
@@ -45,11 +46,14 @@ export interface AttachPODrawerProps {
      * one, the drawer starts with one purchase order per supplier — that is how
      * Odoo raises them.
      */
-    supplierSplits?: { name: string; amount: number }[]
+    supplierSplits?: { id?: string; name: string; amount: number }[]
+    /** Every supplier on the requisition — the choices in each order's supplier picker. */
+    suppliers?: PoSupplierOption[]
   }
   existingPo?: {
     po_number?: string | null
     vendor_name?: string | null
+    supplier_id?: string | null
     total_amount?: number | null
     file_name?: string | null
     file_path?: string | null
@@ -65,6 +69,7 @@ export interface AttachPODrawerProps {
 interface Entry {
   key: number
   poNumber: string
+  supplierId: string | null
   vendorName: string
   amount: string
   file: File | null
@@ -73,9 +78,10 @@ interface Entry {
 }
 
 let nextKey = 1
-const blankEntry = (vendorName = '', amount = ''): Entry => ({
+const blankEntry = (vendorName = '', amount = '', supplierId: string | null = null): Entry => ({
   key: nextKey++,
   poNumber: '',
+  supplierId,
   vendorName,
   amount,
   file: null,
@@ -91,7 +97,7 @@ function initialEntries({
     // Suppliers no PO covers yet — the likely reason another one is being added.
     const open = requestSummary.supplierSplits ?? []
     return open.length > 0
-      ? open.map((s) => blankEntry(s.name, s.amount ? String(Math.round(s.amount * 100) / 100) : ''))
+      ? open.map((s) => blankEntry(s.name, s.amount ? String(Math.round(s.amount * 100) / 100) : '', s.id ?? null))
       : [blankEntry()]
   }
   if (existingPo?.po_number) {
@@ -99,6 +105,7 @@ function initialEntries({
       {
         key: nextKey++,
         poNumber: existingPo.po_number,
+        supplierId: existingPo.supplier_id ?? null,
         vendorName: existingPo.vendor_name || requestSummary.suggestedSupplier || '',
         amount: existingPo.total_amount != null ? String(existingPo.total_amount) : '',
         file: null,
@@ -108,12 +115,13 @@ function initialEntries({
   }
   const splits = requestSummary.supplierSplits ?? []
   if (splits.length > 1) {
-    return splits.map((s) => blankEntry(s.name, s.amount ? String(Math.round(s.amount * 100) / 100) : ''))
+    return splits.map((s) => blankEntry(s.name, s.amount ? String(Math.round(s.amount * 100) / 100) : '', s.id ?? null))
   }
   return [
     blankEntry(
-      requestSummary.suggestedSupplier || '',
-      requestSummary.totalAmount ? String(requestSummary.totalAmount) : ''
+      splits[0]?.name || requestSummary.suggestedSupplier || '',
+      requestSummary.totalAmount ? String(requestSummary.totalAmount) : '',
+      splits[0]?.id ?? null
     ),
   ]
 }
@@ -188,6 +196,7 @@ export default function AttachPODrawer({
         const order: Record<string, unknown> = {
           po_number: entry.poNumber.trim(),
           vendor_name: entry.vendorName.trim() || undefined,
+          supplier_id: entry.supplierId || undefined,
           total_amount: entry.amount.trim() || undefined,
         }
         if (entry.file) {
@@ -353,12 +362,11 @@ export default function AttachPODrawer({
               {/* Vendor and Amount 2-Column Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-foreground">Supplier / Vendor</label>
-                  <Input
-                    placeholder="Vendor name"
-                    value={entry.vendorName}
-                    onChange={(e) => update(entry.key, { vendorName: e.target.value })}
-                    className="h-9 text-xs"
+                  <label className="text-xs font-semibold text-foreground">Supplier</label>
+                  <PoSupplierField
+                    suppliers={requestSummary.suppliers ?? []}
+                    value={{ supplierId: entry.supplierId, vendorName: entry.vendorName }}
+                    onChange={(next) => update(entry.key, next)}
                   />
                 </div>
                 <div className="space-y-1.5">

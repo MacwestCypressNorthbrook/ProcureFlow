@@ -6,7 +6,7 @@ import { getPaymentPosition, listPayments } from '@/lib/payments'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
 import PurchaseOrdersPanel from '@/components/shared/PurchaseOrdersPanel'
-import SupplierBreakdownPanel, { vendorKey } from '@/components/shared/SupplierBreakdownPanel'
+import SupplierBreakdownPanel, { poCoversSupplier } from '@/components/shared/SupplierBreakdownPanel'
 import AddPurchaseOrderButton from '@/components/admin/AddPurchaseOrderButton'
 import MaterialsPricingPanel from '@/components/shared/MaterialsPricingPanel'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
@@ -117,7 +117,8 @@ export default async function StageReview({
     ((request as unknown as Record<string, unknown>).vendor_name as string | undefined) ??
     ''
   const poDocs = documents.filter((d) => d.source === 'po')
-  const supplierSplits = invoiceSuppliers.map((s) => ({ name: s.name, amount: s.requisitioned }))
+  const supplierSplits = invoiceSuppliers.map((s) => ({ id: s.id, name: s.name, amount: s.requisitioned }))
+  const supplierOptions = invoiceSuppliers.map((s) => ({ id: s.id, name: s.name }))
   const requestSummary = {
     purpose: request.purpose,
     department: request.department ?? undefined,
@@ -127,6 +128,7 @@ export default async function StageReview({
     suggestedSupplier,
     itemCount: items.length,
     supplierSplits,
+    suppliers: supplierOptions,
   }
   // A completed requisition can still take further purchase orders — a
   // supplier split out late — from whoever raises them.
@@ -136,15 +138,14 @@ export default async function StageReview({
   const canManagePo =
     (request.status === 'pending_admin' || request.status === 'completed') && can(user.role, 'request:convert')
   // Adding to a closed requisition starts from the suppliers no PO covers yet.
-  const uncoveredSplits = supplierSplits.filter(
-    (s) => !pos.some((po) => vendorKey(po.vendor_name) === vendorKey(s.name))
-  )
+  const uncoveredSplits = supplierSplits.filter((s) => !pos.some((po) => poCoversSupplier(po, s)))
   const purchaseOrders = (
     <PurchaseOrdersPanel
       pos={pos}
       documents={poDocs}
       manageRequestId={canManagePo ? request.id : undefined}
       requestCompleted={request.status === 'completed'}
+      suppliers={supplierOptions}
       action={
         canAppendPo ? (
           <AddPurchaseOrderButton

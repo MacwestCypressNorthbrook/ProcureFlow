@@ -88,6 +88,8 @@ export interface PurchaseOrder {
   purpose: string
   description: string | null
   vendor_name?: string | null
+  /** The supplier this PO is raised to (migration 017). Older POs only have `vendor_name`. */
+  supplier_id?: string | null
   quantity: number | null
   unit_rate: number | null
   total_amount: number | null
