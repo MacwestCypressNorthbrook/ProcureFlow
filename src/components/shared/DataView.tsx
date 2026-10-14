@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   ArrowDown,
   ArrowUp,
@@ -332,10 +332,29 @@ export default function DataView<T>({
     return out
   }, [rows, facets, facetValues, term, searchText, sort, columns])
 
+  /*
+    Tell the caller what is on screen — but only when it actually changed.
+
+    `processed` is rebuilt whenever its inputs change identity, and `columns`,
+    `facets` and `searchText` are normally fresh arrays and closures on every
+    render. So `processed` is a new array almost every render, while its
+    CONTENTS are usually identical. A caller that holds those rows in state
+    would then set state on every render, re-render, and set it again — an
+    endless loop that pins the tab and leaves clicks unanswered.
+
+    Comparing the row ids settles it: a caller hears about a real change and
+    nothing else. The `rows` prop's own identity is part of the comparison, so
+    fresh data from the server is still passed on even when the ids match.
+  */
+  const emitted = useRef<{ rows: T[]; ids: string } | null>(null)
   useEffect(() => {
-    onVisibleRows?.(processed)
+    if (!onVisibleRows) return
+    const ids = processed.map(getRowId).join('\u0000')
+    if (emitted.current && emitted.current.rows === rows && emitted.current.ids === ids) return
+    emitted.current = { rows, ids }
+    onVisibleRows(processed)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- callers pass a fresh closure each render
-  }, [processed])
+  }, [processed, rows])
 
   const total = processed.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))

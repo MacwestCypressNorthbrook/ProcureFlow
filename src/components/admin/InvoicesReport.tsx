@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, BadgeCheck, FileArchive, FileSpreadsheet, FileText, Receipt, Scale, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
@@ -108,7 +108,8 @@ export default function InvoicesReport({
     [visible]
   )
 
-  const columns: DataColumn<InvoiceRow>[] = [
+  // Memoized: DataView re-filters and re-sorts whenever these change identity.
+  const columns: DataColumn<InvoiceRow>[] = useMemo(() => [
     {
       id: 'number',
       label: 'Invoice',
@@ -204,9 +205,10 @@ export default function InvoicesReport({
       sortValue: (r) => r.invoice_date,
       cell: (r) => <span className="whitespace-nowrap text-xs text-muted-foreground">{dateOnly(r.invoice_date)}</span>,
     },
-  ]
+  ], [])
 
-  const facet = (
+
+  const facet = useCallback((
     id: string,
     label: string,
     key: (r: InvoiceRow) => string,
@@ -219,9 +221,9 @@ export default function InvoicesReport({
       .sort(order ?? ((a, b) => labelOf(a).localeCompare(labelOf(b))))
       .map((v) => ({ value: v, label: labelOf(v) })),
     matches: (r, value) => key(r) === value,
-  })
+  }), [rows])
 
-  const facets: DataFacet<InvoiceRow>[] = [
+  const facets: DataFacet<InvoiceRow>[] = useMemo(() => [
     facet('supplier', 'Supplier', (r) => r.supplier_name),
     facet('project', 'Project', (r) => r.project),
     facet('engineer', 'Engineer', (r) => r.engineer),
@@ -229,7 +231,8 @@ export default function InvoicesReport({
     facet('month', 'Invoice month', (r) => r.month, monthName, (a, b) => b.localeCompare(a)),
     facet('document', 'Document', (r) => (r.hasDocument ? 'yes' : 'no'), (v) => (v === 'yes' ? 'Has document' : 'No document')),
     facet('po', 'PO', (r) => (r.po_numbers ? 'yes' : 'no'), (v) => (v === 'yes' ? 'Matched to a PO' : 'No matching PO')),
-  ]
+  ], [facet])
+
 
   const detail: XlsxColumn<InvoiceRow>[] = [
     { header: 'Invoice number', value: (r) => r.invoice_number, width: 16 },

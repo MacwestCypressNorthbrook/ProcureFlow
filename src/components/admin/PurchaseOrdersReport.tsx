@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, CalendarClock, Coins, FileArchive, FileSpreadsheet, FileText, Receipt, Scale, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
@@ -192,7 +192,8 @@ export default function PurchaseOrdersReport({
   )
 
   /* ── Table ──────────────────────────────────────────────────────────── */
-  const columns: DataColumn<PoRow>[] = [
+  // Memoized: DataView re-filters and re-sorts whenever these change identity.
+  const columns: DataColumn<PoRow>[] = useMemo(() => [
     {
       id: 'po',
       label: 'Purchase order',
@@ -298,18 +299,28 @@ export default function PurchaseOrdersReport({
         </div>
       ),
     },
-  ]
+  ], [])
 
-  const facet = (id: string, label: string, key: (r: PoRow) => string, labelOf: (v: string) => string = (v) => v, order?: (a: string, b: string) => number): DataFacet<PoRow> => ({
-    id,
-    label,
-    options: [...new Set(rows.map(key))]
-      .sort(order ?? ((a, b) => labelOf(a).localeCompare(labelOf(b))))
-      .map((v) => ({ value: v, label: labelOf(v) })),
-    matches: (r, value) => key(r) === value,
-  })
 
-  const facets: DataFacet<PoRow>[] = [
+  const facet = useCallback(
+    (
+      id: string,
+      label: string,
+      key: (r: PoRow) => string,
+      labelOf: (v: string) => string = (v) => v,
+      order?: (a: string, b: string) => number
+    ): DataFacet<PoRow> => ({
+      id,
+      label,
+      options: [...new Set(rows.map(key))]
+        .sort(order ?? ((a, b) => labelOf(a).localeCompare(labelOf(b))))
+        .map((v) => ({ value: v, label: labelOf(v) })),
+      matches: (r, value) => key(r) === value,
+    }),
+    [rows]
+  )
+
+  const facets: DataFacet<PoRow>[] = useMemo(() => [
     facet('project', 'Project', (r) => r.project),
     facet('engineer', 'Engineer', (r) => r.engineer),
     facet('supplier', 'Supplier', (r) => r.vendor),
@@ -320,7 +331,8 @@ export default function PurchaseOrdersReport({
     facet('split', 'Requisition', (r) => (num(r.sibling_count) > 1 ? 'multi' : 'single'), (v) =>
       v === 'multi' ? 'Split across several POs' : 'Single PO'
     ),
-  ]
+  ], [facet])
+
 
   /* ── Exports ────────────────────────────────────────────────────────── */
   const describe = (list: PoRow[]) => {
