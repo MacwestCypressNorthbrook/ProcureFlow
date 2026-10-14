@@ -11,6 +11,9 @@ export interface QueueRow extends DbRequest {
   requester_name: string | null
   item_count: number
   document_count: number
+  /** Distinct suppliers across the lines — each one means its own purchase order. */
+  supplier_count?: number
+  supplier_names?: string | null
   po_id: string | null
   po_number: string | null
   po_status: string | null
@@ -40,6 +43,11 @@ export async function getStageQueue(statuses: RequestStatus[]): Promise<QueueRow
               u.name AS requester_name,
               (SELECT COUNT(*)::int FROM public.request_items ri WHERE ri.request_id = r.id) AS item_count,
               (SELECT COUNT(*)::int FROM public.request_attachments ra WHERE ra.request_id = r.id) AS document_count,
+              (SELECT COUNT(DISTINCT ri.supplier_id)::int FROM public.request_items ri
+                WHERE ri.request_id = r.id AND ri.supplier_id IS NOT NULL) AS supplier_count,
+              (SELECT string_agg(DISTINCT s.name, ', ') FROM public.request_items ri
+                 JOIN public.suppliers s ON s.id = ri.supplier_id
+                WHERE ri.request_id = r.id) AS supplier_names,
               po.id AS po_id,
               po.po_number,
               po.status AS po_status,
@@ -84,6 +92,11 @@ export async function getStageInbox(stage: Stage): Promise<QueueRow[]> {
               u.name AS requester_name,
               (SELECT COUNT(*)::int FROM public.request_items ri WHERE ri.request_id = r.id) AS item_count,
               (SELECT COUNT(*)::int FROM public.request_attachments ra WHERE ra.request_id = r.id) AS document_count,
+              (SELECT COUNT(DISTINCT ri.supplier_id)::int FROM public.request_items ri
+                WHERE ri.request_id = r.id AND ri.supplier_id IS NOT NULL) AS supplier_count,
+              (SELECT string_agg(DISTINCT s.name, ', ') FROM public.request_items ri
+                 JOIN public.suppliers s ON s.id = ri.supplier_id
+                WHERE ri.request_id = r.id) AS supplier_names,
               po.id AS po_id,
               po.po_number,
               po.status AS po_status,
@@ -159,7 +172,13 @@ export interface RequestItemRow {
 export interface ReviewBundle {
   request: QueueRow
   items: RequestItemRow[]
+  /** The most recent purchase order — what single-order views and payments read. */
   po: PurchaseOrder | null
+  /**
+   * Every purchase order on the requisition, oldest first. A requisition
+   * sourced from several suppliers is raised as one Odoo PO per vendor.
+   */
+  pos: PurchaseOrder[]
   documents: ReviewDocument[]
   history: ApprovalEntry[]
 }
@@ -193,7 +212,7 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
     )
     if (!request) return null
 
-    const [items, po, requestDocs, history] = await Promise.all([
+    const [items, pos, requestDocs, history] = await Promise.all([
       query<RequestItemRow>(
         `SELECT ri.id, ri.position, ri.description, ri.quantity, ri.unit,
                 ri.unit_price, ri.line_total, ri.remarks, ri.category, ri.is_subcontractor,
@@ -204,11 +223,10 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
           ORDER BY ri.position ASC`,
         [requestId]
       ),
-      queryOne<PurchaseOrder>(
+      query<PurchaseOrder>(
         `SELECT * FROM public.purchase_orders
           WHERE request_id = $1
-          ORDER BY created_at DESC
-          LIMIT 1`,
+          ORDER BY created_at ASC`,
         [requestId]
       ),
       query<{
@@ -257,13 +275,21 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
       review_notes: d.review_notes,
     }))
 
-    if (po) {
-      const poDocs = await query<{ id: string; file_name: string; file_url: string; file_size: number | null }>(
-        `SELECT id, file_name, file_url, file_size
+    const po = pos.length > 0 ? pos[pos.length - 1] : null
+
+    if (pos.length > 0) {
+      const poDocs = await query<{
+        id: string
+        po_id: string
+        file_name: string
+        file_url: string
+        file_size: number | null
+      }>(
+        `SELECT id, po_id, file_name, file_url, file_size
            FROM public.po_attachments
-          WHERE po_id = $1
+          WHERE po_id = ANY($1::uuid[])
           ORDER BY created_at DESC`,
-        [po.id]
+        [pos.map((p) => p.id)]
       )
       for (const d of poDocs) {
         documents.push({
@@ -272,24 +298,28 @@ export async function getReviewBundle(requestId: string): Promise<ReviewBundle |
           file_url: documentHref(d.id, d.file_url),
           file_size: d.file_size,
           source: 'po',
+          po_id: d.po_id,
         })
       }
-      // The PO's own uploaded file, for orders attached before po_attachments
+      // Each PO's own uploaded file, for orders attached before po_attachments
       // existed. Attaching one today writes BOTH `purchase_orders.file_path`
       // and an attachments row for the same physical file, so listing it here
       // unconditionally showed every purchase order twice.
-      const alreadyListed = poDocs.some((d) => d.file_url === po.file_path)
-      if (po.file_path && !alreadyListed) {
-        documents.push({
-          id: `po-file-${po.id}`,
-          file_name: po.file_name ?? 'Purchase order',
-          file_url: documentHref(`po-file-${po.id}`, po.file_path),
-          source: 'po',
-        })
+      for (const order of pos) {
+        const alreadyListed = poDocs.some((d) => d.file_url === order.file_path)
+        if (order.file_path && !alreadyListed) {
+          documents.push({
+            id: `po-file-${order.id}`,
+            file_name: order.file_name ?? 'Purchase order',
+            file_url: documentHref(`po-file-${order.id}`, order.file_path),
+            source: 'po',
+            po_id: order.id,
+          })
+        }
       }
     }
 
-    return { request, items, po, documents, history }
+    return { request, items, po, pos, documents, history }
   } catch (err) {
     console.error('Failed to load the review bundle from Neon:', err)
     return null

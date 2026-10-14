@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import type { Request, PurchaseOrder, ProjectWithMemberCount, UserWithProjects } from '@/lib/types'
+import type { Request, ProjectWithMemberCount, UserWithProjects } from '@/lib/types'
 import { ROLE_LABELS, PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import ThemeToggle from '@/components/layout/ThemeToggle'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -18,6 +18,12 @@ import RequestWindowPanel from './RequestWindowPanel'
 import NotificationSettingsPanel from './NotificationSettingsPanel'
 import AttachPODrawer from './AttachPODrawer'
 import ExportButton from './ExportButton'
+import ExportMenu from '@/components/shared/ExportMenu'
+import PurchaseOrdersReport from './PurchaseOrdersReport'
+import InvoicesReport from './InvoicesReport'
+import type { AdminPurchaseOrder, AdminInvoice } from './report-types'
+import type { ExportColumn } from '@/lib/export'
+import { currentStage, STAGE_LABEL } from '@/lib/workflow'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
 import {
   LayoutGrid,
@@ -36,6 +42,7 @@ import {
   Mail,
   FileUp,
   SlidersHorizontal,
+  Receipt,
 } from 'lucide-react'
 import { AUDIT_ACTION_LABELS } from '@/lib/audit'
 import { can, type Capability, type RoleId } from '@/lib/roles'
@@ -68,17 +75,101 @@ const roleDot: Record<string, string> = {
   sam: 'bg-indigo-500',
 }
 
-/** A requisition row as the admin page queries it — with its purchase order folded in. */
-type AdminRequest = Request & {
+/** A requisition row as the admin page queries it — with its purchase orders folded in. */
+export type AdminRequestRow = Request & {
   project_name?: string | null
+  /** The engineer who raised it, from their account. */
+  requester_name?: string | null
+  requester_email?: string | null
+  sent_back_to?: string | null
+  /** When the requisition last moved — its time at the current stage starts here. */
+  stage_since?: string | null
+  /** The most recent purchase order. */
   po_id?: string | null
   po_number?: string | null
   po_status?: string | null
+  /** Every purchase order on it; a multi-supplier requisition has one per vendor. */
+  po_count?: number | null
+  po_numbers?: string | null
+}
+type AdminRequest = AdminRequestRow
+
+/** Who raised it: their account name, then the name typed on the form. */
+const engineerOf = (r: AdminRequest): string =>
+  r.requester_name?.trim() || r.guest_name?.trim() || r.requester_email || r.guest_email || 'Unknown'
+
+/** Where a requisition sits, as a filterable key — a chain stage, or how it ended. */
+function stageKeyOf(r: AdminRequest): string {
+  const stage = currentStage(r.status, r.sent_back_to)
+  if (stage) return r.status === 'sent_back' ? `sent_back:${stage}` : stage
+  return r.status
 }
 
-type Section = 'overview' | 'users' | 'projects' | 'suppliers' | 'requests' | 'pos' | 'audit' | 'emails' | 'settings'
+const CLOSED_LABELS: Record<string, string> = {
+  completed: 'Completed',
+  rejected: 'Rejected',
+  cancelled: 'Cancelled',
+}
 
-const SECTIONS: Section[] = ['overview', 'users', 'projects', 'suppliers', 'requests', 'pos', 'audit', 'emails', 'settings']
+function stageLabelOf(key: string): string {
+  if (key.startsWith('sent_back:')) {
+    const stage = key.slice('sent_back:'.length)
+    return stage === 'requester' ? 'Requester (sent back)' : `${STAGE_LABEL(stage)} (sent back)`
+  }
+  if (key === 'requester') return 'Requester (draft)'
+  return CLOSED_LABELS[key] ?? (STAGE_LABEL(key) || REQUEST_STATUS_CONFIG[key]?.label || key)
+}
+
+/** Chain order, so the Stage filter and summaries read the way work flows. */
+const STAGE_KEY_ORDER = [
+  'requester',
+  'sent_back:requester',
+  'lead',
+  'sent_back:lead',
+  'supply_chain',
+  'sent_back:supply_chain',
+  'cost_control',
+  'sent_back:cost_control',
+  'admin',
+  'sent_back:admin',
+  'completed',
+  'rejected',
+  'cancelled',
+]
+const stageRank = (key: string) => {
+  const i = STAGE_KEY_ORDER.indexOf(key)
+  return i === -1 ? STAGE_KEY_ORDER.length : i
+}
+
+/** Whole days at the current stage; null once the requisition is closed. */
+function daysAtStage(r: AdminRequest): number | null {
+  if (!currentStage(r.status, r.sent_back_to)) return null
+  const since = new Date(r.stage_since ?? r.created_at).getTime()
+  if (Number.isNaN(since)) return null
+  return Math.max(0, Math.floor((Date.now() - since) / 86_400_000))
+}
+
+/** "3 with Project Lead · 1 completed" — the shape of a set of requisitions. */
+function stageSummary(rows: AdminRequest[]): string {
+  const counts = new Map<string, number>()
+  for (const r of rows) {
+    const key = stageKeyOf(r)
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return [...counts.entries()]
+    .sort((a, b) => stageRank(a[0]) - stageRank(b[0]))
+    .map(([key, n]) => {
+      const label = stageLabelOf(key)
+      return CLOSED_LABELS[key] ? `${n} ${label.toLowerCase()}` : `${n} with ${label}`
+    })
+    .join(' · ')
+}
+
+const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+type Section = 'overview' | 'users' | 'projects' | 'suppliers' | 'requests' | 'pos' | 'invoices' | 'audit' | 'emails' | 'settings'
+
+const SECTIONS: Section[] = ['overview', 'users', 'projects', 'suppliers', 'requests', 'pos', 'invoices', 'audit', 'emails', 'settings']
 
 /**
  * Each tab declares the capability it needs, so a section the viewer cannot
@@ -91,6 +182,7 @@ const nav: { id: Section; label: string; icon: React.ReactNode; capability?: Cap
   { id: 'suppliers', label: 'Suppliers', icon: <Truck size={18} />, capability: 'admin:suppliers' },
   { id: 'requests', label: 'Requests', icon: <ClipboardCheck size={18} /> },
   { id: 'pos', label: 'Purchase Orders', icon: <ShoppingBag size={18} /> },
+  { id: 'invoices', label: 'Invoices', icon: <Receipt size={18} /> },
   { id: 'audit', label: 'Audit Trail', icon: <History size={18} />, capability: 'admin:audit' },
   { id: 'emails', label: 'Email Templates', icon: <Mail size={18} />, capability: 'admin:email' },
   { id: 'settings', label: 'Workspace Preferences', icon: <SlidersHorizontal size={18} />, capability: 'admin:preferences' },
@@ -184,6 +276,7 @@ export default function AdminClient({
   suppliers,
   requests,
   pos,
+  invoices,
   auditTrail,
   requestWindowBlockedDays,
   notificationRoles,
@@ -194,7 +287,8 @@ export default function AdminClient({
   projects: ProjectWithMemberCount[]
   suppliers: SupplierRow[]
   requests: AdminRequest[]
-  pos: PurchaseOrder[]
+  pos: AdminPurchaseOrder[]
+  invoices: AdminInvoice[]
   auditTrail: AuditEntry[]
   requestWindowBlockedDays: number[]
   notificationRoles: Record<RoleId, RoleEmailPolicy> | null
@@ -323,27 +417,39 @@ export default function AdminClient({
 
   /* ── CSV shapes: flat, spreadsheet-friendly, labels matching the screen ── */
 
-  const requestCsv: CsvColumn<AdminRequest>[] = [
+  const requestExport: ExportColumn<AdminRequest>[] = [
     { header: 'Purpose', value: (r) => r.purpose },
-    { header: 'Requester', value: (r) => r.guest_name ?? '' },
+    { header: 'Engineer', value: engineerOf },
     { header: 'Project site', value: (r) => r.project_name ?? '' },
     { header: 'Department', value: (r) => r.department ?? '' },
-    { header: 'Amount (GHS)', value: (r) => csvNumber(r.total_amount) },
+    { header: 'Current stage', value: (r) => stageLabelOf(stageKeyOf(r)) },
+    { header: 'Days at stage', value: (r) => daysAtStage(r) ?? '', align: 'right' },
     { header: 'Status', value: (r) => REQUEST_STATUS_CONFIG[r.status]?.label ?? r.status },
-    { header: 'PO number', value: (r) => r.po_number ?? '' },
-    { header: 'PO status', value: (r) => (r.po_status ? PO_STATUS_CONFIG[r.po_status]?.label ?? r.po_status : '') },
-    { header: 'Created', value: (r) => csvDate(r.created_at) },
+    { header: 'PO numbers', value: (r) => r.po_numbers ?? r.po_number ?? '' },
+    { header: 'Raised', value: (r) => csvDate(r.created_at) },
+    { header: 'Last movement', value: (r) => csvDate(r.stage_since ?? null) },
+    { header: 'Amount (GHS)', value: (r) => csvNumber(r.total_amount), total: true },
   ]
 
-  const poCsv: CsvColumn<PurchaseOrder>[] = [
-    { header: 'PO number', value: (p) => p.po_number ?? '' },
-    { header: 'Purpose', value: (p) => p.purpose },
-    { header: 'Vendor', value: (p) => p.vendor_name ?? '' },
-    { header: 'Amount (GHS)', value: (p) => csvNumber(p.total_amount) },
-    { header: 'Status', value: (p) => PO_STATUS_CONFIG[p.status]?.label ?? p.status },
-    { header: 'Created', value: (p) => csvDate(p.created_at) },
-    { header: 'Paid on', value: (p) => csvDate(p.paid_at ?? null) },
-  ]
+  /** Title, filters and filename that describe exactly what was exported. */
+  const requestExportMeta = (visible: AdminRequest[]) => {
+    const engineers = [...new Set(visible.map(engineerOf))]
+    const sites = [...new Set(visible.map((r) => r.project_name).filter(Boolean))] as string[]
+    const oneEngineer = engineers.length === 1 ? engineers[0] : null
+    const filters: string[] = []
+    if (oneEngineer) filters.push(`Engineer: ${oneEngineer}`)
+    if (sites.length === 1) filters.push(`Project site: ${sites[0]}`)
+    if (visible.length < requests.length) filters.push(`${visible.length} of ${requests.length} requisitions`)
+    return {
+      section: oneEngineer ? `requisitions-${slug(oneEngineer)}` : 'requisitions',
+      meta: {
+        title: oneEngineer ? `Requisitions — ${oneEngineer}` : 'Requisitions by stage',
+        subtitle: `Where each requisition sits in the approval chain. ${stageSummary(visible)}`,
+        exportedBy: user?.name || user?.email || null,
+        filters,
+      },
+    }
+  }
 
   const auditCsv: CsvColumn<AuditEntry>[] = [
     { header: 'Action', value: (e) => AUDIT_ACTION_LABELS[e.action] ?? e.action },
@@ -363,11 +469,11 @@ export default function AdminClient({
     },
     {
       id: 'requester',
-      label: 'Requester',
+      label: 'Engineer',
       hideBelow: 'md',
       sortable: true,
-      sortValue: (r) => r.guest_name ?? '',
-      cell: (r) => <span className="text-sm text-muted-foreground">{r.guest_name ?? '—'}</span>,
+      sortValue: engineerOf,
+      cell: (r) => <span className="text-sm text-muted-foreground">{engineerOf(r)}</span>,
     },
     {
       id: 'project',
@@ -406,6 +512,11 @@ export default function AdminClient({
               <span className="inline-flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
                 <ShoppingBag size={12} className="shrink-0 text-violet-600 dark:text-violet-400" />
                 <span>{poNumber || (poId ? `PO #${poId.slice(0, 8)}` : 'PO')}</span>
+                {(r.po_count ?? 0) > 1 && (
+                  <span className="font-normal text-violet-600/80 dark:text-violet-300/80" title={r.po_numbers ?? undefined}>
+                    +{(r.po_count ?? 1) - 1} more
+                  </span>
+                )}
               </span>
               {poStatus && (
                 <span className="text-[10px] text-muted-foreground font-medium">
@@ -424,8 +535,30 @@ export default function AdminClient({
       },
     },
     {
+      id: 'stage',
+      label: 'Current stage',
+      sortable: true,
+      sortValue: (r) => stageRank(stageKeyOf(r)),
+      cell: (r) => {
+        const days = daysAtStage(r)
+        return (
+          <div className="flex flex-col items-start gap-0.5">
+            <span className="text-sm font-medium text-foreground">{stageLabelOf(stageKeyOf(r))}</span>
+            {days !== null && (
+              <span
+                className={`text-[11px] tabular-nums ${days > 7 ? 'font-semibold text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}
+              >
+                {days === 0 ? 'Since today' : `${days} day${days === 1 ? '' : 's'} here`}
+              </span>
+            )}
+          </div>
+        )
+      },
+    },
+    {
       id: 'status',
       label: 'Status',
+      hideBelow: 'lg',
       sortable: true,
       sortValue: (r) => r.status,
       cell: (r) => <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />,
@@ -441,6 +574,22 @@ export default function AdminClient({
   ]
 
   const requestFacets: DataFacet<AdminRequest>[] = [
+    {
+      id: 'engineer',
+      label: 'Engineer',
+      options: [...new Set(requests.map(engineerOf))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+      matches: (r, value) => engineerOf(r) === value,
+    },
+    {
+      id: 'stage',
+      label: 'Stage',
+      options: [...new Set(requests.map(stageKeyOf))]
+        .sort((a, b) => stageRank(a) - stageRank(b))
+        .map((key) => ({ value: key, label: stageLabelOf(key) })),
+      matches: (r, value) => stageKeyOf(r) === value,
+    },
     {
       id: 'po_state',
       label: 'PO Attached',
@@ -458,59 +607,6 @@ export default function AdminClient({
         label: REQUEST_STATUS_CONFIG[v]?.label ?? v,
       })),
       matches: (r, value) => r.status === value,
-    },
-  ]
-
-  const poCols: DataColumn<PurchaseOrder>[] = [
-    {
-      id: 'purpose',
-      label: 'Purpose',
-      sortable: true,
-      sortValue: (p) => p.purpose,
-      cell: (p) => <span className="font-medium text-foreground">{p.purpose}</span>,
-    },
-    {
-      id: 'amount',
-      label: 'Amount',
-      align: 'right',
-      sortable: true,
-      sortValue: (p) => p.total_amount,
-      cell: (p) => <span className="font-semibold tabular-nums text-foreground">{ghs(p.total_amount)}</span>,
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      sortable: true,
-      sortValue: (p) => p.status,
-      cell: (p) => <StatusBadge status={p.status} config={PO_STATUS_CONFIG} />,
-    },
-    {
-      id: 'created_at',
-      label: 'Created',
-      hideBelow: 'sm',
-      sortable: true,
-      sortValue: (p) => p.created_at,
-      cell: (p) => <span className="text-xs text-muted-foreground">{shortDate(p.created_at)}</span>,
-    },
-    {
-      id: 'paid_at',
-      label: 'Paid On',
-      hideBelow: 'md',
-      sortable: true,
-      sortValue: (p) => p.paid_at ?? null,
-      cell: (p) => <span className="text-xs text-muted-foreground">{shortDate(p.paid_at)}</span>,
-    },
-  ]
-
-  const poFacets: DataFacet<PurchaseOrder>[] = [
-    {
-      id: 'status',
-      label: 'Status',
-      options: Array.from(new Set(pos.map((p) => p.status))).sort().map((v) => ({
-        value: v,
-        label: PO_STATUS_CONFIG[v]?.label ?? v,
-      })),
-      matches: (p, value) => p.status === value,
     },
   ]
 
@@ -576,7 +672,8 @@ export default function AdminClient({
     projects: { title: 'Project Sites', sub: 'The sites requisitions are raised against' },
     suppliers: { title: 'Suppliers', sub: 'Vendors engineers can pick on a requisition' },
     requests: { title: 'Requisitions Raised', sub: 'Every request raised across the organization' },
-    pos: { title: 'Purchase Orders', sub: 'Purchase orders from creation through payment' },
+    pos: { title: 'Purchase Orders', sub: 'Committed spend by project, supplier and engineer — filter, then export exactly what you see' },
+    invoices: { title: 'Invoices', sub: 'Every supplier invoice recorded on a requisition — filter, export, or download the documents' },
     audit: { title: 'Audit Trail', sub: 'Track all actions across the procurement pipeline' },
     emails: { title: 'Email Notification Studio', sub: 'Preview and test transactional email templates tailored to active workflows' },
     settings: { title: 'Workspace Preferences', sub: 'Preferences, role distribution and system information' },
@@ -827,12 +924,15 @@ export default function AdminClient({
             facets={requestFacets}
             onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
             searchPlaceholder="Search requisitions…"
-            searchText={(r) => [r.id, r.purpose, r.guest_name, r.guest_email, r.department, r.project_name]}
+            searchText={(r) => [r.id, r.purpose, engineerOf(r), r.guest_email, r.department, r.project_name, r.po_numbers]}
             initialTerm={focusId}
             defaultSort={{ id: 'created_at', dir: 'desc' }}
             storageKey="admin-requests"
             toolbarExtra={(visible) => (
-              <ExportButton rows={visible} columns={requestCsv} section="requisitions" />
+              (() => {
+                const { section: exportSection, meta } = requestExportMeta(visible)
+                return <ExportMenu rows={visible} columns={requestExport} meta={meta} section={exportSection} />
+              })()
             )}
             emptyTitle="No requests raised yet"
             renderCard={(r) => (
@@ -854,36 +954,16 @@ export default function AdminClient({
         )}
 
         {section === 'pos' && (
-          <DataView
-            rows={pos}
-            getRowId={(p) => p.id}
-            columns={poCols}
-            facets={poFacets}
-            searchPlaceholder="Search purchase orders…"
-            searchText={(p) => [p.id, p.purpose, p.po_number, p.vendor_name, p.description]}
-            initialTerm={focusId}
-            defaultSort={{ id: 'created_at', dir: 'desc' }}
-            storageKey="admin-pos"
-            toolbarExtra={(visible) => (
-              <ExportButton rows={visible} columns={poCsv} section="purchase-orders" />
-            )}
-            emptyTitle="No purchase orders yet"
-            renderCard={(p) => (
-              <article className="surface flex h-full flex-col rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-2 text-sm font-semibold text-foreground">{p.purpose}</p>
-                  <StatusBadge status={p.status} config={PO_STATUS_CONFIG} />
-                </div>
-                <div className="mt-auto pt-4">
-                  <p className="text-lg font-semibold tabular-nums text-foreground">{ghs(p.total_amount)}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span>Created {shortDate(p.created_at)}</span>
-                    {p.paid_at && <span className="shrink-0">Paid {shortDate(p.paid_at)}</span>}
-                  </div>
-                </div>
-              </article>
-            )}
+          <PurchaseOrdersReport
+            pos={pos}
+            invoices={invoices}
+            exportedBy={user?.name || user?.email || null}
+            focusId={focusId}
           />
+        )}
+
+        {section === 'invoices' && (
+          <InvoicesReport invoices={invoices} exportedBy={user?.name || user?.email || null} />
         )}
 
         {section === 'audit' && (

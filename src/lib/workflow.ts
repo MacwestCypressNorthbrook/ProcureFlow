@@ -169,6 +169,21 @@ export function previousStage(stage: Stage): Stage | null {
   return null
 }
 
+/**
+ * Where a stage may send a requisition back to, nearest first.
+ *
+ * Normally only the stage immediately before. Supply Chain is the exception:
+ * what it finds wrong — a missing specification, a quantity nobody can source —
+ * is usually the requester's to fix, and routing that through the Project Lead
+ * only made the Lead forward it unchanged. It may return it straight to the
+ * requester, whose resubmission then comes straight back to Supply Chain.
+ */
+export function sendBackTargets(stage: Stage): Stage[] {
+  if (stage === 'supply_chain') return ['lead', 'requester']
+  const prev = previousStage(stage)
+  return prev ? [prev] : []
+}
+
 /** The stage that closes a requisition — the only one whose approval completes it. */
 export const TERMINAL_STAGE: Stage = 'admin'
 

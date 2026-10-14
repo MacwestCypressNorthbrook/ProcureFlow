@@ -23,7 +23,7 @@ import {
   X,
   Zap,
 } from 'lucide-react'
-import { STAGES, type Stage, nextStage, previousStage } from '@/lib/workflow'
+import { STAGES, type Stage, nextStage, previousStage, sendBackTargets } from '@/lib/workflow'
 import type { PurchaseOrder } from '@/lib/types'
 import DocumentPreviewModal from '@/components/shared/DocumentPreviewModal'
 import { documentUrl } from '@/lib/files'
@@ -39,6 +39,8 @@ export interface ReviewDocument {
   file_url: string
   file_size?: number | null
   source: 'request' | 'po'
+  /** The purchase order a `po` document belongs to — a requisition may have several. */
+  po_id?: string | null
   status?: 'pending' | 'accepted' | 'declined' | null
   reviewed_by?: string | null
   reviewed_at?: string | null
@@ -63,6 +65,8 @@ export interface RequestSummaryInfo {
   currency?: string
   suggestedSupplier?: string
   itemCount?: number
+  /** Each supplier's share of the requisition — one Odoo PO is raised per supplier. */
+  supplierSplits?: { name: string; amount: number }[]
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -208,17 +212,19 @@ export default function ApprovalPanel({
     }
   }
 
-  const act = async (action: 'approve' | 'send_back' | 'resubmit') => {
+  const act = async (action: 'approve' | 'send_back' | 'resubmit', target?: Stage) => {
     if (actLock.current) return
     actLock.current = true
-    setLastAction(action)
-    setBusy(action)
+    // Each send-back target has its own button, so each needs its own spinner.
+    const label = target ? `${action}:${target}` : action
+    setLastAction(label)
+    setBusy(label)
     setError(null)
     try {
       const res = await fetch(`/api/requests/${requestId}/transition`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, comment }),
+        body: JSON.stringify({ action, comment, ...(target ? { target } : {}) }),
       })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -581,6 +587,28 @@ export default function ApprovalPanel({
             (() => {
               const next = stage ? nextStage(stage) : null
               const prev = stage ? previousStage(stage) : null
+              // Supply Chain may also skip the Project Lead and return a
+              // requisition straight to whoever raised it.
+              const canReturnToRequester =
+                !isRequester && stage !== null && prev !== 'requester' && sendBackTargets(stage).includes('requester')
+              const returnToRequesterButton = canReturnToRequester ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!comment.trim()) {
+                      setError('Say what the requester needs to change — it goes to them directly.')
+                      return
+                    }
+                    act('send_back', 'requester')
+                  }}
+                  disabled={locked}
+                  title="Return it to the engineer who raised it. Their resubmission comes straight back to you."
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/40 bg-orange-500/[0.06] px-5 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-500/10 disabled:opacity-60 cursor-pointer dark:text-orange-300 @lg:w-auto"
+                >
+                  {shown === 'send_back:requester' ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
+                  Send back to Requester
+                </button>
+              ) : null
 
               let approveLabel = 'Approve'
               let sendBackLabel = 'Send back'
@@ -603,7 +631,7 @@ export default function ApprovalPanel({
                   approveLabel = 'Approve to Cost Control'
                   sendBackLabel = 'Send back to Project Lead'
                   blurb = 'Set pricing, attach vendor invoices/quotes, and forward to Cost Control for rate verification.'
-                  commentPlaceholder = 'Add notes for Cost Control (optional)...'
+                  commentPlaceholder = 'Notes for Cost Control — or, if sending back to the Requester, what they need to change.'
                 }
               } else {
                 if (next && STAGES[next]) approveLabel = `Approve to ${STAGES[next].label}`
@@ -689,6 +717,7 @@ export default function ApprovalPanel({
                                   {sendBackLabel}
                                 </button>
                               )}
+                              {returnToRequesterButton}
                             </>
                           ) : (
                             <>
@@ -711,6 +740,7 @@ export default function ApprovalPanel({
                                 {shown === 'send_back' ? <Loader2 size={16} className="animate-spin" /> : <RotateCcw size={16} />}
                                 {sendBackLabel}
                               </button>
+                              {returnToRequesterButton}
 
                               {/* Emergency approval. Separated by a rule and a
                                   caption because it is a different kind of
@@ -825,6 +855,7 @@ export default function ApprovalPanel({
           currency: requestSummary?.currency,
           suggestedSupplier: requestSummary?.suggestedSupplier,
           itemCount: requestSummary?.itemCount,
+          supplierSplits: requestSummary?.supplierSplits,
         }}
         existingPo={po}
         onSuccess={() => {

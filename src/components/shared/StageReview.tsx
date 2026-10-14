@@ -5,14 +5,16 @@ import RecordPaymentPanel from '@/components/shared/RecordPaymentPanel'
 import { getPaymentPosition, listPayments } from '@/lib/payments'
 import StageProgress from '@/components/shared/StageProgress'
 import StatusBadge from '@/components/shared/StatusBadge'
-import PoDocumentActions from '@/components/shared/PoDocumentActions'
+import PurchaseOrdersPanel from '@/components/shared/PurchaseOrdersPanel'
+import SupplierBreakdownPanel, { vendorKey } from '@/components/shared/SupplierBreakdownPanel'
+import AddPurchaseOrderButton from '@/components/admin/AddPurchaseOrderButton'
 import MaterialsPricingPanel from '@/components/shared/MaterialsPricingPanel'
 import { PageContainer, PageHeader, Panel, Field } from '@/components/shared/ui-kit'
 import { getReviewBundle } from '@/lib/review'
 import { extractRequisition } from '@/lib/requisitions'
 import { query } from '@/lib/db'
 import type { SupplierOption } from '@/components/shared/SupplierPicker'
-import { REQUEST_STATUS_CONFIG, PO_STATUS_CONFIG, formatCurrency, formatDate, cn } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate, cn } from '@/lib/utils'
 import { currentStage, STAGES, canActAt } from '@/lib/workflow'
 import { isElevated, can } from '@/lib/roles'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
@@ -51,7 +53,7 @@ export default async function StageReview({
   const bundle = await getReviewBundle(requestId)
   if (!bundle) notFound()
 
-  const { request, items, po, documents, history } = bundle
+  const { request, items, po, pos, documents, history } = bundle
   const stage = currentStage(request.status, request.sent_back_to)
   const isRequester = request.created_by === user.id
   const holdsStage =
@@ -114,7 +116,46 @@ export default async function StageReview({
     items.find((i) => i.supplier_name)?.supplier_name ??
     ((request as unknown as Record<string, unknown>).vendor_name as string | undefined) ??
     ''
-  const poDoc = documents.find((d) => d.source === 'po')
+  const poDocs = documents.filter((d) => d.source === 'po')
+  const supplierSplits = invoiceSuppliers.map((s) => ({ name: s.name, amount: s.requisitioned }))
+  const requestSummary = {
+    purpose: request.purpose,
+    department: request.department ?? undefined,
+    projectName: request.project_name ?? undefined,
+    totalAmount: Number(total || request.total_amount || 0),
+    currency: request.currency ?? 'GHS',
+    suggestedSupplier,
+    itemCount: items.length,
+    supplierSplits,
+  }
+  // A completed requisition can still take further purchase orders — a
+  // supplier split out late — from whoever raises them.
+  const canAppendPo = request.status === 'completed' && can(user.role, 'request:convert')
+  // Attached orders stay correctable — edit, re-upload, delete — while the
+  // requisition is with the Administrator or after they closed it.
+  const canManagePo =
+    (request.status === 'pending_admin' || request.status === 'completed') && can(user.role, 'request:convert')
+  // Adding to a closed requisition starts from the suppliers no PO covers yet.
+  const uncoveredSplits = supplierSplits.filter(
+    (s) => !pos.some((po) => vendorKey(po.vendor_name) === vendorKey(s.name))
+  )
+  const purchaseOrders = (
+    <PurchaseOrdersPanel
+      pos={pos}
+      documents={poDocs}
+      manageRequestId={canManagePo ? request.id : undefined}
+      requestCompleted={request.status === 'completed'}
+      action={
+        canAppendPo ? (
+          <AddPurchaseOrderButton
+            requestId={request.id}
+            requestSummary={{ ...requestSummary, supplierSplits: uncoveredSplits }}
+          />
+        ) : undefined
+      }
+    />
+  )
+  const supplierNames = supplierSplits.map((s) => s.name)
   const isSentBackToSupplyChain = request.status === 'sent_back' && request.sent_back_to === 'supply_chain'
   const lastReturnEntry = history.find((h) => h.action === 'sent_back')
   const acceptedInvoices = documents.filter((d) => d.status === 'accepted')
@@ -214,6 +255,12 @@ export default async function StageReview({
             <StageProgress status={request.status} sentBackTo={request.sent_back_to} />
           </nav>
         )}
+
+        <SupplierBreakdownPanel
+          items={items}
+          pos={pos}
+          showPoCoverage={request.status === 'pending_admin' || request.status === 'completed'}
+        />
 
         {stage === 'supply_chain' && holdsStage && (
           <div className="space-y-4">
@@ -355,9 +402,18 @@ export default async function StageReview({
                   This requisition has cleared the Project Lead, Supply Chain and Cost Control — you are the last stage. Review the materials and the audited rates below, generate the Purchase Order in <strong>Odoo</strong>, then attach the PDF and its reference in the panel on the right. That authorizes the requisition, closes it, and notifies everyone who worked on it.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  {suggestedSupplier && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs">
-                      <span className="text-muted-foreground">Supplier:</span> <strong className="font-semibold">{suggestedSupplier}</strong>
+                  {supplierNames.length > 0 && (
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs"
+                      title={supplierNames.join(', ')}
+                    >
+                      <span className="text-muted-foreground">
+                        {supplierNames.length > 1 ? `${supplierNames.length} suppliers:` : 'Supplier:'}
+                      </span>{' '}
+                      <strong className="font-semibold">
+                        {supplierNames.slice(0, 3).join(', ')}
+                        {supplierNames.length > 3 ? ` +${supplierNames.length - 3}` : ''}
+                      </strong>
                     </span>
                   )}
                   <span className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1 text-foreground shadow-xs">
@@ -440,15 +496,7 @@ export default async function StageReview({
                   po={po}
                   showDocuments={false}
                   showHistory={false}
-                  requestSummary={{
-                    purpose: request.purpose,
-                    department: request.department ?? undefined,
-                    projectName: request.project_name ?? undefined,
-                    totalAmount: Number(total || request.total_amount || 0),
-                    currency: request.currency ?? 'GHS',
-                    suggestedSupplier,
-                    itemCount: items.length,
-                  }}
+                  requestSummary={requestSummary}
                   isUrgent={isUrgent}
                   canEscalate={canEscalate}
                 />
@@ -516,33 +564,7 @@ export default async function StageReview({
               showDocuments={false}
             />
 
-            {po && (
-              <Panel title="Purchase order" icon={<ShoppingBag size={15} />}>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Field label="PO number">
-                    <p className="text-sm font-medium text-foreground">{po.po_number ?? '—'}</p>
-                  </Field>
-                  <Field label="Vendor">
-                    <p className="text-sm text-foreground">{po.vendor_name ?? '—'}</p>
-                  </Field>
-                  <Field label="Amount">
-                    <p className="text-sm font-semibold tabular-nums text-foreground">
-                      {formatCurrency(Number(po.total_amount) || 0)}
-                    </p>
-                  </Field>
-                </div>
-                <div className="mt-4 flex flex-col gap-3">
-                  <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
-                  {poDoc && (
-                    <PoDocumentActions
-                      documentId={poDoc.id}
-                      fileName={poDoc.file_name}
-                      fileUrl={poDoc.file_url}
-                    />
-                  )}
-                </div>
-              </Panel>
-            )}
+            {purchaseOrders}
           </div>
         ) : (
           /*
@@ -650,33 +672,7 @@ export default async function StageReview({
                 </Panel>
               )} */}
 
-              {po && (
-                <Panel title="Purchase order" icon={<ShoppingBag size={15} />}>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <Field label="PO number">
-                      <p className="text-sm font-medium text-foreground">{po.po_number ?? '—'}</p>
-                    </Field>
-                    <Field label="Vendor">
-                      <p className="text-sm text-foreground">{po.vendor_name ?? '—'}</p>
-                    </Field>
-                    <Field label="Amount">
-                      <p className="text-sm font-semibold tabular-nums text-foreground">
-                        {formatCurrency(Number(po.total_amount) || 0)}
-                      </p>
-                    </Field>
-                  </div>
-                  <div className="mt-4 flex flex-col gap-3">
-                    <StatusBadge status={po.status} config={PO_STATUS_CONFIG} />
-                    {poDoc && (
-                      <PoDocumentActions
-                        documentId={poDoc.id}
-                        fileName={poDoc.file_name}
-                        fileUrl={poDoc.file_url}
-                      />
-                    )}
-                  </div>
-                </Panel>
-              )}
+              {purchaseOrders}
 
               {descriptionText && items.length > 0 && (
                 <Panel title="Description" icon={<StickyNote size={15} />}>
@@ -718,15 +714,7 @@ export default async function StageReview({
                 history={history}
                 po={po}
                 showDocuments={true}
-                requestSummary={{
-                  purpose: request.purpose,
-                  department: request.department ?? undefined,
-                  projectName: request.project_name ?? undefined,
-                  totalAmount: Number(total || request.total_amount || 0),
-                  currency: request.currency ?? 'GHS',
-                  suggestedSupplier,
-                  itemCount: items.length,
-                }}
+                requestSummary={requestSummary}
                 isUrgent={isUrgent}
                 canEscalate={canEscalate}
               />

@@ -13,6 +13,7 @@ import SupplierPicker, { type SupplierOption } from '@/components/shared/Supplie
 import { uploadDocument } from '@/lib/upload-client'
 import { openDocument } from '@/lib/files'
 import type { Project, RequestAttachment } from '@/lib/types'
+import { STAGE_LABEL } from '@/lib/workflow'
 import {
   RotateCcw,
   Send,
@@ -368,6 +369,9 @@ export default function EditRequestForm({
   }
 
   const isSentBack = status === 'sent_back'
+  // A resubmission resumes at whichever stage returned it — Supply Chain can
+  // now send straight back to the requester, so it is not always the Lead.
+  const returnedBy = sendBackInfo?.stage ? STAGE_LABEL(sendBackInfo.stage) : 'Project Lead'
 
   return (
     <div className="space-y-6">
@@ -385,7 +389,7 @@ export default function EditRequestForm({
                 </span>
                 {sendBackInfo.performer_name && (
                   <span className="text-xs font-medium text-muted-foreground">
-                    by <span className="font-semibold text-foreground">{sendBackInfo.performer_name}</span> (Project Lead)
+                    by <span className="font-semibold text-foreground">{sendBackInfo.performer_name}</span> ({returnedBy})
                   </span>
                 )}
               </div>
@@ -399,7 +403,7 @@ export default function EditRequestForm({
               )}
               <p className="text-xs text-muted-foreground pt-1">
                 Make your edits below. Once finished, click{' '}
-                <strong className="text-foreground">Save & Resubmit to Project Lead</strong> to resume approval.
+                <strong className="text-foreground">Save & Resubmit to {returnedBy}</strong> to resume approval.
               </p>
             </div>
           </div>
@@ -780,7 +784,7 @@ export default function EditRequestForm({
 
       {/* Resubmission Comment (when sent back) */}
       {isSentBack && (
-        <Panel title="Resubmission Note for Project Lead" icon={<RotateCcw size={16} className="text-orange-500" />}>
+        <Panel title={`Resubmission Note for ${returnedBy}`} icon={<RotateCcw size={16} className="text-orange-500" />}>
           <Field label="Explanation of Changes">
             <Textarea
               value={resubmitComment}
@@ -790,7 +794,7 @@ export default function EditRequestForm({
               placeholder="e.g. Adjusted cement quantities to 50 bags and added specification notes as requested."
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              This note will be attached to the approval history and emailed to the Project Lead upon resubmission.
+              This note will be attached to the approval history and emailed to the {returnedBy} upon resubmission.
             </p>
           </Field>
         </Panel>
@@ -837,7 +841,7 @@ export default function EditRequestForm({
               ) : (
                 <Send size={15} />
               )}
-              Save & Resubmit to Project Lead
+              Save & Resubmit to {returnedBy}
             </Button>
           )}
         </div>

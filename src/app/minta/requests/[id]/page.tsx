@@ -16,6 +16,7 @@ import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
 import RemindButton from '@/components/shared/RemindButton'
 import { currentStage } from '@/lib/workflow'
 import PoDocumentActions from '@/components/shared/PoDocumentActions'
+import PurchaseOrdersPanel, { type PurchaseOrderDocument } from '@/components/shared/PurchaseOrdersPanel'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
 import { documentHref } from '@/lib/resolve-file-url'
 import type { PurchaseOrder } from '@/lib/types'
@@ -31,6 +32,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
   let attachments: Record<string, unknown>[] = []
   let items: Awaited<ReturnType<typeof getRequestItems>> = []
   let po: PurchaseOrder | null = null
+  let pos: PurchaseOrder[] = []
+  const poDocs: PurchaseOrderDocument[] = []
   let poDoc: { id: string; file_name: string; file_url: string } | null = null
   let approvalHistory: ApprovalEntry[] = []
 
@@ -47,14 +50,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       // Independent lookups, fired together — one network round trip instead
       // of four serial ones (this used to also re-fetch the request row,
       // items and attachments a second time via getReviewBundle).
-      const [attData, itemRows, poRow, historyRows] = await Promise.all([
+      const [attData, itemRows, poRows, historyRows] = await Promise.all([
         query<Record<string, unknown>>(
           `SELECT * FROM public.request_attachments WHERE request_id = $1 ORDER BY created_at ASC`,
           [id]
         ),
         getRequestItems(id),
-        queryOne<PurchaseOrder>(
-          `SELECT * FROM public.purchase_orders WHERE request_id = $1 ORDER BY created_at DESC LIMIT 1`,
+        query<PurchaseOrder>(
+          `SELECT * FROM public.purchase_orders WHERE request_id = $1 ORDER BY created_at ASC`,
           [id]
         ),
         query<ApprovalEntry>(
@@ -68,34 +71,35 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       ])
       attachments = await resolveAttachments(attData)
       items = itemRows
-      po = poRow
+      pos = poRows
+      po = poRows.length > 0 ? poRows[poRows.length - 1] : null
       approvalHistory = historyRows
 
       // The purchase order document itself. A requester could previously see
       // the PO's number and value but not open the document, which is the one
       // thing they are actually asked for when chasing a delivery.
-      if (po) {
-        const poDocRow = await queryOne<{ id: string; file_name: string; file_url: string }>(
-          `SELECT id, file_name, file_url
+      if (pos.length > 0) {
+        const docRows = await query<{ id: string; po_id: string; file_name: string; file_url: string }>(
+          `SELECT DISTINCT ON (po_id) id, po_id, file_name, file_url
              FROM public.po_attachments
-            WHERE po_id = $1
-            ORDER BY created_at DESC
-            LIMIT 1`,
-          [po.id]
+            WHERE po_id = ANY($1::uuid[])
+            ORDER BY po_id, created_at DESC`,
+          [pos.map((p) => p.id)]
         )
-        if (poDocRow) {
-          poDoc = {
-            id: poDocRow.id,
-            file_name: poDocRow.file_name,
-            file_url: documentHref(poDocRow.id, poDocRow.file_url),
-          }
-        } else if (po.file_path) {
-          poDoc = {
-            id: `po-file-${po.id}`,
-            file_name: po.file_name ?? 'Purchase order',
-            file_url: documentHref(`po-file-${po.id}`, po.file_path),
+        for (const order of pos) {
+          const row = docRows.find((d) => d.po_id === order.id)
+          if (row) {
+            poDocs.push({ id: row.id, po_id: order.id, file_name: row.file_name, file_url: documentHref(row.id, row.file_url) })
+          } else if (order.file_path) {
+            poDocs.push({
+              id: `po-file-${order.id}`,
+              po_id: order.id,
+              file_name: order.file_name ?? 'Purchase order',
+              file_url: documentHref(`po-file-${order.id}`, order.file_path),
+            })
           }
         }
+        poDoc = poDocs.find((d) => d.po_id === po?.id) ?? null
       }
     }
   } catch (err) {
@@ -198,7 +202,9 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               />
             </Panel>
 
-            {po && (
+            {pos.length > 1 && <PurchaseOrdersPanel pos={pos} documents={poDocs} />}
+
+            {po && pos.length === 1 && (
               <Panel title="Purchase Order" icon={<Receipt size={16} />}>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-3">

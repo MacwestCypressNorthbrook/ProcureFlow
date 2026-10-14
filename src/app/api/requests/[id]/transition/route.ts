@@ -4,11 +4,13 @@ import { getUserFromSession } from '@/lib/auth/server'
 import { isElevated } from '@/lib/roles'
 import {
   STAGES,
+  STAGE_LABEL,
   canActAt,
   currentStage,
   isTerminalStage,
   nextStage,
   previousStage,
+  sendBackTargets,
   statusForStage,
   type Stage,
 } from '@/lib/workflow'
@@ -108,7 +110,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const { id } = await params
 
-  let body: { action?: Action; comment?: string; reason?: string }
+  let body: { action?: Action; comment?: string; reason?: string; target?: string }
   try {
     body = await request.json()
   } catch {
@@ -502,11 +504,30 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   /* ── Send back: return to the stage before this one ──────── */
   if (action === 'send_back') {
-    const back = previousStage(stage)
-    if (!back) {
+    const targets = sendBackTargets(stage)
+    if (targets.length === 0) {
       return NextResponse.json(
         { error: 'This requisition is already with the requester.' },
         { status: 409 }
+      )
+    }
+
+    // No target means the stage immediately before — what every caller sent
+    // before targets existed. A named target must be one this stage may use.
+    const back = (body.target ?? previousStage(stage)) as Stage
+    if (!targets.includes(back)) {
+      return NextResponse.json(
+        { error: `${STAGES[stage].label} cannot send a requisition back to ${STAGE_LABEL(back)}.` },
+        { status: 400 }
+      )
+    }
+
+    // Skipping a stage on the way back needs a reason the requester can act on;
+    // it arrives with no one in between to explain it.
+    if (back === 'requester' && stage === 'supply_chain' && !comment) {
+      return NextResponse.json(
+        { error: 'Say what the requester needs to change — it goes to them directly.' },
+        { status: 400 }
       )
     }
 

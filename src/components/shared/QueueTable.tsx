@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 import DataView, { type DataColumn } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
-import { Paperclip, ShoppingBag } from 'lucide-react'
+import { Paperclip, ShoppingBag, Truck } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { QueueRow } from '@/lib/review'
 import { writeQueueOrder } from '@/lib/queue-order'
@@ -77,6 +77,31 @@ export default function QueueTable({
         ) : (
           <span className="text-xs text-muted-foreground">Unassigned</span>
         ),
+    },
+    {
+      id: 'suppliers',
+      label: 'Suppliers',
+      hideBelow: 'lg',
+      sortable: true,
+      sortValue: (r) => r.supplier_count ?? 0,
+      cell: (r) => {
+        const count = r.supplier_count ?? 0
+        if (count === 0) return <span className="text-xs text-muted-foreground">—</span>
+        // More than one supplier means more than one purchase order — flagged
+        // so it is never a surprise at the Administrator's stage.
+        return count > 1 ? (
+          <span
+            className="inline-flex items-center gap-1 whitespace-nowrap rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300"
+            title={r.supplier_names ?? undefined}
+          >
+            <Truck size={11} /> {count} suppliers
+          </span>
+        ) : (
+          <span className="block max-w-[150px] truncate text-xs text-muted-foreground" title={r.supplier_names ?? undefined}>
+            {r.supplier_names}
+          </span>
+        )
+      },
     },
     {
       id: 'amount',

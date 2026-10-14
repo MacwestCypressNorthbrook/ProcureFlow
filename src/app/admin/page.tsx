@@ -3,11 +3,10 @@ import { can } from '@/lib/roles'
 import { query } from '@/lib/db'
 import { getRequestWindowSettings } from '@/lib/settings'
 import { getNotificationSettings } from '@/lib/notification-settings'
-import AdminClient, { type AuditEntry } from '@/components/admin/AdminClient'
+import AdminClient, { type AuditEntry, type AdminRequestRow } from '@/components/admin/AdminClient'
+import type { AdminPurchaseOrder, AdminInvoice } from '@/components/admin/report-types'
 import type { SupplierRow } from '@/components/admin/SuppliersPanel'
 import type {
-  Request,
-  PurchaseOrder,
   ProjectWithMemberCount,
   UserWithProjects,
 } from '@/lib/types'
@@ -23,6 +22,42 @@ export default async function AdminPage() {
   const maySeeUsers = can(user.role, 'admin:users')
   const maySeeAudit = can(user.role, 'admin:audit')
   const maySeePreferences = can(user.role, 'admin:preferences')
+
+  // Supplier invoices live in a table that migration 016 adds; until it is
+  // applied the Invoices tab simply shows nothing rather than breaking the page.
+  const invoicesPromise = query<AdminInvoice>(
+    `SELECT si.id, si.request_id, si.supplier_id, si.invoice_number, si.invoice_date, si.amount,
+            si.status, si.notes, si.created_at, si.verified_at,
+            s.name AS supplier_name,
+            r.purpose AS request_purpose,
+            r.status AS request_status,
+            pr.name AS project_name,
+            COALESCE(eu.name, r.guest_name) AS engineer_name,
+            rb.name AS recorded_by_name,
+            vb.name AS verified_by_name,
+            ra.id AS attachment_id,
+            ra.file_name AS attachment_name,
+            ra.file_url AS attachment_url,
+            (SELECT string_agg(po.po_number, ', ' ORDER BY po.created_at)
+               FROM public.purchase_orders po
+              WHERE po.request_id = si.request_id
+                AND regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(COALESCE(s.name, '')), '[^a-z0-9]', '', 'g')) AS po_numbers,
+            (SELECT COALESCE(SUM(ri.line_total), 0) FROM public.request_items ri
+              WHERE ri.request_id = si.request_id AND ri.supplier_id = si.supplier_id) AS supplier_requisitioned
+       FROM public.supplier_invoices si
+       JOIN public.suppliers s ON s.id = si.supplier_id
+       LEFT JOIN public.requests r ON r.id = si.request_id
+       LEFT JOIN public.projects pr ON pr.id = r.project_id
+       LEFT JOIN public.users eu ON eu.id = r.created_by
+       LEFT JOIN public.users rb ON rb.id = si.recorded_by
+       LEFT JOIN public.users vb ON vb.id = si.verified_by
+       LEFT JOIN public.request_attachments ra ON ra.id = si.attachment_id
+      ORDER BY si.invoice_date DESC, si.created_at DESC
+      LIMIT 2000`
+  ).catch((err) => {
+    console.error('Supplier invoices unavailable for the admin report:', err)
+    return [] as AdminInvoice[]
+  })
 
   const [users, projects, suppliers, requests, pos, auditTrail, requestWindow, notificationSettings] = await Promise.all([
     maySeeUsers
@@ -57,16 +92,27 @@ export default async function AdminPage() {
         GROUP BY s.id
         ORDER BY s.is_active DESC, s.name ASC`
     ),
-    query<Request & { po_id?: string | null; po_number?: string | null; po_status?: string | null; po_vendor_name?: string | null; po_amount?: number | null }>(
+    query<AdminRequestRow>(
+      // Everything the Requests tab filters and exports on: who raised it, which
+      // stage holds it and since when, and every purchase order against it.
       `SELECT r.*,
               pr.name AS project_name,
-              po.id as po_id,
-              po.po_number as po_number,
-              po.status as po_status,
-              po.vendor_name as po_vendor_name,
-              po.total_amount as po_amount
+              u.name AS requester_name,
+              u.email AS requester_email,
+              COALESCE(
+                (SELECT MAX(a.created_at) FROM public.request_approvals a WHERE a.request_id = r.id),
+                r.created_at
+              ) AS stage_since,
+              po.id AS po_id,
+              po.po_number,
+              po.status AS po_status,
+              po.vendor_name AS po_vendor_name,
+              po.total_amount AS po_amount,
+              pos.po_count,
+              pos.po_numbers
        FROM public.requests r
        LEFT JOIN public.projects pr ON pr.id = r.project_id
+       LEFT JOIN public.users u ON u.id = r.created_by
        LEFT JOIN LATERAL (
          SELECT id, po_number, status, vendor_name, total_amount
          FROM public.purchase_orders
@@ -74,10 +120,62 @@ export default async function AdminPage() {
          ORDER BY created_at DESC
          LIMIT 1
        ) po ON true
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int AS po_count,
+                string_agg(po_number, ', ' ORDER BY created_at) AS po_numbers
+         FROM public.purchase_orders
+         WHERE request_id = r.id
+       ) pos ON true
        ORDER BY r.created_at DESC
-       LIMIT 200`
+       LIMIT 1000`
     ),
-    query<PurchaseOrder>(`SELECT * FROM public.purchase_orders ORDER BY created_at DESC LIMIT 200`),
+    query<AdminPurchaseOrder>(
+      // Everything a purchase-order report depends on, resolved in one pass. A
+      // PO is matched to "its" supplier lines by vendor name, normalized the way
+      // the UI's vendorKey() does, since POs do not store a supplier id.
+      `SELECT po.*,
+              r.purpose AS request_purpose,
+              r.status AS request_status,
+              r.created_at AS request_created_at,
+              r.total_amount AS request_total,
+              r.department,
+              pr.name AS project_name,
+              pr.code AS project_code,
+              COALESCE(eu.name, r.guest_name) AS engineer_name,
+              cb.name AS raised_by_name,
+              (SELECT COALESCE(SUM(pp.amount), 0) FROM public.po_payments pp WHERE pp.po_id = po.id) AS paid_amount,
+              (SELECT COUNT(*)::int FROM public.po_attachments pa WHERE pa.po_id = po.id) AS document_count,
+              doc.id AS document_id,
+              doc.file_name AS document_name,
+              (SELECT COUNT(*)::int FROM public.purchase_orders o WHERE o.request_id = po.request_id) AS sibling_count,
+              (SELECT string_agg(DISTINCT s.name, ', ')
+                 FROM public.request_items ri JOIN public.suppliers s ON s.id = ri.supplier_id
+                WHERE ri.request_id = po.request_id) AS requisition_suppliers,
+              sl.line_count AS supplier_line_count,
+              sl.items AS supplier_items,
+              sl.value AS supplier_requisitioned
+         FROM public.purchase_orders po
+         LEFT JOIN public.requests r ON r.id = po.request_id
+         LEFT JOIN public.projects pr ON pr.id = r.project_id
+         LEFT JOIN public.users eu ON eu.id = r.created_by
+         LEFT JOIN public.users cb ON cb.id = po.created_by
+         LEFT JOIN LATERAL (
+              SELECT pa.id, pa.file_name FROM public.po_attachments pa
+               WHERE pa.po_id = po.id ORDER BY pa.created_at DESC LIMIT 1
+         ) doc ON true
+         LEFT JOIN LATERAL (
+              SELECT COUNT(*)::int AS line_count,
+                     string_agg(ri.description, '; ' ORDER BY ri.position) AS items,
+                     COALESCE(SUM(ri.line_total), 0) AS value
+                FROM public.request_items ri
+                JOIN public.suppliers s ON s.id = ri.supplier_id
+               WHERE ri.request_id = po.request_id
+                 AND regexp_replace(lower(COALESCE(s.name, '')), '[^a-z0-9]', '', 'g') = regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g')
+                 AND regexp_replace(lower(COALESCE(po.vendor_name, '')), '[^a-z0-9]', '', 'g') <> ''
+         ) sl ON true
+        ORDER BY po.created_at DESC
+        LIMIT 2000`
+    ),
     maySeeAudit
       ? query<AuditEntry>(
       `SELECT a.*,
@@ -94,6 +192,9 @@ export default async function AdminPage() {
     maySeePreferences ? getNotificationSettings() : Promise.resolve(null),
   ])
 
+
+  const invoices = await invoicesPromise
+
   return (
     <AdminClient
       user={{ name: user.name, email: user.email }}
@@ -103,6 +204,7 @@ export default async function AdminPage() {
       suppliers={suppliers}
       requests={requests}
       pos={pos}
+      invoices={invoices}
       auditTrail={auditTrail}
       requestWindowBlockedDays={requestWindow.blockedDays}
       notificationRoles={notificationSettings?.roles ?? null}
