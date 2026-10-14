@@ -254,6 +254,7 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
         { href: '/admin/requests', label: 'Awaiting Authorization', icon: <ClipboardCheck size={18} /> },
         { href: '/admin/reviewed', label: 'Reviewed', icon: <ClipboardList size={18} /> },
         { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
+        { href: '/admin?tab=invoices', label: 'Invoices', icon: <Receipt size={18} /> },
       ],
     },
     {
@@ -272,6 +273,7 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
         { href: '/admin/requests', label: 'Requisitions', icon: <FileText size={18} /> },
         { href: '/admin/reviewed', label: 'Reviewed', icon: <ClipboardList size={18} /> },
         { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
+        { href: '/admin?tab=invoices', label: 'Invoices', icon: <Receipt size={18} /> },
       ],
     },
     {
