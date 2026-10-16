@@ -762,7 +762,7 @@ export default function RequestForm({
                     <th className="w-10 px-3 py-2.5 text-center">#</th>
                     <th className="w-36 px-3 py-2.5">Type</th>
                     <th className="px-3 py-2.5">Description</th>
-                    <th className="w-20 px-3 py-2.5">Qty</th>
+                    <th className="w-24 px-3 py-2.5 2xl:w-28">Qty</th>
                     <th className="w-24 px-3 py-2.5">Unit</th>
                     <th className="w-28 px-3 py-2.5">Unit price / amount</th>
                     <th className="w-44 px-3 py-2.5">Supplier</th>
@@ -844,7 +844,7 @@ export default function RequestForm({
                             step="any"
                             value={line.quantity}
                             onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
-                            className="h-10 w-full rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                            className="h-10 w-full min-w-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           />
                         )}
                       </td>
