@@ -1,10 +1,9 @@
 import Link from 'next/link'
 import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
-import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
-import { requestSummaryStats } from '@/components/shared/stat-presets'
+import { PageContainer } from '@/components/shared/ui-kit'
 import { getStageInbox, getStageDecisions } from '@/lib/review'
-import { Scale } from 'lucide-react'
+import ReviewerHomeDashboard from '@/components/dashboards/ReviewerHomeDashboard'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,16 +58,9 @@ export default async function CostControlPage() {
         ))}
       </nav>
 
-      <StatGrid
-        stats={requestSummaryStats({
-          requests: pending as unknown as Record<string, unknown>[],
-          label: 'Awaiting your audit',
-          icon: <Scale size={18} />,
-          tone: 'emerald',
-          trailing: 'age',
-          ageLabel: 'Longest waiting',
-        })}
-      />
+      <div className="space-y-4 sm:space-y-5">
+        <ReviewerHomeDashboard role="cost_control" queue={pending} decisions={decisions} hrefBase="/cost-control/requests" />
+      </div>
 
       <QueueTable rows={pending} hrefBase="/cost-control/requests" storageKey="cost-control-queue" />
     </PageContainer>

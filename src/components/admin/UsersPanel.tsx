@@ -8,6 +8,9 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { Mail, ShieldCheck, UserPlus } from 'lucide-react'
 import ExportButton from './ExportButton'
 import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
+import { TableTray } from '@/components/shared/dashboard/kit'
+import UsersDashboard from './UsersDashboard'
+import type { AdminRequestRow } from './AdminClient'
 
 /** A profile created by an admin that nobody has signed up against yet. */
 const isPending = (u: UserWithProjects) => Boolean(u.auth_id?.startsWith('pending:'))
@@ -54,14 +57,18 @@ function RolePill({ role }: { role: string }) {
 export default function UsersPanel({
   users,
   projects,
+  requests,
   onChanged,
   notify,
 }: {
   users: UserWithProjects[]
   projects: ProjectWithMemberCount[]
+  /** Requisitions, so the dashboard can show who is raising work. */
+  requests: AdminRequestRow[]
   onChanged: () => void
   notify: (msg: string, ok: boolean) => void
 }) {
+  const [visible, setVisible] = useState<UserWithProjects[]>(users)
   const [editing, setEditing] = useState<UserWithProjects | null>(null)
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<Draft>(emptyDraft())
@@ -373,70 +380,74 @@ export default function UsersPanel({
   const open = creating || editing !== null
 
   return (
-    <div className="space-y-5">
-      <DataView
-        rows={users}
-        getRowId={(u) => u.id}
-        columns={columns}
-        facets={facets}
-        searchPlaceholder="Search by name or email…"
-        searchText={(u) => [u.name, u.email, u.phone, ...(u.projects ?? []).map((p) => p.name)]}
-        defaultSort={{ id: 'created_at', dir: 'desc' }}
-        defaultView="grid"
-        storageKey="admin-users"
-        onRowClick={openEdit}
-        emptyTitle="No users yet"
-        emptyMessage="People appear here once they are added or sign in."
-        toolbarExtra={(visible) => (
-          <>
-            <ExportButton rows={visible} columns={userCsv} section="users" />
-            <AdminButton type="button" onClick={openCreate} className="shrink-0">
-              <UserPlus size={16} /> Add user
-            </AdminButton>
-          </>
-        )}
-        renderCard={(u) => (
-          <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
-            <div className="flex items-start gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
-                {(u.name ?? u.email).slice(0, 2).toUpperCase()}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-foreground">{u.name ?? 'Unnamed'}</p>
-                <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+    <div className="space-y-4 sm:space-y-5">
+      <UsersDashboard all={users} visible={visible} requests={requests} />
+      <TableTray label="People" info="Every chart above reflects exactly what this list's search and filters leave. Select a person to manage their account.">
+        <DataView
+          rows={users}
+          onVisibleRows={setVisible}
+          getRowId={(u) => u.id}
+          columns={columns}
+          facets={facets}
+          searchPlaceholder="Search by name or email…"
+          searchText={(u) => [u.name, u.email, u.phone, ...(u.projects ?? []).map((p) => p.name)]}
+          defaultSort={{ id: 'created_at', dir: 'desc' }}
+          defaultView="grid"
+          storageKey="admin-users"
+          onRowClick={openEdit}
+          emptyTitle="No users yet"
+          emptyMessage="People appear here once they are added or sign in."
+          toolbarExtra={(visible) => (
+            <>
+              <ExportButton rows={visible} columns={userCsv} section="users" />
+              <AdminButton type="button" onClick={openCreate} className="shrink-0">
+                <UserPlus size={16} /> Add user
+              </AdminButton>
+            </>
+          )}
+          renderCard={(u) => (
+            <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">
+                  {(u.name ?? u.email).slice(0, 2).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-foreground">{u.name ?? 'Unnamed'}</p>
+                  <p className="truncate text-xs text-muted-foreground">{u.email}</p>
+                </div>
+                {u.is_active === false ? (
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Disabled
+                  </span>
+                ) : isPending(u) ? (
+                  <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                    Invited
+                  </span>
+                ) : null}
               </div>
-              {u.is_active === false ? (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  Disabled
-                </span>
-              ) : isPending(u) ? (
-                <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                  Invited
-                </span>
-              ) : null}
-            </div>
 
-            <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              <RolePill role={u.role} />
-              {(u.projects ?? []).slice(0, 2).map((p) => (
-                <span key={p.id} className="max-w-[160px] truncate rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
-                  {p.name}
-                </span>
-              ))}
-              {(u.projects ?? []).length > 2 && (
-                <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
-                  +{(u.projects ?? []).length - 2}
-                </span>
-              )}
-              {(u.projects ?? []).length === 0 && (
-                <span className="text-[11px] text-muted-foreground">No projects assigned</span>
-              )}
-            </div>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <RolePill role={u.role} />
+                {(u.projects ?? []).slice(0, 2).map((p) => (
+                  <span key={p.id} className="max-w-[160px] truncate rounded-full border border-border px-2.5 py-1 text-[11px] text-muted-foreground">
+                    {p.name}
+                  </span>
+                ))}
+                {(u.projects ?? []).length > 2 && (
+                  <span className="rounded-full border border-border px-2 py-1 text-[11px] text-muted-foreground">
+                    +{(u.projects ?? []).length - 2}
+                  </span>
+                )}
+                {(u.projects ?? []).length === 0 && (
+                  <span className="text-[11px] text-muted-foreground">No projects assigned</span>
+                )}
+              </div>
 
-            <p className="mt-auto pt-3 text-[11px] text-muted-foreground">Joined {shortDate(u.created_at)}</p>
-          </article>
-        )}
-      />
+              <p className="mt-auto pt-3 text-[11px] text-muted-foreground">Joined {shortDate(u.created_at)}</p>
+            </article>
+          )}
+        />
+      </TableTray>
 
       <AdminModal
         open={open}

@@ -7,6 +7,9 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { Mail, Phone, Plus } from 'lucide-react'
 import ExportButton from './ExportButton'
 import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
+import { TableTray } from '@/components/shared/dashboard/kit'
+import SuppliersDashboard from './SuppliersDashboard'
+import type { AdminPurchaseOrder } from './report-types'
 
 export type SupplierRow = Supplier & { usage_count?: number }
 
@@ -48,13 +51,17 @@ const toDraft = (s: SupplierRow): Draft => ({
 
 export default function SuppliersPanel({
   suppliers,
+  pos,
   onChanged,
   notify,
 }: {
   suppliers: SupplierRow[]
+  /** Purchase orders, so the dashboard can show spend per supplier. */
+  pos: AdminPurchaseOrder[]
   onChanged: () => void
   notify: (msg: string, ok: boolean) => void
 }) {
+  const [visible, setVisible] = useState<SupplierRow[]>(suppliers)
   const [editing, setEditing] = useState<SupplierRow | null>(null)
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<Draft>(emptyDraft())
@@ -220,66 +227,70 @@ export default function SuppliersPanel({
   const open = creating || editing !== null
 
   return (
-    <div className="space-y-5">
-      <DataView
-        rows={suppliers}
-        getRowId={(s) => s.id}
-        columns={columns}
-        facets={facets}
-        searchPlaceholder="Search suppliers…"
-        searchText={(s) => [s.name, s.category, s.contact_name, s.phone, s.email, s.notes]}
-        defaultSort={{ id: 'name', dir: 'asc' }}
-        defaultView="grid"
-        storageKey="admin-suppliers"
-        onRowClick={openEdit}
-        emptyTitle="No suppliers yet"
-        emptyMessage="Add vendors here so engineers can pick them on a requisition."
-        toolbarExtra={(visible) => (
-          <>
-            <ExportButton rows={visible} columns={supplierCsv} section="suppliers" />
-            <AdminButton type="button" onClick={openCreate} className="shrink-0">
-              <Plus size={16} /> New supplier
-            </AdminButton>
-          </>
-        )}
-        renderCard={(s) => (
-          <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{s.name}</p>
-                {s.category && <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.category}</p>}
+    <div className="space-y-4 sm:space-y-5">
+      <SuppliersDashboard all={suppliers} visible={visible} pos={pos} />
+      <TableTray label="Supplier directory" info="Every chart above reflects exactly what this list's search and filters leave. Select a supplier to edit it.">
+        <DataView
+          rows={suppliers}
+          onVisibleRows={setVisible}
+          getRowId={(s) => s.id}
+          columns={columns}
+          facets={facets}
+          searchPlaceholder="Search suppliers…"
+          searchText={(s) => [s.name, s.category, s.contact_name, s.phone, s.email, s.notes]}
+          defaultSort={{ id: 'name', dir: 'asc' }}
+          defaultView="grid"
+          storageKey="admin-suppliers"
+          onRowClick={openEdit}
+          emptyTitle="No suppliers yet"
+          emptyMessage="Add vendors here so engineers can pick them on a requisition."
+          toolbarExtra={(visible) => (
+            <>
+              <ExportButton rows={visible} columns={supplierCsv} section="suppliers" />
+              <AdminButton type="button" onClick={openCreate} className="shrink-0">
+                <Plus size={16} /> New supplier
+              </AdminButton>
+            </>
+          )}
+          renderCard={(s) => (
+            <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{s.name}</p>
+                  {s.category && <p className="mt-0.5 truncate text-xs text-muted-foreground">{s.category}</p>}
+                </div>
+                {!s.is_active && (
+                  <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Inactive
+                  </span>
+                )}
               </div>
-              {!s.is_active && (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  Inactive
-                </span>
-              )}
-            </div>
 
-            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-              {s.contact_name && <p className="truncate">{s.contact_name}</p>}
-              {s.phone && (
-                <p className="flex items-center gap-1.5">
-                  <Phone size={13} className="shrink-0" />
-                  <span className="truncate">{s.phone}</span>
+              <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                {s.contact_name && <p className="truncate">{s.contact_name}</p>}
+                {s.phone && (
+                  <p className="flex items-center gap-1.5">
+                    <Phone size={13} className="shrink-0" />
+                    <span className="truncate">{s.phone}</span>
+                  </p>
+                )}
+                {s.email && (
+                  <p className="flex items-center gap-1.5">
+                    <Mail size={13} className="shrink-0" />
+                    <span className="truncate">{s.email}</span>
+                  </p>
+                )}
+              </div>
+
+              {s.usage_count !== undefined && (
+                <p className="mt-auto pt-3 text-[11px] tabular-nums text-muted-foreground">
+                  Used on {s.usage_count} requisition {s.usage_count === 1 ? 'line' : 'lines'}
                 </p>
               )}
-              {s.email && (
-                <p className="flex items-center gap-1.5">
-                  <Mail size={13} className="shrink-0" />
-                  <span className="truncate">{s.email}</span>
-                </p>
-              )}
-            </div>
-
-            {s.usage_count !== undefined && (
-              <p className="mt-auto pt-3 text-[11px] tabular-nums text-muted-foreground">
-                Used on {s.usage_count} requisition {s.usage_count === 1 ? 'line' : 'lines'}
-              </p>
-            )}
-          </article>
-        )}
-      />
+            </article>
+          )}
+        />
+      </TableTray>
 
       <AdminModal
         open={open}

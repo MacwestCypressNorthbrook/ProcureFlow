@@ -4,31 +4,24 @@ import { Button } from '@/components/ui/button'
 import {
   PageContainer,
   SectionHeader,
-  StatGrid,
   DashboardHero,
   EmptyState,
 } from '@/components/shared/ui-kit'
-import { monthSplit, statMoney } from '@/components/shared/stat-presets'
-import { getStageInbox, getStageQueue } from '@/lib/review'
+import { statMoney } from '@/components/shared/stat-presets'
+import { getStageDecisions, getStageInbox, getStageQueue } from '@/lib/review'
 import { statusForStage } from '@/lib/workflow'
-import { ClipboardCheck, CheckCircle, Clock, Wallet, ArrowRight } from 'lucide-react'
+import ReviewerHomeDashboard from '@/components/dashboards/ReviewerHomeDashboard'
+import { CheckCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
-
-/** Whole days since the oldest item in a queue; null when the queue is empty. */
-function oldestWaitingDays(dates: string[]): number | null {
-  const times = dates.map((d) => new Date(d).getTime()).filter((t) => !Number.isNaN(t))
-  if (times.length === 0) return null
-  return Math.max(0, Math.floor((Date.now() - Math.min(...times)) / 86_400_000))
-}
 
 export default async function SamPage() {
   const user = await requirePageRole('project_lead')
 
   // The Project Lead is the first review in the chain; everything downstream is
   // shown only as context for what they have already cleared.
-  const [waiting, downstream] = await Promise.all([
+  const [waiting, downstream, decisions] = await Promise.all([
     getStageInbox('lead'),
     getStageQueue([
       statusForStage('supply_chain'),
@@ -36,11 +29,11 @@ export default async function SamPage() {
       statusForStage('cost_control'),
       statusForStage('finance'),
     ]),
+    // This lead's own decisions, for the dashboard's month-by-month view.
+    getStageDecisions('lead', { limit: 1000, actorId: user.id }),
   ])
 
-  const month = monthSplit(waiting.map((r) => r.created_at))
   const queueValue = waiting.reduce((sum, r) => sum + (Number(r.total_amount) || 0), 0)
-  const oldestDays = oldestWaitingDays(waiting.map((r) => r.created_at))
   const firstName = user.name?.split(' ')[0]
 
   return (
@@ -75,44 +68,7 @@ export default async function SamPage() {
           }
         />
 
-        <StatGrid
-          stats={[
-            {
-              label: 'Awaiting your review',
-              value: waiting.length,
-              icon: <ClipboardCheck size={18} />,
-              tone: 'indigo',
-              delta: month.delta,
-              badge: waiting.length > 0 ? 'Needs action' : undefined,
-              compare:
-                month.lastMonth > 0
-                  ? `vs. ${month.lastMonth} last month`
-                  : `${month.thisMonth} raised this month`,
-              href: '/sam/requests',
-            },
-            {
-              label: 'Queue value',
-              value: statMoney(queueValue),
-              icon: <Wallet size={18} />,
-              tone: 'purple',
-              compare: `Across ${waiting.length} requisition${waiting.length === 1 ? '' : 's'}`,
-            },
-            {
-              label: 'Longest waiting',
-              value: oldestDays !== null ? `${oldestDays}d` : '—',
-              icon: <Clock size={18} />,
-              tone: oldestDays !== null && oldestDays > 7 ? 'red' : 'amber',
-              compare: oldestDays !== null ? 'Since it was raised' : 'Nothing in the queue',
-            },
-            {
-              label: 'Cleared by you',
-              value: downstream.length,
-              icon: <CheckCircle size={18} />,
-              tone: 'emerald',
-              compare: 'Now with later stages',
-            },
-          ]}
-        />
+        <ReviewerHomeDashboard role="lead" queue={waiting} decisions={decisions} hrefBase="/sam/requests" />
 
         <section>
           <SectionHeader title="Awaiting your review" count={waiting.length} />

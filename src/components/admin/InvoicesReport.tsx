@@ -2,9 +2,8 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, BadgeCheck, FileArchive, FileSpreadsheet, FileText, Receipt, Scale, Table2 } from 'lucide-react'
+import { AlertTriangle, BadgeCheck, FileArchive, FileSpreadsheet, FileText, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
-import { StatGrid } from '@/components/shared/ui-kit'
 import { cn } from '@/lib/utils'
 import { buildXlsx, downloadBlob, sheet, summarize, type XlsxColumn } from '@/lib/xlsx'
 import { downloadPdf, exportFilename, type ExportColumn } from '@/lib/export'
@@ -12,7 +11,30 @@ import { toCsv, downloadCsv } from '@/lib/csv'
 import { downloadDocumentBundle, MAX_BUNDLE_FILES } from '@/lib/bundle-documents'
 import type { AdminInvoice } from './report-types'
 import ReportExportMenu, { type ReportExportOption } from './ReportExportMenu'
-import { ChartCard, MonthColumns, RankedBars, ghsFull, monthSeries, rankRows } from './report-charts'
+import {
+  AttentionStrip,
+  KpiRow,
+  KpiTile,
+  TableTray,
+  compact,
+  concentrationInsight,
+  daysBetween,
+  ghsFull,
+  monthOverMonth,
+  monthlySpark,
+  pct,
+  stableSlices,
+} from '@/components/shared/dashboard/kit'
+import { PixelTrend } from '@/components/shared/dashboard/time-charts'
+import { BreakdownDonut, DayHistogram, DivergingBars, StackedShare, type DivergingRow } from '@/components/shared/dashboard/share-charts'
+
+type Dimension = 'supplier' | 'project' | 'engineer'
+
+const DIMENSIONS: { value: Dimension; label: string }[] = [
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'project', label: 'Project' },
+  { value: 'engineer', label: 'Engineer' },
+]
 
 interface InvoiceRow extends AdminInvoice {
   value: number
@@ -130,16 +152,63 @@ export default function InvoicesReport({
     }
   }, [visible])
 
-  // Charts plot money, so they plot recorded invoices. A document would
-  // otherwise enter every ranking as a zero-value bar for its supplier.
+  /* ── Charts ─────────────────────────────────────────────────────────── */
+  // Money charts plot recorded invoices alone: a document would otherwise
+  // enter every ranking as a zero-value bar for its supplier.
   const charts = useMemo(() => {
     const recorded = visible.filter((r) => !r.isDocument)
+    const verified = recorded.filter((r) => r.status === 'verified')
+    const documents = visible.filter((r) => r.isDocument)
+
+    // Billed against what each requisition priced for that supplier — counted
+    // once per requisition and supplier, then summed per supplier.
+    const pairs = new Map<string, { supplier: string; invoiced: number; requisitioned: number }>()
+    for (const r of recorded) {
+      const key = `${r.request_id}|${r.supplier_id}`
+      const entry = pairs.get(key) ?? { supplier: r.supplier, invoiced: 0, requisitioned: num(r.supplier_requisitioned) }
+      entry.invoiced += r.value
+      pairs.set(key, entry)
+    }
+    const bySupplier = new Map<string, DivergingRow>()
+    for (const p of pairs.values()) {
+      if (p.requisitioned <= 0) continue
+      const g = bySupplier.get(p.supplier) ?? { label: p.supplier, delta: 0, base: 0, count: 0 }
+      g.delta += p.invoiced - p.requisitioned
+      g.base += p.requisitioned
+      g.count += 1
+      bySupplier.set(p.supplier, g)
+    }
+
     return {
-      supplier: rankRows(summarize(recorded, (r) => r.supplier, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
-      project: rankRows(summarize(recorded, (r) => r.project, (r) => r.value).map((g) => ({ label: g.name, value: g.total, count: g.count }))),
-      months: monthSeries(recorded, (r) => r.effectiveDate, (r) => r.value),
+      trend: recorded.map((r) => ({ at: r.effectiveDate, value: r.value, part: r.status === 'verified' ? r.value : 0 })),
+      billing: [...bySupplier.values()],
+      verifyDays: verified.map((r) => daysBetween(r.created_at, r.verified_at)).filter((d): d is number => d !== null),
+      sparks: {
+        value: monthlySpark(recorded, (r) => r.effectiveDate, (rs) => rs.reduce((s, r) => s + r.value, 0), ghsFull),
+        verified: monthlySpark(verified, (r) => r.effectiveDate, (rs) => rs.reduce((s, r) => s + r.value, 0), ghsFull),
+        awaiting: monthlySpark(recorded.filter((r) => r.status !== 'verified'), (r) => r.effectiveDate, (rs) => rs.length, (n) => `${n} awaiting`),
+        documents: monthlySpark(documents, (r) => r.uploaded_at ?? r.created_at, (rs) => rs.length, (n) => `${n} unrecorded`),
+      },
+      steps: [
+        { label: 'Not recorded', note: 'a file, no number or amount yet', count: documents.length },
+        { label: 'Awaiting verification', note: 'keyed in, not yet checked', count: recorded.length - verified.length, value: recorded.reduce((s, r) => s + r.value, 0) - verified.reduce((s, r) => s + r.value, 0) },
+        { label: 'Verified', note: 'checked by Cost Control', count: verified.length, value: verified.reduce((s, r) => s + r.value, 0) },
+      ],
     }
   }, [visible])
+
+  const [dimension, setDimension] = useState<Dimension>('supplier')
+  const breakdown = useMemo(() => {
+    const key: Record<Dimension, (r: InvoiceRow) => string> = {
+      supplier: (r) => r.supplier,
+      project: (r) => r.project,
+      engineer: (r) => r.engineer,
+    }
+    const recordedAll = rows.filter((r) => !r.isDocument)
+    const slices = stableSlices(recordedAll, visible.filter((r) => !r.isDocument), key[dimension], (r) => r.value)
+    const noun = dimension
+    return { slices, insight: concentrationInsight(slices, noun, `${noun}s`, 'invoiced value') }
+  }, [rows, visible, dimension])
 
   // Memoized: DataView re-filters and re-sorts whenever these change identity.
   const columns: DataColumn<InvoiceRow>[] = useMemo(() => [
@@ -481,59 +550,110 @@ export default function InvoicesReport({
   }
 
   return (
-    <div className="space-y-6">
-      <StatGrid
-        stats={[
-          {
-            label: 'Invoiced',
-            value: ghsFull(stats.total),
-            icon: <Receipt size={18} />,
-            tone: 'purple',
-            compare: `${stats.count} recorded invoice${stats.count === 1 ? '' : 's'} from ${stats.suppliers} supplier${stats.suppliers === 1 ? '' : 's'}`,
-          },
-          {
-            label: 'Verified by Cost Control',
-            value: ghsFull(stats.verifiedValue),
-            icon: <BadgeCheck size={18} />,
-            tone: 'emerald',
-            share: stats.total > 0 ? stats.verifiedValue / stats.total : 0,
-            compare: `${stats.verifiedCount} verified · ${stats.awaiting} awaiting verification`,
-          },
-          {
-            label: 'Billed above requisition',
-            value: stats.overBilled,
-            icon: <Scale size={18} />,
-            tone: stats.overBilled > 0 ? 'red' : 'emerald',
-            compare:
-              stats.overBilled > 0
-                ? `Supplier invoices exceed what was requisitioned by ${ghsFull(stats.overBilledBy)}`
-                : 'No supplier has invoiced more than was requisitioned',
-          },
-          {
-            label: 'Not recorded yet',
-            value: stats.unrecorded,
-            icon: <FileText size={18} />,
-            tone: stats.unrecorded > 0 ? 'amber' : 'emerald',
-            compare:
-              stats.unrecorded > 0
-                ? `Invoice document${stats.unrecorded === 1 ? '' : 's'} attached but never recorded, so ${stats.unrecorded === 1 ? 'its value is' : 'their value is'} in no total${stats.unidentified > 0 ? ` · ${stats.unidentified} with no supplier identified` : ''}`
-                : `Every invoice document is recorded · ${stats.noDocument} record${stats.noDocument === 1 ? '' : 's'} with no document · ${stats.noPo} with no matching PO`,
-          },
+    <div className="space-y-4 sm:space-y-5">
+      <KpiRow>
+        <KpiTile
+          label="Invoiced"
+          prefix="GHS"
+          value={compact(stats.total)}
+          title={ghsFull(stats.total)}
+          spark={charts.sparks.value}
+          info={`${stats.count} recorded invoice${stats.count === 1 ? '' : 's'} from ${stats.suppliers} supplier${stats.suppliers === 1 ? '' : 's'}, by invoice date. Unrecorded documents carry no amount, so they are in no total.`}
+          trend={monthOverMonth(charts.sparks.value, { percent: true, upIsGood: null })}
+          note="this month vs last"
+        />
+        <KpiTile
+          label="Verified"
+          value={`${pct(stats.verifiedValue, stats.total)}`}
+          unit="% of value"
+          title={ghsFull(stats.verifiedValue)}
+          spark={charts.sparks.verified}
+          info="Share of invoiced value Cost Control has checked against the document. The sparkline is verified value per month."
+          note={`${stats.verifiedCount} verified · ${stats.awaiting} awaiting`}
+        />
+        <KpiTile
+          label="Awaiting check"
+          value={stats.awaiting.toLocaleString('en-GB')}
+          unit={stats.awaiting === 1 ? 'invoice' : 'invoices'}
+          spark={charts.sparks.awaiting}
+          info="Recorded invoices Cost Control has not verified yet, by the month they are dated. Falling is good."
+          trend={monthOverMonth(charts.sparks.awaiting, { upIsGood: false })}
+          note="this month vs last"
+        />
+        <KpiTile
+          label="Not recorded"
+          value={stats.unrecorded.toLocaleString('en-GB')}
+          unit={stats.unrecorded === 1 ? 'document' : 'documents'}
+          spark={charts.sparks.documents}
+          info="Invoice files attached to a requisition but never keyed in — their value is in no total until someone records the number, date and amount."
+          note={stats.unidentified ? `${stats.unidentified} with no supplier identified` : 'every supplier identified'}
+        />
+      </KpiRow>
+
+      <AttentionStrip
+        items={[
+          stats.overBilled > 0 && `${stats.overBilled} supplier billing${stats.overBilled === 1 ? '' : 's'} above the requisition, by ${ghsFull(stats.overBilledBy)}`,
+          stats.unrecorded > 0 && `${stats.unrecorded} invoice document${stats.unrecorded === 1 ? '' : 's'} not recorded`,
+          stats.noDocument > 0 && `${stats.noDocument} record${stats.noDocument === 1 ? '' : 's'} with no document`,
+          stats.noPo > 0 && `${stats.noPo} with no matching PO`,
         ]}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <ChartCard title="Invoiced by supplier" caption="Who is billing">
-          <RankedBars rows={charts.supplier} unit="invoice" />
-        </ChartCard>
-        <ChartCard title="Invoiced by project" caption="Which sites the invoices are for">
-          <RankedBars rows={charts.project} unit="invoice" />
-        </ChartCard>
-        <ChartCard title="Monthly invoiced value" caption="Last 12 months, by invoice date">
-          <MonthColumns points={charts.months} unit="invoice" />
-        </ChartCard>
+        <div className="min-w-0 lg:col-span-2">
+          <PixelTrend
+            label="Invoiced trend"
+            info="Recorded invoice value by invoice date. Dark squares are verified by Cost Control; light squares are recorded but not yet checked."
+            items={charts.trend}
+            format="money"
+            noun="invoice"
+            partLabel="Verified"
+            restLabel="Awaiting check"
+            rangeLabel="Invoiced in range"
+          />
+        </div>
+        <BreakdownDonut
+          label="Who's billing"
+          info="Recorded invoice value split by supplier, project or engineer. The five largest keep their colour as you filter."
+          measure="Invoiced"
+          format="money"
+          noun="invoice"
+          slices={breakdown.slices}
+          insight={breakdown.insight}
+          dimension={dimension}
+          dimensions={DIMENSIONS}
+          onDimension={setDimension}
+        />
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <StackedShare
+          label="Verification pipeline"
+          info="Every invoice at the step it has reached: a file nobody has keyed in, a record awaiting Cost Control, or verified."
+          steps={charts.steps}
+          noun="invoice"
+          doneLabel="verified"
+        />
+        <DivergingBars
+          label="Billed vs requisitioned"
+          info="What each supplier has invoiced against what the requisitions priced for them, counted once per requisition. Over means billed above the requisition."
+          rows={charts.billing}
+          reference="requisitioned"
+          noun="requisition"
+          empty="No recorded invoice matches a priced requisition supplier yet."
+        />
+        <div className="min-w-0 md:col-span-2 xl:col-span-1">
+          <DayHistogram
+            label="Days to verify"
+            info="Days from an invoice being recorded to Cost Control verifying it. The darker column holds the median."
+            days={charts.verifyDays}
+            noun="invoice"
+            caption="median days to verify"
+          />
+        </div>
+      </div>
+
+      <TableTray label="Invoices" info="Every chart above reflects exactly what this table's search and filters leave. Select a row to open its requisition.">
       <DataView
         rows={rows}
         getRowId={(r) => r.id}
@@ -549,6 +669,7 @@ export default function InvoicesReport({
         emptyTitle="No supplier invoices yet"
         emptyMessage="Invoice documents appear here as soon as they are attached to a requisition, and become full records once Supply Chain or Cost Control keys in the number, date and amount."
       />
+      </TableTray>
     </div>
   )
 }

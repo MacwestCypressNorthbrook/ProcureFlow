@@ -5,12 +5,11 @@ import { Button } from '@/components/ui/button'
 import {
   PageContainer,
   SectionHeader,
-  StatGrid,
   DashboardHero,
   EmptyState,
 } from '@/components/shared/ui-kit'
-import { monthSplit } from '@/components/shared/stat-presets'
-import { FileText, Eye, CheckCircle, XCircle, Plus, ArrowRight, Clock, RotateCcw } from 'lucide-react'
+import EngineerHomeDashboard, { type MyRequisition } from '@/components/dashboards/EngineerHomeDashboard'
+import { FileText, Plus, ArrowRight, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -57,8 +56,6 @@ export default async function MintaPage() {
   // whole chain until they resubmit, so it leads the page.
   const sentBackRequests = myRequests.filter((r) => r.status === 'sent_back')
 
-  const share = (n: number) => (stats.total > 0 ? n / stats.total : 0)
-  const month = monthSplit(myRequests.map((r) => (r.created_at as string | null) ?? null))
   const inFlight = stats.pending + stats.reviewing
   const firstName = user?.name?.split(' ')[0]
   const recentRequests = myRequests.slice(0, 8)
@@ -128,64 +125,7 @@ export default async function MintaPage() {
           </section>
         )}
 
-        <StatGrid
-          stats={[
-            {
-              label: 'Needs your attention',
-              value: stats.sentBack,
-              icon: <RotateCcw size={18} />,
-              tone: 'red',
-              badge: stats.sentBack > 0 ? 'Sent back' : undefined,
-              compare: stats.sentBack > 0 ? 'Blocking the chain until resubmitted' : 'Nothing sent back',
-            },
-            {
-              label: 'Total requests',
-              value: stats.total,
-              icon: <FileText size={18} />,
-              tone: 'indigo',
-              delta: month.delta,
-              compare:
-                month.lastMonth > 0
-                  ? `vs. ${month.lastMonth} last month`
-                  : `${month.thisMonth} raised this month`,
-              href: '/minta/requests',
-            },
-            {
-              label: 'Pending',
-              value: stats.pending,
-              icon: <Clock size={18} />,
-              tone: 'blue',
-              hint: 'Waiting to be picked up',
-              share: share(stats.pending),
-              href: '/minta/tracking',
-            },
-            {
-              label: 'Under review',
-              value: stats.reviewing,
-              icon: <Eye size={18} />,
-              tone: 'amber',
-              hint: 'With procurement',
-              share: share(stats.reviewing),
-              href: '/minta/tracking',
-            },
-            {
-              label: 'Converted',
-              value: stats.converted,
-              icon: <CheckCircle size={18} />,
-              tone: 'emerald',
-              hint: 'Turned into purchase orders',
-              share: share(stats.converted),
-            },
-            {
-              label: 'Rejected',
-              value: stats.rejected,
-              icon: <XCircle size={18} />,
-              tone: 'red',
-              hint: stats.rejected > 0 ? 'Review the notes and resubmit' : 'Nothing rejected',
-              share: share(stats.rejected),
-            },
-          ]}
-        />
+        <EngineerHomeDashboard requests={myRequests as unknown as MyRequisition[]} />
 
         <section>
           <SectionHeader

@@ -7,6 +7,10 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { MapPin, Plus, Users as UsersIcon } from 'lucide-react'
 import ExportButton from './ExportButton'
 import { formatDate as csvDate, type CsvColumn } from '@/lib/csv'
+import { TableTray } from '@/components/shared/dashboard/kit'
+import ProjectsDashboard from './ProjectsDashboard'
+import type { AdminPurchaseOrder } from './report-types'
+import type { AdminRequestRow } from './AdminClient'
 
 const STATUSES: { value: string; label: string }[] = [
   { value: 'active', label: 'Active' },
@@ -57,13 +61,19 @@ function StatusPill({ status }: { status: string }) {
 
 export default function ProjectsPanel({
   projects,
+  requests,
+  pos,
   onChanged,
   notify,
 }: {
   projects: ProjectWithMemberCount[]
+  /** Requisitions and POs, so the dashboard can show activity and spend per site. */
+  requests: AdminRequestRow[]
+  pos: AdminPurchaseOrder[]
   onChanged: () => void
   notify: (msg: string, ok: boolean) => void
 }) {
+  const [visible, setVisible] = useState<ProjectWithMemberCount[]>(projects)
   const [editing, setEditing] = useState<ProjectWithMemberCount | null>(null)
   const [creating, setCreating] = useState(false)
   const [draft, setDraft] = useState<Draft>(emptyDraft())
@@ -220,53 +230,57 @@ export default function ProjectsPanel({
   const open = creating || editing !== null
 
   return (
-    <div className="space-y-5">
-      <DataView
-        rows={projects}
-        getRowId={(p) => p.id}
-        columns={columns}
-        facets={facets}
-        searchPlaceholder="Search projects…"
-        searchText={(p) => [p.name, p.code, p.site_location, p.client]}
-        defaultSort={{ id: 'name', dir: 'asc' }}
-        defaultView="grid"
-        storageKey="admin-projects"
-        onRowClick={openEdit}
-        emptyTitle="No project sites yet"
-        emptyMessage="Create one so engineers can raise requisitions against a site."
-        toolbarExtra={(visible) => (
-          <>
-            <ExportButton rows={visible} columns={projectCsv} section="project-sites" />
-            <AdminButton type="button" onClick={openCreate} className="shrink-0">
-              <Plus size={16} /> New project
-            </AdminButton>
-          </>
-        )}
-        renderCard={(p) => (
-          <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-foreground">{p.name}</p>
-                {p.code && <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.code}</p>}
+    <div className="space-y-4 sm:space-y-5">
+      <ProjectsDashboard all={projects} visible={visible} requests={requests} pos={pos} />
+      <TableTray label="Project sites" info="Every chart above reflects exactly what this list's search and filters leave. Select a site to edit it.">
+        <DataView
+          rows={projects}
+          onVisibleRows={setVisible}
+          getRowId={(p) => p.id}
+          columns={columns}
+          facets={facets}
+          searchPlaceholder="Search projects…"
+          searchText={(p) => [p.name, p.code, p.site_location, p.client]}
+          defaultSort={{ id: 'name', dir: 'asc' }}
+          defaultView="grid"
+          storageKey="admin-projects"
+          onRowClick={openEdit}
+          emptyTitle="No project sites yet"
+          emptyMessage="Create one so engineers can raise requisitions against a site."
+          toolbarExtra={(visible) => (
+            <>
+              <ExportButton rows={visible} columns={projectCsv} section="project-sites" />
+              <AdminButton type="button" onClick={openCreate} className="shrink-0">
+                <Plus size={16} /> New project
+              </AdminButton>
+            </>
+          )}
+          renderCard={(p) => (
+            <article className="surface flex h-full flex-col rounded-xl p-4 transition-colors hover:border-ring">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{p.name}</p>
+                  {p.code && <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{p.code}</p>}
+                </div>
+                <StatusPill status={p.status} />
               </div>
-              <StatusPill status={p.status} />
-            </div>
 
-            <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-              {p.site_location && (
+              <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                {p.site_location && (
+                  <p className="flex items-center gap-1.5">
+                    <MapPin size={13} className="shrink-0" />
+                    <span className="truncate">{p.site_location}</span>
+                  </p>
+                )}
                 <p className="flex items-center gap-1.5">
-                  <MapPin size={13} className="shrink-0" />
-                  <span className="truncate">{p.site_location}</span>
+                  <UsersIcon size={13} className="shrink-0" />
+                  {p.member_count} assigned
                 </p>
-              )}
-              <p className="flex items-center gap-1.5">
-                <UsersIcon size={13} className="shrink-0" />
-                {p.member_count} assigned
-              </p>
-            </div>
-          </article>
-        )}
-      />
+              </div>
+            </article>
+          )}
+        />
+      </TableTray>
 
       <AdminModal
         open={open}

@@ -745,7 +745,7 @@ export default function DataView<T>({
               )}
           </ScrollRow>
 
-          <div className="order-3 flex shrink-0 items-center gap-2 empty:hidden @xl:order-2 @5xl:order-3">
+          <div className="order-3 flex min-w-0 flex-wrap items-center gap-2 empty:hidden @xl:order-2 @xl:shrink-0 @xl:flex-nowrap @5xl:order-3">
             {typeof toolbarExtra === 'function' ? toolbarExtra(processed) : toolbarExtra}
 
             {renderCard && (
@@ -931,7 +931,7 @@ export default function DataView<T>({
             <span className="font-medium tabular-nums text-foreground">{total}</span>
           </p>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <select
               value={pageSize}
               onChange={(e) => setPageSize(Number(e.target.value))}

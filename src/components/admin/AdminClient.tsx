@@ -7,7 +7,7 @@ import type { Request, ProjectWithMemberCount, UserWithProjects } from '@/lib/ty
 import { ROLE_LABELS, PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG } from '@/lib/utils'
 import ThemeToggle from '@/components/layout/ThemeToggle'
 import StatusBadge from '@/components/shared/StatusBadge'
-import { PageContainer, PageHeader, Panel, SectionHeader, StatGrid, DashboardHero } from '@/components/shared/ui-kit'
+import { PageContainer, PageHeader, Panel, SectionHeader, DashboardHero } from '@/components/shared/ui-kit'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import UsersPanel from './UsersPanel'
@@ -21,6 +21,10 @@ import ExportButton from './ExportButton'
 import ExportMenu from '@/components/shared/ExportMenu'
 import PurchaseOrdersReport from './PurchaseOrdersReport'
 import InvoicesReport from './InvoicesReport'
+import RequisitionsDashboard from './RequisitionsDashboard'
+import AuditDashboard from './AuditDashboard'
+import AdminOverviewDashboard from './AdminOverviewDashboard'
+import { TableTray } from '@/components/shared/dashboard/kit'
 import type { AdminPurchaseOrder, AdminInvoice } from './report-types'
 import type { ExportColumn } from '@/lib/export'
 import { currentStage, STAGE_LABEL } from '@/lib/workflow'
@@ -34,7 +38,6 @@ import {
   CheckCircle,
   AlertTriangle,
   ArrowRight,
-  TrendingUp,
   History,
   Building2,
   Truck,
@@ -58,22 +61,6 @@ const ghs = (n: number | string | null | undefined) => {
 const shortDate = (d: string | null) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 
-
-const roleDot: Record<string, string> = {
-  engineer: 'bg-blue-500',
-  supply_chain: 'bg-amber-500',
-  finance: 'bg-rose-500',
-  cost_control: 'bg-emerald-500',
-  project_lead: 'bg-indigo-500',
-  super_user: 'bg-purple-500',
-  administrator: 'bg-slate-500',
-  adminstrator: 'bg-slate-500',
-  superuser: 'bg-purple-500',
-  admin: 'bg-slate-500',
-  minta: 'bg-blue-500',
-  mintah: 'bg-amber-500',
-  sam: 'bg-indigo-500',
-}
 
 /** A requisition row as the admin page queries it — with its purchase orders folded in. */
 export type AdminRequestRow = Request & {
@@ -326,6 +313,9 @@ export default function AdminClient({
   }
 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  // What each table's search and filters leave — the dashboards above it chart exactly these.
+  const [visibleRequests, setVisibleRequests] = useState<AdminRequest[]>(requests)
+  const [visibleAudit, setVisibleAudit] = useState<AuditEntry[]>(auditTrail)
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
 
   /** Surface the outcome of an admin action, then re-fetch server data. */
@@ -357,31 +347,7 @@ export default function AdminClient({
     return Object.entries(m).sort((a, b) => b[1] - a[1])
   }, [users])
 
-  const pipeline = useMemo(() => {
-    const raised = requests.length
-    const base = Math.max(1, raised)
-    const approved = pos.filter(
-      (p) => p.status === 'pending_finance' || p.status === 'paid',
-    ).length
-    const settled = pos.filter((p) => p.status === 'paid').length
-    return [
-      { label: 'Requisitions raised', count: raised, pct: 1, dot: 'bg-blue-500', bar: 'bg-blue-500', hint: 'Across every project site' },
-      { label: 'Converted to POs', count: pos.length, pct: pos.length / base, dot: 'bg-amber-500', bar: 'bg-amber-500', hint: 'Raised by procurement' },
-      { label: 'Approved', count: approved, pct: approved / base, dot: 'bg-indigo-500', bar: 'bg-indigo-500', hint: 'Signed off and cleared for payment' },
-      { label: 'Paid & closed', count: settled, pct: settled / base, dot: 'bg-emerald-500', bar: 'bg-emerald-500', hint: 'Receipted and reconciled' },
-    ]
-  }, [requests, pos])
-
   const firstName = user?.name?.split(' ')[0]
-
-  /**
-   * Requisitions both reviews have cleared, waiting on the Administrator to
-   * raise the purchase order in Odoo and attach the PDF here.
-   */
-  const awaitingPo = useMemo(
-    () => requests.filter((r) => r.status === 'pending_admin'),
-    [requests]
-  )
 
   const [poTarget, setPoTarget] = useState<AdminRequest | null>(null)
 
@@ -708,173 +674,7 @@ export default function AdminClient({
               }
             />
 
-            <StatGrid
-              stats={[
-                {
-                  label: 'Total users',
-                  value: stats.users,
-                  icon: <PeopleIcon size={18} />,
-                  tone: 'purple',
-                  hint: `${stats.activeUsers} active`,
-                  onClick: () => setSection('users'),
-                },
-                {
-                  label: 'Project sites',
-                  value: projects.length,
-                  icon: <Building2 size={18} />,
-                  tone: 'indigo',
-                  hint: 'Requisitions are raised against these',
-                  onClick: () => setSection('projects'),
-                },
-                {
-                  label: 'Suppliers',
-                  value: suppliers.length,
-                  icon: <Truck size={18} />,
-                  tone: 'blue',
-                  hint: 'Available on requisitions',
-                  onClick: () => setSection('suppliers'),
-                },
-                {
-                  label: 'Awaiting a PO document',
-                  value: awaitingPo.length,
-                  icon: <FileUp size={18} />,
-                  tone: 'amber',
-                  badge: awaitingPo.length > 0 ? 'Needs action' : undefined,
-                  compare: 'Cleared by both reviews — attach the Odoo PDF',
-                  onClick: () => setSection('requests'),
-                },
-                {
-                  label: 'Requisitions',
-                  value: stats.requests,
-                  icon: <ClipboardCheck size={18} />,
-                  tone: 'indigo',
-                  hint: `${stats.converted} converted to POs`,
-                  share: stats.requests > 0 ? stats.converted / stats.requests : 0,
-                  onClick: () => setSection('requests'),
-                },
-                {
-                  label: 'Purchase orders',
-                  value: stats.pos,
-                  icon: <ShoppingBag size={18} />,
-                  tone: 'emerald',
-                  hint: `${stats.completed} completed`,
-                  share: stats.pos > 0 ? stats.completed / stats.pos : 0,
-                  badge: stats.pending > 0 ? `${stats.pending} open` : undefined,
-                  onClick: () => setSection('pos'),
-                },
-              ]}
-            />
-
-            <div className="grid gap-4 lg:grid-cols-5">
-              <Panel
-                title="Procurement pipeline"
-                icon={<TrendingUp size={16} />}
-                className="lg:col-span-3"
-                bodyClassName="p-5"
-                action={
-                  <button
-                    onClick={() => setSection('pos')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    Purchase orders <ArrowRight size={13} />
-                  </button>
-                }
-              >
-                <ul className="space-y-4">
-                  {pipeline.map((stage) => (
-                    <li key={stage.label}>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <span className="flex items-center gap-2 text-xs font-medium text-foreground">
-                          <span className={`h-2 w-2 rounded-full ${stage.dot}`} />
-                          {stage.label}
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums text-foreground">
-                          {stage.count}
-                          <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">
-                            {Math.round(stage.pct * 100)}%
-                          </span>
-                        </span>
-                      </div>
-                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-                        <span
-                          className={`block h-full rounded-full ${stage.bar}`}
-                          style={{ width: `${Math.max(stage.pct * 100, stage.count > 0 ? 3 : 0)}%` }}
-                        />
-                      </div>
-                      <p className="mt-1.5 text-[11px] text-muted-foreground">{stage.hint}</p>
-                    </li>
-                  ))}
-                </ul>
-
-                <div className="mt-5 grid grid-cols-2 gap-3 border-t border-border pt-4">
-                  <div>
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <Wallet size={13} /> Total PO value
-                    </p>
-                    <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-foreground">
-                      {ghs(stats.value)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <CheckCircle size={13} /> Settled
-                    </p>
-                    <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight text-emerald-600 dark:text-emerald-400">
-                      {ghs(stats.settledValue)}
-                    </p>
-                  </div>
-                </div>
-              </Panel>
-
-              <div className="space-y-4 lg:col-span-2">
-                <Panel
-                  title="Awaiting action"
-                  icon={<AlertTriangle size={16} className="text-amber-500" />}
-                  bodyClassName="p-5"
-                >
-                  <div className="flex items-end gap-3">
-                    <p className="text-4xl font-semibold leading-none tracking-tight tabular-nums text-foreground">
-                      {stats.pending}
-                    </p>
-                    <span className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                      {stats.pending > 0 ? 'Open' : 'Clear'}
-                    </span>
-                  </div>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    orders awaiting executive approval or payment across the pipeline.
-                  </p>
-                  <button
-                    onClick={() => setSection('pos')}
-                    className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    Review purchase orders <ArrowRight size={13} />
-                  </button>
-                </Panel>
-
-                <Panel title="Users by role" icon={<PeopleIcon size={16} />} bodyClassName="p-5">
-                  <ul className="space-y-3.5">
-                    {roleCounts.map(([r, count]) => (
-                      <li key={r}>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-foreground">
-                            <span className={`h-2 w-2 shrink-0 rounded-full ${roleDot[r] ?? 'bg-slate-400'}`} />
-                            <span className="truncate">{ROLE_LABELS[r]?.split(' ')[0] ?? r}</span>
-                          </span>
-                          <span className="text-xs font-semibold tabular-nums text-muted-foreground">{count}</span>
-                        </div>
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={`h-full rounded-full ${(roleDot[r] ?? 'bg-slate-400')}`}
-                            style={{ width: `${(count / Math.max(1, users.length)) * 100}%` }}
-                          />
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </Panel>
-              </div>
-            </div>
+            <AdminOverviewDashboard requests={requests} pos={pos} />
 
             <section>
               <SectionHeader
@@ -905,52 +705,61 @@ export default function AdminClient({
         )}
 
         {section === 'users' && (
-          <UsersPanel users={users} projects={projects} onChanged={router.refresh} notify={notify} />
+          <UsersPanel users={users} projects={projects} requests={requests} onChanged={router.refresh} notify={notify} />
         )}
 
         {section === 'projects' && (
-          <ProjectsPanel projects={projects} onChanged={router.refresh} notify={notify} />
+          <ProjectsPanel projects={projects} requests={requests} pos={pos} onChanged={router.refresh} notify={notify} />
         )}
 
         {section === 'suppliers' && (
-          <SuppliersPanel suppliers={suppliers} onChanged={router.refresh} notify={notify} />
+          <SuppliersPanel suppliers={suppliers} pos={pos} onChanged={router.refresh} notify={notify} />
         )}
 
         {section === 'requests' && (
-          <DataView
-            rows={requests}
-            getRowId={(r) => r.id}
-            columns={[...requestCols, attachColumn]}
-            facets={requestFacets}
-            onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
-            searchPlaceholder="Search requisitions…"
-            searchText={(r) => [r.id, r.purpose, engineerOf(r), r.guest_email, r.department, r.project_name, r.po_numbers]}
-            initialTerm={focusId}
-            defaultSort={{ id: 'created_at', dir: 'desc' }}
-            storageKey="admin-requests"
-            toolbarExtra={(visible) => (
-              (() => {
-                const { section: exportSection, meta } = requestExportMeta(visible)
-                return <ExportMenu rows={visible} columns={requestExport} meta={meta} section={exportSection} />
-              })()
-            )}
-            emptyTitle="No requests raised yet"
-            renderCard={(r) => (
-              <article className="surface flex h-full flex-col rounded-xl p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="line-clamp-2 text-sm font-semibold text-foreground">{r.purpose}</p>
-                  <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
-                </div>
-                <div className="mt-auto pt-4">
-                  <p className="text-lg font-semibold tabular-nums text-foreground">{ghs(r.total_amount ?? null)}</p>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                    <span className="truncate">{r.guest_name ?? '—'}</span>
-                    <span className="shrink-0">{shortDate(r.created_at)}</span>
-                  </div>
-                </div>
-              </article>
-            )}
-          />
+          <div className="space-y-4 sm:space-y-5">
+            <RequisitionsDashboard all={requests} visible={visibleRequests} engineerOf={engineerOf} daysAtStage={daysAtStage} />
+            <TableTray
+              label="Requisitions"
+              info="Every chart above reflects exactly what this table's search and filters leave. Select a row to open the requisition."
+            >
+              <DataView
+                rows={requests}
+                onVisibleRows={setVisibleRequests}
+                getRowId={(r) => r.id}
+                columns={[...requestCols, attachColumn]}
+                facets={requestFacets}
+                onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
+                searchPlaceholder="Search requisitions…"
+                searchText={(r) => [r.id, r.purpose, engineerOf(r), r.guest_email, r.department, r.project_name, r.po_numbers]}
+                initialTerm={focusId}
+                defaultSort={{ id: 'created_at', dir: 'desc' }}
+                storageKey="admin-requests"
+                toolbarExtra={(visible) => (
+                  (() => {
+                    const { section: exportSection, meta } = requestExportMeta(visible)
+                    return <ExportMenu rows={visible} columns={requestExport} meta={meta} section={exportSection} />
+                  })()
+                )}
+                emptyTitle="No requests raised yet"
+                renderCard={(r) => (
+                  <article className="surface flex h-full flex-col rounded-xl p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="line-clamp-2 text-sm font-semibold text-foreground">{r.purpose}</p>
+                      <StatusBadge status={r.status} config={REQUEST_STATUS_CONFIG} />
+                    </div>
+                    <div className="mt-auto pt-4">
+                      <p className="text-lg font-semibold tabular-nums text-foreground">{ghs(r.total_amount ?? null)}</p>
+                      <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                        <span className="truncate">{r.guest_name ?? '—'}</span>
+                        <span className="shrink-0">{shortDate(r.created_at)}</span>
+                      </div>
+                    </div>
+                  </article>
+                )}
+              />
+            </TableTray>
+          </div>
         )}
 
         {section === 'pos' && (
@@ -967,20 +776,26 @@ export default function AdminClient({
         )}
 
         {section === 'audit' && (
-          <DataView
-            rows={auditTrail}
-            getRowId={(e) => e.id}
-            columns={auditCols}
-            facets={auditFacets}
-            searchPlaceholder="Search the audit trail…"
-            searchText={(e) => [e.action, e.notes, e.po?.purpose, e.performer?.name, e.performer?.email]}
-            defaultSort={{ id: 'created_at', dir: 'desc' }}
-            toolbarExtra={(visible) => (
-              <ExportButton rows={visible} columns={auditCsv} section="audit-trail" />
-            )}
-            storageKey="admin-audit"
-            emptyTitle="No audit trail entries yet"
-          />
+          <div className="space-y-4 sm:space-y-5">
+            <AuditDashboard all={auditTrail} visible={visibleAudit} />
+            <TableTray label="Audit log" info="Every chart above reflects exactly what this table's search and filters leave.">
+              <DataView
+                rows={auditTrail}
+                onVisibleRows={setVisibleAudit}
+                getRowId={(e) => e.id}
+                columns={auditCols}
+                facets={auditFacets}
+                searchPlaceholder="Search the audit trail…"
+                searchText={(e) => [e.action, e.notes, e.po?.purpose, e.performer?.name, e.performer?.email]}
+                defaultSort={{ id: 'created_at', dir: 'desc' }}
+                toolbarExtra={(visible) => (
+                  <ExportButton rows={visible} columns={auditCsv} section="audit-trail" />
+                )}
+                storageKey="admin-audit"
+                emptyTitle="No audit trail entries yet"
+              />
+            </TableTray>
+          </div>
         )}
 
         {section === 'emails' && (

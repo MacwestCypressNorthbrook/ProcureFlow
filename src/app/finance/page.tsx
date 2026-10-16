@@ -1,10 +1,10 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
 import POTable from '@/components/shared/POTable'
-import { PageContainer, SectionHeader, StatGrid, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
+import { PageContainer, SectionHeader, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
+import FinanceHomeDashboard from '@/components/dashboards/FinanceHomeDashboard'
 import { Button } from '@/components/ui/button'
-import { monthSplit } from '@/components/shared/stat-presets'
-import { CreditCard, CheckCircle, Wallet, Clock, ArrowRight } from 'lucide-react'
+import { CheckCircle, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 import type { PurchaseOrder } from '@/lib/types'
 
@@ -32,7 +32,6 @@ export default async function FinancePage() {
     const paid = new Date(p.paid_at)
     return paid.getMonth() === now.getMonth() && paid.getFullYear() === now.getFullYear()
   }).length
-  const totalProcessed = allPos.filter((p) => p.status === 'paid').length
   const totalAmount = allPos
     .filter((p) => p.status === 'paid' || p.status === 'pending_finance')
     .reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0)
@@ -41,16 +40,12 @@ export default async function FinancePage() {
   const recentlyCompleted = allPos.filter((p) => p.status === 'paid').slice(0, 8)
 
   const pendingAmount = pendingPaying.reduce((sum, p) => sum + (Number(p.total_amount) || 0), 0)
-  const settledShare = totalProcessed + pendingCount > 0 ? totalProcessed / (totalProcessed + pendingCount) : 0
   const money = (n: number) =>
     new Intl.NumberFormat('en-GH', {
       style: 'currency',
       currency: 'GHS',
       maximumFractionDigits: 0,
     }).format(n)
-  const paidMonth = monthSplit(
-    allPos.filter((p) => p.status === 'paid').map((p) => p.paid_at)
-  )
   const firstName = user?.name?.split(' ')[0]
 
   return (
@@ -86,48 +81,7 @@ export default async function FinancePage() {
           }
         />
 
-        <StatGrid
-          stats={[
-            {
-              label: 'Pending payment',
-              value: pendingCount,
-              icon: <CreditCard size={18} />,
-              tone: 'blue',
-              hint: money(pendingAmount) + ' outstanding',
-              badge: pendingCount > 0 ? 'Needs action' : undefined,
-              href: '/finance/pending',
-            },
-            {
-              label: 'Completed this month',
-              value: completedThisMonth,
-              icon: <CheckCircle size={18} />,
-              tone: 'emerald',
-              delta: paidMonth.delta,
-              compare:
-                paidMonth.lastMonth > 0
-                  ? `vs. ${paidMonth.lastMonth} last month`
-                  : 'No payments settled last month',
-              href: '/finance/completed',
-            },
-            {
-              label: 'Total processed',
-              value: totalProcessed,
-              icon: <Clock size={18} />,
-              tone: 'purple',
-              hint: 'All time',
-              share: settledShare,
-              href: '/finance/completed',
-            },
-            {
-              label: 'Total value',
-              value: money(totalAmount),
-              icon: <Wallet size={18} />,
-              tone: 'amber',
-              hint: 'Approved, pending and settled',
-              href: '/finance/all',
-            },
-          ]}
-        />
+        <FinanceHomeDashboard pos={allPos} />
 
         <section>
           <SectionHeader

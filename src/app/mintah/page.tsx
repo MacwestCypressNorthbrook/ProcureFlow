@@ -1,51 +1,39 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { query } from '@/lib/db'
 import RequestTable from '@/components/shared/RequestTable'
-import POTable from '@/components/shared/POTable'
-import { PageContainer, SectionHeader, StatGrid, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
-import { FileText, ShoppingBag, AlertTriangle, CheckCircle, Eye, ArrowRight, RotateCcw } from 'lucide-react'
+import { PageContainer, SectionHeader, DashboardHero, EmptyState } from '@/components/shared/ui-kit'
+import { FileText, ArrowRight, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { monthSplit, statMoney } from '@/components/shared/stat-presets'
 import Link from 'next/link'
-import type { PurchaseOrder } from '@/lib/types'
+import { getStageDecisions, getStageInbox, type QueueRow, type StageDecision } from '@/lib/review'
+import ReviewerHomeDashboard from '@/components/dashboards/ReviewerHomeDashboard'
 
 export const dynamic = 'force-dynamic'
 
 export default async function MintahPage() {
   const user = await requirePageRole('supply_chain')
 
-  let incomingRequests: Record<string, unknown>[] = []
-  let reviewingRequests: Record<string, unknown>[] = []
-  let costControlRequests: Record<string, unknown>[] = []
+  let reviewingRequests: QueueRow[] = []
+  let decisions: StageDecision[] = []
+  let withLeads = 0
+  let withCostControl = 0
 
   try {
-    const [incomingRes, reviewingRes, costControlRes] = await Promise.all([
-      query<Record<string, unknown>>(
-        `SELECT r.*, pr.name AS project_name
-           FROM public.requests r
-           LEFT JOIN public.projects pr ON pr.id = r.project_id
-          WHERE r.status IN ('pending_lead')
-          ORDER BY r.created_at DESC LIMIT 8`
-      ),
-      query<Record<string, unknown>>(
-        `SELECT r.*, pr.name AS project_name
-           FROM public.requests r
-           LEFT JOIN public.projects pr ON pr.id = r.project_id
-          WHERE r.status = 'pending_supply_chain'
-             OR (r.status = 'sent_back' AND r.sent_back_to = 'supply_chain')
-          ORDER BY r.created_at DESC`
-      ),
-      query<Record<string, unknown>>(
-        `SELECT r.*, pr.name AS project_name
-           FROM public.requests r
-           LEFT JOIN public.projects pr ON pr.id = r.project_id
-          WHERE r.status = 'pending_cost_control'
-          ORDER BY r.created_at DESC LIMIT 8`
+    // The queue comes from the shared inbox so it carries supplier names; the
+    // stages either side are only counted, never listed here.
+    const [queueRes, decisionsRes, counts] = await Promise.all([
+      getStageInbox('supply_chain'),
+      getStageDecisions('supply_chain', { limit: 1000, actorId: user.id }),
+      query<{ lead: number; cost_control: number }>(
+        `SELECT COUNT(*) FILTER (WHERE status = 'pending_lead')::int AS lead,
+                COUNT(*) FILTER (WHERE status = 'pending_cost_control')::int AS cost_control
+           FROM public.requests`
       ),
     ])
-    incomingRequests = incomingRes
-    reviewingRequests = reviewingRes
-    costControlRequests = costControlRes
+    reviewingRequests = queueRes
+    decisions = decisionsRes
+    withLeads = counts[0]?.lead ?? 0
+    withCostControl = counts[0]?.cost_control ?? 0
   } catch (err) {
     console.error('Failed to query Mintah data from Neon:', err)
   }
@@ -54,10 +42,10 @@ export default async function MintahPage() {
   const sentBackCount = sentBackRequests.length
 
   const stats = {
-    upstreamLead: incomingRequests.length,
+    upstreamLead: withLeads,
     awaitingReview: reviewingRequests.length,
     sentBack: sentBackCount,
-    withCostControl: costControlRequests.length,
+    withCostControl,
   }
 
   const recentRequests = reviewingRequests.slice(0, 8)
@@ -111,47 +99,16 @@ export default async function MintahPage() {
           </div>
         )}
 
-        <StatGrid
-          stats={[
-            {
-              label: 'Awaiting your review',
-              value: stats.awaitingReview,
-              icon: <Eye size={18} />,
-              tone: 'amber',
-              hint: 'Ready for pricing & invoices',
-              badge: stats.awaitingReview > 0 ? 'Action needed' : undefined,
-              href: '/mintah/queue',
-            },
-            ...(sentBackCount > 0
-              ? [
-                  {
-                    label: 'Returned by Cost Control',
-                    value: sentBackCount,
-                    icon: <RotateCcw size={18} />,
-                    tone: 'red' as const,
-                    hint: 'Cost revision required',
-                    badge: 'Action Needed',
-                    href: '/mintah/queue',
-                  },
-                ]
-              : []),
-            {
-              label: 'Under Cost Control Audit',
-              value: stats.withCostControl,
-              icon: <ShoppingBag size={18} />,
-              tone: 'indigo',
-              hint: 'Invoices under audit',
-              href: '/mintah/requests',
-            },
-            {
-              label: 'With Project Leads',
-              value: stats.upstreamLead,
-              icon: <FileText size={18} />,
-              tone: 'blue',
-              hint: 'Pending lead sign-off',
-              href: '/mintah/requests',
-            },
-          ]}
+        <ReviewerHomeDashboard
+          role="supply_chain"
+          queue={reviewingRequests}
+          decisions={decisions}
+          hrefBase="/mintah/queue"
+          neighbours={{
+            before: { label: 'With Project Leads', count: stats.upstreamLead },
+            returned: stats.sentBack,
+            after: { label: 'With Cost Control', count: stats.withCostControl },
+          }}
         />
 
         <section>
