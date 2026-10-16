@@ -273,7 +273,7 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
       label: 'Operations',
       items: [
         { href: '/admin', label: 'Admin Overview', icon: <LayoutDashboard size={18} /> },
-        { href: '/admin/requests', label: 'Requisitions', icon: <FileText size={18} /> },
+        { href: '/admin?tab=requests', label: 'All Requisitions', icon: <FileText size={18} /> },
         { href: '/admin/reviewed', label: 'Reviewed', icon: <ClipboardList size={18} /> },
         { href: '/admin?tab=pos', label: 'Purchase Orders', icon: <FileCheck2 size={18} /> },
         { href: '/admin?tab=invoices', label: 'Invoices', icon: <Receipt size={18} /> },
@@ -282,6 +282,9 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
     {
       label: 'Cross-Department Dashboards',
       items: [
+        // Where the purchase order is raised. Super User is elevated, so it
+        // holds `request:convert` and may act here like the Administrator.
+        { href: '/admin/requests', label: 'Administrator', icon: <FileCheck2 size={18} /> },
         { href: '/sam/requests', label: 'Project Lead', icon: <ClipboardCheck size={18} /> },
         { href: '/mintah/queue', label: 'Supply Chain', icon: <Eye size={18} /> },
         { href: '/cost-control', label: 'Cost Control', icon: <Scale size={18} /> },
