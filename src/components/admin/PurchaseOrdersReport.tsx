@@ -2,10 +2,9 @@
 
 import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, CalendarClock, Coins, FileArchive, FileSpreadsheet, FileText, Receipt, Scale, Table2 } from 'lucide-react'
+import { AlertTriangle, FileArchive, FileSpreadsheet, FileText, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
-import { StatGrid } from '@/components/shared/ui-kit'
 import { PO_STATUS_CONFIG, REQUEST_STATUS_CONFIG, cn } from '@/lib/utils'
 import { buildXlsx, downloadBlob, sheet, summarize, type XlsxColumn } from '@/lib/xlsx'
 import { downloadPdf, exportFilename, type ExportColumn } from '@/lib/export'
@@ -13,7 +12,21 @@ import { toCsv, downloadCsv } from '@/lib/csv'
 import { downloadDocumentBundle, MAX_BUNDLE_FILES } from '@/lib/bundle-documents'
 import { vendorKey, type AdminInvoice, type AdminPurchaseOrder } from './report-types'
 import ReportExportMenu, { type ReportExportOption } from './ReportExportMenu'
-import { ChartCard, MonthColumns, RankedBars, ghsFull, monthSeries, rankRows } from './report-charts'
+import { ghsFull, monthSeries } from './report-charts'
+import {
+  BreakdownDonut,
+  KpiTile,
+  LeadTime,
+  PixelTrend,
+  SpendPipeline,
+  Tray,
+  VarianceBars,
+  compact,
+  type KpiTrend,
+  type Slice,
+  type SparkPoint,
+  type VarianceRow,
+} from './po-dashboard'
 
 /** One purchase order with the figures its report derives. */
 interface PoRow extends AdminPurchaseOrder {
@@ -125,13 +138,48 @@ function deriveRows(pos: AdminPurchaseOrder[], invoices: AdminInvoice[]): PoRow[
   })
 }
 
-function ranked(rows: PoRow[], key: (r: PoRow) => string) {
-  return rankRows(summarize(rows, key, (r) => r.amount).map((g) => ({ label: g.name, value: g.total, count: g.count })))
-}
-
 /** "+GHS 1,200 (+4.0%)" */
 function signedMoney(n: number) {
   return `${n > 0 ? '+' : n < 0 ? '−' : ''}${ghsFull(Math.abs(n))}`
+}
+
+type Dimension = 'project' | 'supplier' | 'engineer' | 'status'
+
+const DIMENSIONS: { value: Dimension; label: string }[] = [
+  { value: 'project', label: 'Project' },
+  { value: 'supplier', label: 'Supplier' },
+  { value: 'engineer', label: 'Engineer' },
+  { value: 'status', label: 'Status' },
+]
+
+const DIMENSION_KEY: Record<Dimension, (r: PoRow) => string> = {
+  project: (r) => r.project,
+  supplier: (r) => r.vendor,
+  engineer: (r) => r.engineer,
+  status: (r) => r.status,
+}
+
+const dimensionLabel = (d: Dimension, key: string) => (d === 'status' ? PO_STATUS_CONFIG[key]?.label ?? key : key)
+
+/** The part of a PO's value that has a recorded invoice — never more than the PO itself. */
+const invoicedPart = (r: PoRow) => Math.min(r.invoiced, r.amount || r.invoiced)
+
+const median = (values: number[]) => {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted.length ? sorted[Math.floor(sorted.length / 2)] : null
+}
+
+const shortMonth = (ym: string) => {
+  const [y, m] = ym.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })
+}
+
+function trendOf(change: number, text: string, upIsGood: boolean | null): KpiTrend {
+  return {
+    text,
+    direction: change > 0 ? 'up' : change < 0 ? 'down' : 'flat',
+    good: upIsGood === null ? null : upIsGood ? change > 0 : change < 0,
+  }
 }
 
 export default function PurchaseOrdersReport({
@@ -161,22 +209,30 @@ export default function PurchaseOrdersReport({
     const matched = visible.filter((r) => r.requisitioned !== null)
     const matchedReq = matched.reduce((s, r) => s + (r.requisitioned ?? 0), 0)
     const matchedPo = matched.reduce((s, r) => s + r.amount, 0)
-    const invoiced = visible.reduce((s, r) => s + Math.min(r.invoiced, r.amount || r.invoiced), 0)
-    const days = visible.map((r) => r.daysToPo).filter((d): d is number => d !== null).sort((a, b) => a - b)
+    const invoiced = visible.reduce((s, r) => s + invoicedPart(r), 0)
+    const days = visible.map((r) => r.daysToPo).filter((d): d is number => d !== null)
+    const daysIn = (month: string) =>
+      visible.filter((r) => r.month === month && r.daysToPo !== null).map((r) => r.daysToPo as number)
     return {
       committed,
       count: visible.length,
       average: visible.length ? committed / visible.length : 0,
       thisValue,
       lastValue,
+      thisCount: visible.filter((r) => r.month === thisMonth).length,
+      lastCount: visible.filter((r) => r.month === lastMonth).length,
       delta: lastValue > 0 ? ((thisValue - lastValue) / lastValue) * 100 : undefined,
       variance: matchedPo - matchedReq,
       variancePct: matchedReq > 0 ? (matchedPo - matchedReq) / matchedReq : 0,
       matchedCount: matched.length,
       invoiced,
       invoicedShare: committed > 0 ? invoiced / committed : 0,
-      medianDays: days.length ? days[Math.floor(days.length / 2)] : null,
-      slowest: days.length ? days[days.length - 1] : null,
+      paid: visible.reduce((s, r) => s + Math.min(r.paid, r.amount || r.paid), 0),
+      days,
+      medianDays: median(days),
+      thisMedianDays: median(daysIn(thisMonth)),
+      lastMedianDays: median(daysIn(lastMonth)),
+      slowest: days.length ? Math.max(...days) : null,
       noDocument: visible.filter((r) => !r.document_id && !r.file_path).length,
       overTen: visible.filter((r) => (r.variancePct ?? 0) > 0.1).length,
       unmatched: visible.filter((r) => r.band === 'unmatched').length,
@@ -184,15 +240,90 @@ export default function PurchaseOrdersReport({
     }
   }, [visible])
 
-  const charts = useMemo(
-    () => ({
-      project: ranked(visible, (r) => r.project),
-      supplier: ranked(visible, (r) => r.vendor),
-      engineer: ranked(visible, (r) => r.engineer),
-      months: monthSeries(visible, (r) => r.created_at, (r) => r.amount),
-    }),
+  /* ── Charts ─────────────────────────────────────────────────────────── */
+  const sparks = useMemo(() => {
+    const value = monthSeries(visible, (r) => r.created_at, (r) => r.amount, 8)
+    const invoiced = monthSeries(visible, (r) => r.created_at, invoicedPart, 8)
+    return {
+      value: value.map<SparkPoint>((p) => ({ label: shortMonth(p.month), value: p.value, display: ghsFull(p.value) })),
+      count: value.map<SparkPoint>((p) => ({ label: shortMonth(p.month), value: p.count, display: `${p.count} POs` })),
+      invoiced: invoiced.map<SparkPoint>((p) => ({ label: shortMonth(p.month), value: p.value, display: ghsFull(p.value) })),
+      days: value.map<SparkPoint>((p) => {
+        const d = median(visible.filter((r) => r.month === p.month && r.daysToPo !== null).map((r) => r.daysToPo as number))
+        return { label: shortMonth(p.month), value: d ?? 0, display: d === null ? 'no POs' : `${d} days` }
+      }),
+    }
+  }, [visible])
+
+  const trendItems = useMemo(
+    () => visible.map((r) => ({ at: r.created_at, amount: r.amount, invoiced: invoicedPart(r) })),
     [visible]
   )
+
+  // Colours follow the entity, not its rank in the current filter: the five
+  // largest across *all* POs hold their slot, so filtering never repaints them.
+  const [dimension, setDimension] = useState<Dimension>('project')
+  const pinned = useMemo(() => {
+    const key = DIMENSION_KEY[dimension]
+    const totals = new Map<string, number>()
+    for (const r of rows) totals.set(key(r), (totals.get(key(r)) ?? 0) + r.amount)
+    return new Map([...totals].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k], i) => [k, i + 1]))
+  }, [rows, dimension])
+
+  const breakdown = useMemo(() => {
+    const key = DIMENSION_KEY[dimension]
+    const groups = new Map<string, { value: number; count: number }>()
+    for (const r of visible) {
+      const g = groups.get(key(r)) ?? { value: 0, count: 0 }
+      g.value += r.amount
+      g.count += 1
+      groups.set(key(r), g)
+    }
+    const present = [...groups].sort((a, b) => b[1].value - a[1].value)
+    const taken = new Set(present.map(([k]) => pinned.get(k)).filter(Boolean))
+    const free = [1, 2, 3, 4, 5].filter((s) => !taken.has(s))
+    const slices: Slice[] = []
+    const other = { value: 0, count: 0, n: 0 }
+    for (const [k, g] of present) {
+      const slot = pinned.get(k) ?? free.shift()
+      if (slot) slices.push({ key: k, label: dimensionLabel(dimension, k), value: g.value, count: g.count, slot })
+      else {
+        other.value += g.value
+        other.count += g.count
+        other.n += 1
+      }
+    }
+    if (other.n) slices.push({ key: '__other', label: `Other (${other.n})`, value: other.value, count: other.count, slot: null })
+
+    const total = present.reduce((s, [, g]) => s + g.value, 0)
+    const share = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0)
+    const noun = DIMENSIONS.find((d) => d.value === dimension)!.label.toLowerCase()
+    const insight =
+      present.length === 0 || total === 0
+        ? null
+        : present.length === 1
+          ? `All committed value sits with one ${noun}: ${dimensionLabel(dimension, present[0][0])}.`
+          : present.length >= 4
+            ? `${dimensionLabel(dimension, present[0][0])} holds ${share(present[0][1].value)}% of committed value; the top three ${noun === 'status' ? 'statuses' : `${noun}s`} together hold ${share(present.slice(0, 3).reduce((s, [, g]) => s + g.value, 0))}%.`
+            : `${dimensionLabel(dimension, present[0][0])} holds ${share(present[0][1].value)}% of committed value across ${present[0][1].count} PO${present[0][1].count === 1 ? '' : 's'}.`
+    return { slices, insight }
+  }, [visible, dimension, pinned])
+
+  const variance = useMemo(() => {
+    const groups = new Map<string, VarianceRow>()
+    for (const r of visible) {
+      if (r.requisitioned === null) continue
+      const g = groups.get(r.project) ?? { label: r.project, variance: 0, requisitioned: 0, count: 0 }
+      g.variance += r.variance ?? 0
+      g.requisitioned += r.requisitioned
+      g.count += 1
+      groups.set(r.project, g)
+    }
+    return [...groups.values()]
+      .filter((g) => Math.abs(g.variance) >= 0.5)
+      .sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance))
+      .slice(0, 6)
+  }, [visible])
 
   /* ── Table ──────────────────────────────────────────────────────────── */
   // Memoized: DataView re-filters and re-sorts whenever these change identity.
@@ -558,104 +689,116 @@ export default function PurchaseOrdersReport({
     ]
   }
 
+  const countChange = stats.thisCount - stats.lastCount
+  const daysChange =
+    stats.thisMedianDays !== null && stats.lastMedianDays !== null ? stats.thisMedianDays - stats.lastMedianDays : null
+
+  const attention = [
+    stats.overTen > 0 && `${stats.overTen} PO${stats.overTen === 1 ? '' : 's'} more than 10% over the requisition`,
+    stats.unmatched > 0 && `${stats.unmatched} PO vendor${stats.unmatched === 1 ? '' : 's'} not on the requisition`,
+    stats.noDocument > 0 && `${stats.noDocument} without a PO document`,
+    stats.uninvoiced > 0 && `${stats.uninvoiced} with no invoice recorded`,
+  ].filter(Boolean) as string[]
+
   return (
-    <div className="space-y-6">
-      <StatGrid
-        stats={[
-          {
-            label: 'Committed value',
-            value: ghsFull(stats.committed),
-            icon: <Coins size={18} />,
-            tone: 'purple',
-            compare: `${stats.count} purchase order${stats.count === 1 ? '' : 's'} · average ${ghsFull(stats.average)}`,
-          },
-          {
-            label: 'Raised this month',
-            value: ghsFull(stats.thisValue),
-            icon: <CalendarClock size={18} />,
-            tone: 'blue',
-            delta: stats.delta !== undefined ? Math.round(stats.delta) : undefined,
-            compare: stats.lastValue > 0 ? `vs. ${ghsFull(stats.lastValue)} last month` : 'Nothing raised last month',
-          },
-          {
-            label: 'PO vs requisitioned',
-            value: stats.matchedCount ? signedMoney(stats.variance) : '—',
-            icon: <Scale size={18} />,
-            tone: stats.variance > 0 ? 'red' : 'emerald',
-            compare: stats.matchedCount
-              ? `${(stats.variancePct * 100).toFixed(1)}% ${stats.variance > 0 ? 'above' : stats.variance < 0 ? 'below' : 'against'} what was requisitioned · ${stats.matchedCount} PO${stats.matchedCount === 1 ? '' : 's'} matched to a supplier`
-              : 'No PO vendor matches a requisition supplier yet',
-          },
-          {
-            label: 'Invoiced',
-            value: ghsFull(stats.invoiced),
-            icon: <Receipt size={18} />,
-            tone: 'emerald',
-            share: stats.invoicedShare,
-            compare: `${Math.round(stats.invoicedShare * 100)}% of committed value has a recorded invoice`,
-          },
-          {
-            label: 'Requisition to PO',
-            value: stats.medianDays !== null ? `${stats.medianDays}d` : '—',
-            icon: <CalendarClock size={18} />,
-            tone: stats.medianDays !== null && stats.medianDays > 14 ? 'red' : 'amber',
-            compare: stats.slowest !== null ? `Median wait · slowest ${stats.slowest} days` : 'No dated requisitions',
-          },
-        ]}
-      />
+    <div className="space-y-4 sm:space-y-5">
+      <div className="grid grid-cols-1 gap-3 stagger sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
+        <KpiTile
+          label="Committed value"
+          prefix="GHS"
+          value={compact(stats.committed)}
+          title={ghsFull(stats.committed)}
+          spark={sparks.value}
+          info={`Total value of the ${stats.count} purchase orders shown, averaging ${ghsFull(stats.average)} each. The sparkline is the last eight months; the dark bar is this month.`}
+          trend={stats.delta !== undefined ? trendOf(stats.delta, `${Math.abs(Math.round(stats.delta))}%`, null) : undefined}
+          note={stats.lastValue > 0 ? 'this month vs last' : 'nothing raised last month'}
+        />
+        <KpiTile
+          label="Purchase orders"
+          value={stats.count.toLocaleString('en-GB')}
+          unit={stats.count === 1 ? 'PO' : 'POs'}
+          spark={sparks.count}
+          info="How many purchase orders match the current filters, with POs raised per month over the last eight months."
+          trend={trendOf(countChange, `${Math.abs(countChange)}`, null)}
+          note={`raised this month (${stats.thisCount}) vs last`}
+        />
+        <KpiTile
+          label="Invoiced"
+          prefix="GHS"
+          value={compact(stats.invoiced)}
+          title={ghsFull(stats.invoiced)}
+          spark={sparks.invoiced}
+          info="Committed value with a recorded invoice against it. Invoices on a requisition are shared across that supplier's POs by value, and never count beyond a PO's own amount."
+          note={`${Math.round(stats.invoicedShare * 100)}% of committed value`}
+        />
+        <KpiTile
+          label="Requisition to PO"
+          value={stats.medianDays !== null ? String(stats.medianDays) : '—'}
+          unit={stats.medianDays === 1 ? 'day' : 'days'}
+          spark={sparks.days}
+          info="Median days from a requisition being raised to its purchase order. Falling is good. The sparkline is each month's median."
+          trend={daysChange !== null ? trendOf(daysChange, `${Math.abs(daysChange)}d`, false) : undefined}
+          note={daysChange !== null ? 'median this month vs last' : stats.slowest !== null ? `slowest ${stats.slowest} days` : 'no dated requisitions'}
+        />
+      </div>
 
       {/* What deserves a second look, in words — never colour alone. */}
-      {(stats.noDocument > 0 || stats.overTen > 0 || stats.unmatched > 0 || stats.uninvoiced > 0) && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          {[
-            stats.overTen > 0 && `${stats.overTen} PO${stats.overTen === 1 ? '' : 's'} more than 10% over the requisition`,
-            stats.unmatched > 0 && `${stats.unmatched} PO vendor${stats.unmatched === 1 ? '' : 's'} not on the requisition`,
-            stats.noDocument > 0 && `${stats.noDocument} without a PO document`,
-            stats.uninvoiced > 0 && `${stats.uninvoiced} with no invoice recorded`,
-          ]
-            .filter(Boolean)
-            .map((text) => (
-              <span
-                key={text as string}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-2.5 py-1 font-medium text-amber-800 dark:text-amber-300"
-              >
-                <AlertTriangle size={12} /> {text}
-              </span>
-            ))}
+      {attention.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {attention.map((text) => (
+            <span
+              key={text}
+              className="inline-flex items-center gap-2 rounded-xl border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-xs font-medium text-amber-800 dark:text-amber-300"
+            >
+              <AlertTriangle size={13} className="shrink-0" /> {text}
+            </span>
+          ))}
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <ChartCard title="Committed by project" caption="Where purchase-order spend is going">
-          <RankedBars rows={charts.project} />
-        </ChartCard>
-        <ChartCard title="Committed by supplier" caption="Who the purchase orders are raised to">
-          <RankedBars rows={charts.supplier} />
-        </ChartCard>
-        <ChartCard title="Committed by engineer" caption="By whoever raised the underlying requisition">
-          <RankedBars rows={charts.engineer} />
-        </ChartCard>
-        <ChartCard title="Monthly committed value" caption="Last 12 months, by the month each PO was raised">
-          <MonthColumns points={charts.months} />
-        </ChartCard>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
+          <PixelTrend items={trendItems} />
+        </div>
+        <BreakdownDonut
+          dimension={dimension}
+          dimensions={DIMENSIONS}
+          onDimension={setDimension}
+          slices={breakdown.slices}
+          insight={breakdown.insight}
+        />
       </div>
 
-      <DataView
-        rows={rows}
-        getRowId={(r) => r.id}
-        columns={columns}
-        facets={facets}
-        onVisibleRows={setVisible}
-        onRowClick={(r) => r.request_id && router.push(`/admin/requests/${r.request_id}`)}
-        searchPlaceholder="Search PO number, supplier, project, engineer…"
-        searchText={(r) => [r.id, r.po_number, r.vendor, r.project, r.engineer, r.request_purpose, r.supplier_items, r.department]}
-        initialTerm={focusId}
-        defaultSort={{ id: 'created_at', dir: 'desc' }}
-        storageKey="admin-po-report"
-        toolbarExtra={(list) => <ReportExportMenu count={list.length} noun="purchase order" options={exportOptions(list)} />}
-        emptyTitle="No purchase orders yet"
-        emptyMessage="Purchase orders appear here once the Administrator attaches them."
-      />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <SpendPipeline committed={stats.committed} invoiced={stats.invoiced} paid={stats.paid} />
+        <VarianceBars rows={variance} net={stats.variance} netPct={stats.variancePct} />
+        <div className="min-w-0 md:col-span-2 xl:col-span-1">
+          <LeadTime days={stats.days} />
+        </div>
+      </div>
+
+      <Tray
+        label="Purchase orders"
+        info="Every chart above reflects exactly what this table's search and filters leave. Select a row to open its requisition."
+        bodyClassName="border-0 bg-transparent p-0.5 shadow-none sm:p-1"
+      >
+        <DataView
+          rows={rows}
+          getRowId={(r) => r.id}
+          columns={columns}
+          facets={facets}
+          onVisibleRows={setVisible}
+          onRowClick={(r) => r.request_id && router.push(`/admin/requests/${r.request_id}`)}
+          searchPlaceholder="Search PO number, supplier, project, engineer…"
+          searchText={(r) => [r.id, r.po_number, r.vendor, r.project, r.engineer, r.request_purpose, r.supplier_items, r.department]}
+          initialTerm={focusId}
+          defaultSort={{ id: 'created_at', dir: 'desc' }}
+          storageKey="admin-po-report"
+          toolbarExtra={(list) => <ReportExportMenu count={list.length} noun="purchase order" options={exportOptions(list)} />}
+          emptyTitle="No purchase orders yet"
+          emptyMessage="Purchase orders appear here once the Administrator attaches them."
+        />
+      </Tray>
     </div>
   )
 }

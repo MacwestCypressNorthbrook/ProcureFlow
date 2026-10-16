@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowDown,
   ArrowUp,
@@ -200,21 +201,33 @@ function FacetPicker<T>({
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [pos, setPos] = useState<PopoverPos | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+      const target = e.target as Node
+      if (wrapRef.current?.contains(target) || popRef.current?.contains(target)) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
+    // The filter row scrolls sideways and the page scrolls; the popover is
+    // fixed to the viewport, so it follows its button on either.
+    const follow = () => buttonRef.current && setPos(popoverPos(buttonRef.current))
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', follow, true)
+    window.addEventListener('resize', follow)
     return () => {
       document.removeEventListener('mousedown', onDown)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', follow, true)
+      window.removeEventListener('resize', follow)
     }
   }, [open])
 
@@ -233,14 +246,18 @@ function FacetPicker<T>({
         : `${selected.length} selected`
 
   return (
-    <div ref={wrapRef} className="relative w-full lg:w-auto">
+    <div ref={wrapRef} className="relative w-full @xl:w-auto @xl:shrink-0">
       <button
+        ref={buttonRef}
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={(e) => {
+          if (!open) setPos(popoverPos(e.currentTarget))
+          setOpen(!open)
+        }}
         aria-haspopup="true"
         aria-expanded={open}
         title={selected.length > 1 ? selected.map((v) => facet.options.find((o) => o.value === v)?.label ?? v).join(', ') : undefined}
-        className={`${controlClass} inline-flex w-full items-center justify-between gap-2 pr-2.5 font-medium lg:w-auto ${
+        className={`${controlClass} inline-flex w-full items-center justify-between gap-2 whitespace-nowrap pr-2.5 font-medium @xl:w-auto ${
           selected.length > 0 ? 'border-primary/50 bg-primary/[0.04]' : ''
         }`}
       >
@@ -250,8 +267,12 @@ function FacetPicker<T>({
         <ChevronDown size={15} aria-hidden="true" className="shrink-0 text-muted-foreground" />
       </button>
 
-      {open && (
-        <div className="absolute left-0 z-50 mt-1.5 w-full min-w-[240px] overflow-hidden rounded-xl border border-border bg-popover shadow-xl lg:w-[260px]">
+      {open && pos && createPortal(
+        <div
+          ref={popRef}
+          className="fixed z-[70] overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+          style={{ left: pos.left, width: pos.width, ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }) }}
+        >
           {searchable && (
             <div className="border-b border-border p-2">
               <input
@@ -306,7 +327,104 @@ function FacetPicker<T>({
               Clear
             </button>
           </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
+interface PopoverPos {
+  left: number
+  width: number
+  top?: number
+  bottom?: number
+}
+
+/** Under the button, or above it when the viewport has no room below; never off-screen sideways. */
+function popoverPos(button: HTMLElement): PopoverPos {
+  const r = button.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const width = Math.min(Math.max(r.width, 260), vw - 16)
+  const left = Math.max(8, Math.min(r.left, vw - width - 8))
+  const NEEDED = 340
+  return vh - r.bottom < NEEDED && r.top > vh - r.bottom
+    ? { left, width, bottom: vh - r.top + 6 }
+    : { left, width, top: r.bottom + 6 }
+}
+
+/**
+ * The filter row: one line that scrolls sideways once the toolbar is `@xl` wide, with fades and
+ * arrow buttons at whichever edge has more to show. On phones it stays a
+ * stacked list behind the Filters button.
+ */
+function ScrollRow({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const innerRef = useRef<HTMLDivElement>(null)
+  const [edges, setEdges] = useState({ start: false, end: false })
+
+  useEffect(() => {
+    const el = scrollRef.current
+    const inner = innerRef.current
+    if (!el || !inner) return
+    const update = () => {
+      const start = el.scrollLeft > 1
+      const end = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+      setEdges((prev) => (prev.start === start && prev.end === end ? prev : { start, end }))
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    // Either side can change the overflow: the container resizing, or a
+    // filter label growing ("Status: All" → "Status: 3 selected").
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    observer.observe(inner)
+    return () => {
+      el.removeEventListener('scroll', update)
+      observer.disconnect()
+    }
+  }, [])
+
+  const nudge = (dir: 1 | -1) => scrollRef.current?.scrollBy({ left: dir * scrollRef.current.clientWidth * 0.7, behavior: 'smooth' })
+  // A mask rather than a painted gradient, so the fade suits whatever surface
+  // the list sits on.
+  const mask =
+    edges.start || edges.end
+      ? `linear-gradient(to right, ${edges.start ? 'transparent, #000 56px' : '#000, #000'}, ${edges.end ? '#000 calc(100% - 56px), transparent' : '#000'})`
+      : undefined
+
+  return (
+    <div className={`relative min-w-0 ${className}`}>
+      {/* Padding inside, pulled back with negative margin, keeps focus rings unclipped. */}
+      <div
+        ref={scrollRef}
+        className="scrollbar-none @xl:-m-1 @xl:overflow-x-auto @xl:overscroll-x-contain @xl:p-1"
+        style={mask ? { maskImage: mask, WebkitMaskImage: mask } : undefined}
+      >
+        <div ref={innerRef} className="flex flex-col gap-2 @xl:w-max @xl:flex-row @xl:items-center">
+          {children}
         </div>
+      </div>
+      {edges.start && (
+        <button
+          type="button"
+          onClick={() => nudge(-1)}
+          aria-label="Scroll filters left"
+          className="absolute left-0 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground @xl:flex"
+        >
+          <ChevronLeft size={16} />
+        </button>
+      )}
+      {edges.end && (
+        <button
+          type="button"
+          onClick={() => nudge(1)}
+          aria-label="Scroll filters right"
+          className="absolute right-0 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-colors hover:text-foreground @xl:flex"
+        >
+          <ChevronRight size={16} />
+        </button>
       )}
     </div>
   )
@@ -525,10 +643,18 @@ export default function DataView<T>({
     <div className="space-y-3">
       {/* ── Toolbar ─────────────────────────────────────────────────── */}
       {hasToolbar && (
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-2">
+        /*
+          Laid out by the toolbar's own width, not the viewport's: beside a
+          sidebar a laptop screen leaves far less room than its breakpoint
+          suggests. Wide (@5xl): search · filters · actions on one line.
+          Narrower: search and actions, then the filters on a full line of
+          their own, so they can never be squeezed out.
+        */
+        <div className="@container">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+          <div className="order-1 flex w-full items-center gap-2 @xl:w-auto @xl:flex-1 @5xl:flex-none">
             {searchText && (
-              <div className="relative w-full lg:w-80">
+              <div className="relative w-full @5xl:w-80">
                 <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <input
                   value={term}
@@ -568,9 +694,10 @@ export default function DataView<T>({
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Facets: inline from lg, collapsed behind the Filters button below it */}
-            <div className={`${showFilters ? 'flex' : 'hidden'} w-full flex-col gap-2 sm:flex-row lg:flex lg:w-auto`}>
+          {/* Facets: always shown from lg, collapsed behind the Filters button below it */}
+          <ScrollRow
+            className={`${showFilters ? 'block' : 'hidden'} order-2 w-full lg:block @xl:order-3 @5xl:order-2 @5xl:w-auto @5xl:flex-1`}
+          >
               {facets.map((facet) => (
                 <FacetPicker
                   key={facet.id}
@@ -586,7 +713,7 @@ export default function DataView<T>({
                 headers are scrolled off by the time you want to re-sort.
               */}
               {sortableColumns.length > 0 && (
-                <SelectShell className="w-full lg:w-auto">
+                <SelectShell className="w-full @xl:w-auto @xl:shrink-0">
                   <select
                     value={sort ? `${sort.id}:${sort.dir}` : ''}
                     onChange={(e) => {
@@ -611,13 +738,14 @@ export default function DataView<T>({
                 <button
                   type="button"
                   onClick={clearAll}
-                  className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="inline-flex h-10 shrink-0 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   Clear
                 </button>
               )}
-            </div>
+          </ScrollRow>
 
+          <div className="order-3 flex shrink-0 items-center gap-2 empty:hidden @xl:order-2 @5xl:order-3">
             {typeof toolbarExtra === 'function' ? toolbarExtra(processed) : toolbarExtra}
 
             {renderCard && (
@@ -647,6 +775,7 @@ export default function DataView<T>({
               </div>
             )}
           </div>
+        </div>
         </div>
       )}
 
