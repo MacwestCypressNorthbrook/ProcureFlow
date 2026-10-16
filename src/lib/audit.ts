@@ -49,6 +49,8 @@ export type PoAuditAction =
   | 'resubmitted'
   | 'part_paid'
   | 'paid'
+  | 'cancelled'
+  | 'voided'
 
 /**
  * The INSERT for one audit entry, as a [sql, params] pair for `transaction()`.
@@ -88,6 +90,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   resubmitted: 'Resubmitted for approval',
   part_paid: 'Part payment recorded',
   paid: 'Payment completed',
+  cancelled: 'Cancelled',
+  voided: 'Voided',
   // legacy
   approved_by_sam: 'Approved',
   rejected_by_sam: 'Rejected',
@@ -100,7 +104,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
 export type AuditTone = 'positive' | 'negative' | 'neutral'
 
 const POSITIVE_ACTIONS = new Set(['approved', 'paid', 'part_paid', 'approved_by_sam', 'payment_completed'])
-const NEGATIVE_ACTIONS = new Set(['rejected', 'sent_back', 'rejected_by_sam', 'sent_back_by_sam'])
+const NEGATIVE_ACTIONS = new Set(['rejected', 'sent_back', 'rejected_by_sam', 'sent_back_by_sam', 'cancelled', 'voided'])
 
 export function auditTone(action: string): AuditTone {
   if (POSITIVE_ACTIONS.has(action)) return 'positive'

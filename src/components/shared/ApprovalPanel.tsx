@@ -81,6 +81,8 @@ const ACTION_LABEL: Record<string, string> = {
   rejected: 'Rejected',
   items_removed: 'Materials removed',
   edited: 'Edited',
+  cancelled: 'Cancelled',
+  voided: 'Voided',
 }
 
 const ACTION_TONE: Record<string, string> = {
@@ -93,6 +95,8 @@ const ACTION_TONE: Record<string, string> = {
   rejected: 'bg-red-500/10 text-red-600 dark:text-red-400',
   items_removed: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
   edited: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+  cancelled: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+  voided: 'bg-red-500/10 text-red-600 dark:text-red-400',
 }
 
 /**

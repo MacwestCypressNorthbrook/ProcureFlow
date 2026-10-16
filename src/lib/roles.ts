@@ -161,6 +161,8 @@ export type Capability =
   | 'request:review'
   | 'request:convert'
   | 'request:urgent'
+  | 'request:cancel'
+  | 'request:void'
   | 'invoice:record'
   | 'invoice:verify'
   | 'po:view'
@@ -197,6 +199,14 @@ export const CAPABILITIES: Record<Capability, RoleId[]> = {
   // site, so the red button is theirs alone — if every stage could raise an
   // urgent flag, nothing would be urgent.
   'request:urgent': ['project_lead'],
+
+  // Cancel at any stage before completion. Requesters may also withdraw their
+  // own — that rule lives in `cancelModeFor`, since it depends on ownership.
+  'request:cancel': ['administrator', 'supply_chain', 'cost_control'],
+
+  // Reversing a completed requisition and its purchase orders is the
+  // Administrator's call alone.
+  'request:void': ['administrator'],
 
   // Supplier invoices are recorded by whoever handles the vendor paperwork —
   // Supply Chain as it sources the materials, Cost Control as it audits them —

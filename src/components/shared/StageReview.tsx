@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
+import CancelRequisitionDialog from '@/components/shared/CancelRequisitionDialog'
+import { cancelModeFor } from '@/lib/cancellation'
 import RecordPaymentPanel from '@/components/shared/RecordPaymentPanel'
 import { getPaymentPosition, listPayments } from '@/lib/payments'
 import StageProgress from '@/components/shared/StageProgress'
@@ -189,6 +191,7 @@ export default async function StageReview({
   const descriptionText = richDoc.data ? null : request.description?.trim() || null
 
   const isUrgent = request.is_urgent === true
+  const cancelMode = cancelModeFor(user.role, request.status, isRequester)
   // Only the Project Lead escalates, and only while the requisition is still
   // theirs — see `request:urgent` in lib/roles.ts.
   const canEscalate = stage === 'lead' && holdsStage && can(user.role, 'request:urgent')
@@ -231,6 +234,14 @@ export default async function StageReview({
             <div className="flex flex-wrap items-center gap-2">
               {isUrgent && <UrgentBadge />}
               <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
+              {cancelMode && (
+                <CancelRequisitionDialog
+                  requestId={request.id}
+                  purpose={request.purpose}
+                  mode={cancelMode}
+                  hasPurchaseOrders={pos.length > 0}
+                />
+              )}
             </div>
           }
         />

@@ -56,6 +56,16 @@ const ACTION: Record<string, { label: string; className: string; icon: React.Rea
     className: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     icon: <Trash2 size={12} />,
   },
+  cancelled: {
+    label: 'Cancelled',
+    className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
+    icon: <XCircle size={12} />,
+  },
+  voided: {
+    label: 'Voided',
+    className: 'bg-red-500/10 text-red-600 dark:text-red-400',
+    icon: <XCircle size={12} />,
+  },
 }
 
 function ActionPill({ action }: { action: string }) {

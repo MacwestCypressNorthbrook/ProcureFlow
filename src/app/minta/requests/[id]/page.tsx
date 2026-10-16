@@ -10,6 +10,8 @@ import { resolveAttachments } from '@/lib/resolve-file-url'
 import { FileText, Paperclip, Clock, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
+import CancelRequisitionDialog from '@/components/shared/CancelRequisitionDialog'
+import { cancelModeFor } from '@/lib/cancellation'
 import ApprovalPanel, { type ApprovalEntry } from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
@@ -131,6 +133,8 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
       : requestData.guest_email === user?.email || user?.role === 'engineer') ||
     isElevated(user?.role)
 
+  const cancelMode = isOwner ? cancelModeFor(user?.role, status, true) : null
+
   const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
   const poPayments = po ? await listPayments(po.id) : []
 
@@ -169,6 +173,14 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               {isUrgent && <UrgentBadge />}
               <StatusBadge status={status} config={REQUEST_STATUS_CONFIG} />
               {isOwner && (canEdit || canDelete) && <RequestActions requestId={id} canEdit={canEdit} canDelete={canDelete} />}
+              {cancelMode && (
+                <CancelRequisitionDialog
+                  requestId={id}
+                  purpose={String(requestData.purpose || '')}
+                  mode={cancelMode}
+                  hasPurchaseOrders={pos.length > 0}
+                />
+              )}
             </div>
           }
         />
