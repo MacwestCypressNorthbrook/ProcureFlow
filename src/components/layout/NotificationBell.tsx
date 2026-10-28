@@ -33,6 +33,14 @@ function groupByDay(notifications: Notification[]): Array<{ label: string; items
   return groups
 }
 
+const POLL_MS = 60_000
+/**
+ * Stop polling after this long without a click, key, scroll or focus.
+ * Kept just past the stage digest's 10-minute quiet period, so a reviewer's
+ * own last polls send their batch without waiting for the cron.
+ */
+const IDLE_AFTER_MS = 12 * 60_000
+
 export default function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -53,9 +61,20 @@ export default function NotificationBell() {
       }
     }
 
+    // Each poll wakes the database, which then stays billable for ~5 minutes.
+    // A tab left open on a desk overnight would keep it awake until morning,
+    // so polling also stops once nobody has touched the page for a while.
+    let lastActivity = Date.now()
+    const poll = () => {
+      if (Date.now() - lastActivity > IDLE_AFTER_MS) {
+        stopPolling()
+        return
+      }
+      fetchNotifications()
+    }
     const startPolling = () => {
       if (interval) return
-      interval = setInterval(fetchNotifications, 30000)
+      interval = setInterval(poll, POLL_MS)
     }
     const stopPolling = () => {
       if (interval) {
@@ -64,11 +83,12 @@ export default function NotificationBell() {
       }
     }
 
-    // A backgrounded tab has no business hitting the API every 30s for hours
+    // A backgrounded tab has no business hitting the API every minute for hours
     // on end — pause entirely while hidden, and catch up the moment it's
     // visible again instead of waiting out whatever was left of the interval.
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        lastActivity = Date.now()
         fetchNotifications()
         startPolling()
       } else {
@@ -76,14 +96,27 @@ export default function NotificationBell() {
       }
     }
 
+    // Back from idle: catch up at once, then resume the regular poll.
+    const handleActivity = () => {
+      const wasIdle = !interval && document.visibilityState === 'visible'
+      lastActivity = Date.now()
+      if (wasIdle) {
+        fetchNotifications()
+        startPolling()
+      }
+    }
+    const activityEvents = ['pointerdown', 'keydown', 'scroll', 'focus'] as const
+
     fetchNotifications()
     if (document.visibilityState === 'visible') startPolling()
     document.addEventListener('visibilitychange', handleVisibility)
+    for (const e of activityEvents) window.addEventListener(e, handleActivity, { passive: true })
 
     return () => {
       isMounted = false
       stopPolling()
       document.removeEventListener('visibilitychange', handleVisibility)
+      for (const e of activityEvents) window.removeEventListener(e, handleActivity)
     }
   }, [])
 
