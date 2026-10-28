@@ -34,7 +34,7 @@ curl -X POST 'https://<your-domain>/api/reminders/send' \
 |---|---|
 | **Method** | `POST` only — a `GET` returns 405 |
 | **Auth** | `Authorization: Bearer $CRON_SECRET`. Missing/blank `CRON_SECRET` on the server → **503** (fails closed); wrong value → **401** |
-| **Interval** | **Every 5 minutes** (`*/5 * * * *`) |
+| **Interval** | **Every 5 minutes** (`*/5 * * * *`) — the app itself decides which ticks do work; see below |
 | **Job timezone** | `Africa/Accra`, so the weekly digest lands on the intended weekday |
 
 Scheduled externally (cron-job.org, GitHub Actions, Vercel Cron — anything that can POST with a
@@ -60,8 +60,34 @@ rejections are also emailed immediately — only forward approvals are bundled.
 ### Why the interval matters
 
 A batch is sent on the first run *after* its 10-minute quiet period elapses, so the cron interval
-is added to the delay: at `*/5` a reviewer's approvals reach the next stage in ~10–15 minutes; at
-`*/15` that stretches to ~25. Anything slower than every 15 minutes makes the handoff feel broken.
+is added to the delay. Anything slower than every 15 minutes makes the handoff feel broken.
+
+### Not every tick does work (database compute)
+
+Neon bills compute for every minute the database is awake and suspends it only after ~5 idle
+minutes, so a query every 5 minutes keeps it awake 24/7 — ~730 hours a month with nobody using the
+app. That exhausted the plan quota once (every query then fails with HTTP 402 and the whole app,
+sign-in included, goes down).
+
+So the database should only wake when there is real work. Two things make that happen:
+
+1. **Active users carry the work.** Whenever someone's notification bell polls (every minute,
+   only while they are active), the same request runs the dispatcher afterwards (`after()`), at
+   most once per 2 minutes. The database is awake for them anyway, so this costs nothing extra.
+   A lease row in `app_settings` (`dispatch_lease`) stops two instances sending the same batch.
+2. **The cron only fills the gaps.** The scheduler keeps firing `*/5`, but `src/lib/cron-window.ts`
+   lets through only:
+
+| When (Accra) | Cron runs | Covers |
+|---|---|---|
+| Mon–Fri 07:00–19:00 | every 30 min | a reviewer who approved a batch and closed the tab at once |
+| Nights and weekends | every 3 hours | overnight reminders/digests (also sent when the first person opens the app) |
+
+Skipped ticks return `{ "success": true, "skipped": true }` without touching the database. Add
+`?force=1` to the URL to bypass the schedule (manual dispatch, testing).
+
+The bell stops polling after 12 minutes with no click, key or scroll, so a tab left open overnight
+lets the database sleep.
 
 ### Related environment variables
 
