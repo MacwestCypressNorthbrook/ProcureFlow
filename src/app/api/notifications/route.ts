@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import { getUserFromSession } from '@/lib/auth/server'
+import { piggybackDispatch } from '@/lib/dispatch'
 import { clearUserNotifications, getUserNotifications, markNotificationAsRead } from '@/lib/notifications'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +12,11 @@ export async function GET() {
   }
 
   const notifications = await getUserNotifications(user.id)
+
+  // The database is awake for this poll anyway; send whatever is due now
+  // rather than waking it again later from the cron.
+  after(piggybackDispatch)
+
   return NextResponse.json({ data: notifications })
 }
 

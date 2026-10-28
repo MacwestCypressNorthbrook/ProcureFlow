@@ -267,17 +267,36 @@ export async function dispatchEmailDigests(): Promise<{ sent: Partial<Record<Rol
 
   // Legacy role values (`sam`, `mintah`…) map to a role only through
   // normalizeRole, which SQL cannot call — so match here, as the dispatcher does.
-  const people = (
-    await query<{ id: string; email: string | null; name: string | null; role: string | null }>(
-      `SELECT id, email, name, role FROM public.users
-        WHERE COALESCE(is_active, true) AND auth_id NOT LIKE 'pending:%'`
+  let people: Array<{ id: string; email: string | null; name: string | null; role: string | null }>
+  let queued: Set<string>
+  try {
+    // Who has emails held. On most runs nobody does and no role's digest is
+    // due, so there is nothing to send and no reason to read the user table.
+    queued = new Set(
+      (await query<{ user_id: string }>(`SELECT DISTINCT user_id FROM public.email_digest_queue`)).map((r) => r.user_id)
     )
-  ).filter((p) => p.email)
+    const anyDue = ROLE_IDS.some((role) => isDigestDue(settings.roles[role], settings.lastSent[role]))
+    if (queued.size === 0 && !anyDue) return { sent }
+
+    people = (
+      await query<{ id: string; email: string | null; name: string | null; role: string | null }>(
+        `SELECT id, email, name, role FROM public.users
+          WHERE COALESCE(is_active, true) AND auth_id NOT LIKE 'pending:%'`
+      )
+    ).filter((p) => p.email)
+  } catch (err) {
+    console.error('Failed to prepare email digests:', err)
+    return { sent }
+  }
 
   for (const role of ROLE_IDS) {
     try {
       const policy = settings.roles[role]
-      const members = people.filter((p) => normalizeRole(p.role) === role)
+      const scheduled = isDigestDue(policy, settings.lastSent[role])
+      // Off the schedule, only people with something held have anything to flush.
+      const members = people.filter(
+        (p) => normalizeRole(p.role) === role && (scheduled || queued.has(p.id))
+      )
       if (members.length === 0) continue
 
       if (policy.delivery === 'off') {
@@ -285,7 +304,6 @@ export async function dispatchEmailDigests(): Promise<{ sent: Partial<Record<Rol
         continue
       }
 
-      const scheduled = isDigestDue(policy, settings.lastSent[role])
       // A role switched back to "immediately" with emails still held: flush now.
       if (!scheduled && policy.delivery !== 'immediate') continue
 
@@ -420,15 +438,25 @@ export async function dispatchStageDigests(): Promise<{ sent: Record<string, num
   const sent: Record<string, number> = {}
   const { STAGES } = await import('@/lib/workflow')
 
+  // One round-trip for every stage's batch window; most runs find none.
+  let windows: Array<{ stage: string; oldest: string; newest: string }>
+  try {
+    windows = await query<{ stage: string; oldest: string; newest: string }>(
+      `SELECT stage, MIN(queued_at) AS oldest, MAX(queued_at) AS newest
+         FROM public.stage_digest_queue
+        WHERE stage = ANY($1::text[])
+        GROUP BY stage`,
+      [[...DIGEST_STAGES]]
+    )
+  } catch (err) {
+    console.error('Failed to read the stage digest queue:', err)
+    return { sent }
+  }
+
   for (const stage of DIGEST_STAGES) {
     try {
-      const window = await queryOne<{ oldest: string | null; newest: string | null; count: number }>(
-        `SELECT MIN(queued_at) AS oldest, MAX(queued_at) AS newest, COUNT(*)::int AS count
-           FROM public.stage_digest_queue
-          WHERE stage = $1`,
-        [stage]
-      )
-      if (!window || !window.count || !window.newest || !window.oldest) continue
+      const window = windows.find((w) => w.stage === stage)
+      if (!window) continue
 
       const quietFor = (Date.now() - new Date(window.newest).getTime()) / 60_000
       const waitingFor = (Date.now() - new Date(window.oldest).getTime()) / 60_000
