@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { dispatchPendingReminders, dispatchEmailDigests, dispatchStageDigests } from '@/lib/notifications'
-import { pruneRateLimits } from '@/lib/rate-limit'
+import { runDispatch } from '@/lib/dispatch'
+import { isCronTickDue } from '@/lib/cron-window'
 
 export async function POST(request: Request) {
   // Allow authorization via Bearer CRON_SECRET or session
@@ -19,26 +19,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
   }
 
-  const result = await dispatchPendingReminders()
+  // Most ticks return here without a single query, so the database can
+  // suspend between runs. `?force=1` runs now regardless (manual dispatch).
+  const force = new URL(request.url).searchParams.get('force') === '1'
+  if (!force && !isCronTickDue()) {
+    return NextResponse.json({ success: true, skipped: true })
+  }
 
-  // Each role's daily or weekly email digest rides the same cron: it no-ops
-  // until a role's configured day and hour (Admin → Notifications), and sends
-  // at most once per day even then.
-  const digests = await dispatchEmailDigests()
-
-  // Each downstream stage's approved batch, sent once the approvals settle.
-  // How soon that is after a reviewer finishes is bounded by this cron's own
-  // interval, so it wants to run every few minutes.
-  const stageDigests = await dispatchStageDigests()
-
-  // Housekeeping rides along with the cron that already runs: rate-limit
-  // counters are only meaningful for an hour, so anything older is dead weight.
-  await pruneRateLimits()
+  const result = await runDispatch()
+  if (!result.ran) {
+    // Another run (an active user's poll, or a cron overlap) holds the lease.
+    return NextResponse.json({ success: true, skipped: true, reason: 'dispatch already running' })
+  }
 
   return NextResponse.json({
     success: true,
     processed: result.processed,
-    emailDigests: digests.sent,
-    stageDigests: stageDigests.sent,
+    emailDigests: result.emailDigests,
+    stageDigests: result.stageDigests,
   })
 }
