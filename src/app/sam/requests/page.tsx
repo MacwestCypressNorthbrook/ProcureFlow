@@ -4,6 +4,7 @@ import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
 import { getStageInbox, getStageDecisionCount } from '@/lib/review'
 import StageTabs from '@/components/shared/StageTabs'
+import { STAGES, statusForStage } from '@/lib/workflow'
 import { ClipboardCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +35,12 @@ export default async function LeadQueuePage() {
             ageLabel: 'Longest waiting',
           })}
         />
-        <QueueTable rows={rows} hrefBase="/sam/requests" storageKey="lead-queue" />
+        <QueueTable
+          rows={rows}
+          hrefBase="/sam/requests"
+          storageKey="lead-queue"
+          batch={{ eligibleStatus: statusForStage('lead'), nextStageLabel: STAGES.supply_chain.label }}
+        />
       </PageContainer>
     </>
   )

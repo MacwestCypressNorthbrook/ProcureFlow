@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import BatchApproveDialog from '@/components/shared/BatchApproveDialog'
 import DataView, { type DataColumn } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
@@ -19,18 +21,58 @@ import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '
  * exists yet. Newest first, like every other list in the app; the "Longest
  * waiting" tile above the queue is what surfaces anything ageing.
  */
+/** The batch endpoint's cap — one sitting's worth, not a bulk import. */
+const MAX_BATCH = 50
+
 export default function QueueTable({
   rows,
   hrefBase,
   storageKey,
+  batch,
 }: {
   rows: QueueRow[]
   hrefBase: string
   storageKey: string
+  /**
+   * Tick-and-approve for a stage whose approval has no checks of its own (the
+   * Project Lead). Only rows at `eligibleStatus` and not urgent can be ticked:
+   * a requisition sent back to the stage carries a question and must be opened.
+   */
+  batch?: { eligibleStatus: string; nextStageLabel: string }
 }) {
   const router = useRouter()
+  const [picked, setPicked] = useState<string[]>([])
+
+  const eligible = (r: QueueRow) => Boolean(batch) && r.status === batch!.eligibleStatus && !r.is_urgent
+  // A refresh drops rows that were approved; a tick on a row that is gone is not a selection.
+  const selected = picked.filter((id) => rows.some((r) => r.id === id && eligible(r)))
+  const toggle = (id: string) =>
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : prev.length >= MAX_BATCH ? prev : [...prev, id]))
+
+  const selectColumn: DataColumn<QueueRow> = {
+    id: 'select',
+    label: '',
+    headClassName: 'w-10',
+    cell: (r) =>
+      eligible(r) ? (
+        <input
+          type="checkbox"
+          aria-label={`Select ${r.purpose}`}
+          checked={selected.includes(r.id)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => toggle(r.id)}
+          className="h-4 w-4 cursor-pointer rounded border-input accent-primary"
+        />
+      ) : (
+        <span
+          className="block h-4 w-4"
+          title={r.is_urgent ? 'Urgent — open it to act' : 'Sent back to you — open it to answer'}
+        />
+      ),
+  }
 
   const columns: DataColumn<QueueRow>[] = [
+    ...(batch ? [selectColumn] : []),
     {
       id: 'purpose',
       label: 'Requisition',
@@ -232,6 +274,32 @@ export default function QueueTable({
       ]}
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
+      toolbarExtra={
+        batch
+          ? (visible: QueueRow[]) => {
+              const shown = visible.filter(eligible).map((r) => r.id)
+              const allShown = shown.length > 0 && shown.slice(0, MAX_BATCH).every((id) => selected.includes(id))
+              return (
+                <div className="flex items-center gap-2">
+                  {shown.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPicked(allShown ? [] : shown.slice(0, MAX_BATCH))}
+                      className="inline-flex h-9 items-center rounded-lg border border-input bg-card px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+                    >
+                      {allShown ? 'Clear selection' : `Select ${Math.min(shown.length, MAX_BATCH)} shown`}
+                    </button>
+                  )}
+                  <BatchApproveDialog
+                    items={rows.filter((r) => selected.includes(r.id))}
+                    nextStageLabel={batch.nextStageLabel}
+                    onDone={() => setPicked([])}
+                  />
+                </div>
+              )
+            }
+          : undefined
+      }
       onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}
       emptyTitle="Nothing waiting"
       emptyMessage="Requisitions arrive here when the stage before yours approves them."
