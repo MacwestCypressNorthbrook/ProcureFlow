@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
+import { approvalDates, approverNames, lastApproval, type ApprovalStep } from '@/lib/approval-trail'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { extractRequisition } from '@/components/shared/RichRequisitionView'
@@ -21,6 +24,8 @@ interface RequestRow {
   created_at: string
   /** Joined from public.projects — the site the materials are for. */
   project_name?: string | null
+  /** The sign-offs, oldest first; only lists that filter by approver load it. */
+  approvals_list?: ApprovalStep[] | null
   [key: string]: unknown
 }
 
@@ -62,6 +67,9 @@ export default function RequestTable({
   compact?: boolean
 }) {
   const router = useRouter()
+  const hasApprovals = requests.some((r) => 'approvals_list' in r)
+  // Approvers ticked in the filter, so their sign-offs stand out in the trail.
+  const [approverFocus, setApproverFocus] = useState<string[]>([])
 
   const columns: DataColumn<RequestRow>[] = [
     {
@@ -144,6 +152,20 @@ export default function RequestTable({
       sortValue: estimatedTotal,
       cell: (r) => <span className="tabular-nums text-foreground">{ghs(estimatedTotal(r))}</span>,
     },
+    // Only lists that load the approval trail get the column; elsewhere every
+    // row would read "Pending" whatever its real state.
+    ...(hasApprovals
+      ? [
+          {
+            id: 'approval',
+            label: 'Approval',
+            hideBelow: 'lg',
+            sortable: true,
+            sortValue: (r) => lastApproval(r.approvals_list)?.at ?? null,
+            cell: (r) => <ApprovalTrailCell list={r.approvals_list} highlight={approverFocus} />,
+          } satisfies DataColumn<RequestRow>,
+        ]
+      : []),
     {
       id: 'status',
       label: 'Status',
@@ -178,6 +200,8 @@ export default function RequestTable({
   const projects = Array.from(new Set(requests.map((r) => r.project_name).filter(Boolean))).sort() as string[]
   const types = Array.from(new Set(requests.map((r) => requisitionType(r.description))))
   const engineers = Array.from(new Set(requests.map((r) => r.guest_name?.trim()).filter(Boolean))).sort() as string[]
+  const approvers = [...new Set(requests.flatMap((r) => approverNames(r.approvals_list)))].sort((a, b) => a.localeCompare(b))
+
   const facets: DataFacet<RequestRow>[] = [
     {
       id: 'status',
@@ -215,6 +239,16 @@ export default function RequestTable({
           } satisfies DataFacet<RequestRow>,
         ]
       : []),
+    ...(approvers.length > 0
+      ? [
+          {
+            id: 'approver',
+            label: 'Approver',
+            options: approvers.map((a) => ({ value: a, label: a })),
+            matches: (r, value) => approverNames(r.approvals_list).includes(value),
+          } satisfies DataFacet<RequestRow>,
+        ]
+      : []),
   ]
 
   return (
@@ -223,11 +257,26 @@ export default function RequestTable({
       getRowId={(r) => r.id}
       columns={columns}
       facets={facets}
+      dateFilters={
+        hasApprovals
+          ? [
+              {
+                id: 'approval_date',
+                label: 'Approval Date',
+                // With approvers ticked, only their own sign-offs count.
+                scopedBy: 'approver',
+                getDate: (r, approvers) => approvalDates(r.approvals_list, approvers),
+              },
+            ]
+          : []
+      }
+      onFacetValues={hasApprovals ? (v) => setApproverFocus(v.approver ?? []) : undefined}
       searchPlaceholder="Search requests…"
       searchText={(r) => [
         r.purpose,
         r.guest_name,
         r.guest_email,
+        ...approverNames(r.approvals_list),
         itemSummary(r.description),
         REQUISITION_TYPE_CONFIG[requisitionType(r.description)].label,
       ]}

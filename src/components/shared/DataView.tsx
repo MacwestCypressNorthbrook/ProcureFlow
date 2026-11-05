@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import {
   ArrowDown,
   ArrowUp,
+  Calendar,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -45,6 +46,29 @@ export interface DataFacet<T> {
   matches: (row: T, value: string) => boolean
 }
 
+export interface DateRangeValue {
+  mode: 'exact' | 'range'
+  date?: string // YYYY-MM-DD
+  from?: string // YYYY-MM-DD
+  to?: string   // YYYY-MM-DD
+}
+
+export interface DataDateFilter<T> {
+  id: string
+  label: string
+  /**
+   * The row's dates. With `scopedBy`, the second argument is what that facet
+   * has ticked (empty when nothing is), so the dates can be narrowed to match.
+   */
+  getDate: (row: T, scope: string[]) => string | Date | null | undefined | Array<string | Date | null | undefined>
+  /**
+   * A facet this date belongs to. "Approver: Ama" with "Approved: 3 Oct" must
+   * mean Ama approved it on 3 Oct, not that she approved it some time and
+   * someone approved it on 3 Oct, so the facet's ticked values reach getDate.
+   */
+  scopedBy?: string
+}
+
 type ViewMode = 'table' | 'grid'
 type SortDir = 'asc' | 'desc'
 
@@ -82,6 +106,7 @@ interface Session {
    * multi-select holds a bare string, which is read as a single selection.
    */
   facets?: Record<string, string[] | string>
+  dateFilters?: Record<string, DateRangeValue>
   sort?: { id: string; dir: SortDir } | null
   page?: number
 }
@@ -341,14 +366,332 @@ interface PopoverPos {
   bottom?: number
 }
 
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatDisplayDate(dateStr?: string): string {
+  if (!dateStr) return ''
+  const parts = dateStr.split('-')
+  if (parts.length === 3) {
+    const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]))
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+    }
+  }
+  return dateStr
+}
+
+function extractDateStr(val: string | Date | null | undefined): string | null {
+  if (!val) return null
+  if (typeof val === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val
+    const d = new Date(val)
+    if (Number.isNaN(d.getTime())) return null
+    return toLocalDateStr(d)
+  }
+  if (val instanceof Date) {
+    if (Number.isNaN(val.getTime())) return null
+    return toLocalDateStr(val)
+  }
+  return null
+}
+
+function DateFilterPicker<T>({
+  filter,
+  value,
+  onChange,
+}: {
+  filter: DataDateFilter<T>
+  value?: DateRangeValue
+  onChange: (next?: DateRangeValue) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [mode, setMode] = useState<'exact' | 'range'>(value?.mode ?? 'range')
+  const [exactDate, setExactDate] = useState(value?.date ?? '')
+  const [fromDate, setFromDate] = useState(value?.from ?? '')
+  const [toDate, setToDate] = useState(value?.to ?? '')
+  const [pos, setPos] = useState<PopoverPos | null>(null)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const popRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (value) {
+      setMode(value.mode)
+      if (value.date) setExactDate(value.date)
+      if (value.from) setFromDate(value.from)
+      if (value.to) setToDate(value.to)
+    } else {
+      setExactDate('')
+      setFromDate('')
+      setToDate('')
+    }
+  }, [value])
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (wrapRef.current?.contains(target) || popRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    const follow = () => buttonRef.current && setPos(popoverPos(buttonRef.current, 320))
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', follow, true)
+    window.addEventListener('resize', follow)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', follow, true)
+      window.removeEventListener('resize', follow)
+    }
+  }, [open])
+
+  const applyPreset = (preset: 'today' | 'yesterday' | '7days' | '30days' | 'thisMonth' | 'lastMonth') => {
+    const now = new Date()
+    const todayStr = toLocalDateStr(now)
+    let next: DateRangeValue
+
+    if (preset === 'today') {
+      next = { mode: 'exact', date: todayStr }
+      setExactDate(todayStr)
+      setMode('exact')
+    } else if (preset === 'yesterday') {
+      const yest = new Date(now)
+      yest.setDate(yest.getDate() - 1)
+      const yStr = toLocalDateStr(yest)
+      next = { mode: 'exact', date: yStr }
+      setExactDate(yStr)
+      setMode('exact')
+    } else if (preset === '7days') {
+      const past = new Date(now)
+      past.setDate(past.getDate() - 6)
+      const pastStr = toLocalDateStr(past)
+      next = { mode: 'range', from: pastStr, to: todayStr }
+      setFromDate(pastStr)
+      setToDate(todayStr)
+      setMode('range')
+    } else if (preset === '30days') {
+      const past = new Date(now)
+      past.setDate(past.getDate() - 29)
+      const pastStr = toLocalDateStr(past)
+      next = { mode: 'range', from: pastStr, to: todayStr }
+      setFromDate(pastStr)
+      setToDate(todayStr)
+      setMode('range')
+    } else if (preset === 'thisMonth') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
+      const fStr = toLocalDateStr(firstDay)
+      next = { mode: 'range', from: fStr, to: todayStr }
+      setFromDate(fStr)
+      setToDate(todayStr)
+      setMode('range')
+    } else {
+      const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
+      const fStr = toLocalDateStr(firstDay)
+      const lStr = toLocalDateStr(lastDay)
+      next = { mode: 'range', from: fStr, to: lStr }
+      setFromDate(fStr)
+      setToDate(lStr)
+      setMode('range')
+    }
+    onChange(next)
+  }
+
+  const hasValue =
+    Boolean(value) &&
+    ((value?.mode === 'exact' && Boolean(value?.date)) ||
+      (value?.mode === 'range' && Boolean(value?.from || value?.to)))
+
+  let summary = 'All'
+  if (value?.mode === 'exact' && value?.date) {
+    summary = formatDisplayDate(value.date)
+  } else if (value?.mode === 'range') {
+    if (value.from && value.to) {
+      summary = `${formatDisplayDate(value.from)} – ${formatDisplayDate(value.to)}`
+    } else if (value.from) {
+      summary = `From ${formatDisplayDate(value.from)}`
+    } else if (value.to) {
+      summary = `Until ${formatDisplayDate(value.to)}`
+    }
+  }
+
+  return (
+    <div ref={wrapRef} className="relative w-full @xl:w-auto @xl:shrink-0">
+      <button
+        ref={buttonRef}
+        type="button"
+        onClick={(e) => {
+          if (!open) setPos(popoverPos(e.currentTarget, 320))
+          setOpen(!open)
+        }}
+        aria-haspopup="true"
+        aria-expanded={open}
+        className={`${controlClass} inline-flex w-full items-center justify-between gap-2 whitespace-nowrap pr-2.5 font-medium @xl:w-auto ${
+          hasValue ? 'border-primary/50 bg-primary/[0.04]' : ''
+        }`}
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          <Calendar size={14} className="shrink-0 text-muted-foreground" />
+          <span className="truncate">
+            <span className="text-muted-foreground">{filter.label}:</span> {summary}
+          </span>
+        </span>
+        <ChevronDown size={15} aria-hidden="true" className="shrink-0 text-muted-foreground" />
+      </button>
+
+      {open && pos && createPortal(
+        <div
+          ref={popRef}
+          className="fixed z-[70] w-80 overflow-hidden rounded-xl border border-border bg-popover shadow-xl"
+          style={{ left: pos.left, width: pos.width, ...(pos.top !== undefined ? { top: pos.top } : { bottom: pos.bottom }) }}
+        >
+          {/* Mode Switcher */}
+          <div className="flex border-b border-border bg-muted/20 p-1.5">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('range')
+                if (fromDate || toDate) onChange({ mode: 'range', from: fromDate, to: toDate })
+              }}
+              className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
+                mode === 'range' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Date range
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode('exact')
+                if (exactDate) onChange({ mode: 'exact', date: exactDate })
+              }}
+              className={`flex-1 rounded-md py-1 text-xs font-medium transition-colors ${
+                mode === 'exact' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Single date
+            </button>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap gap-1 border-b border-border p-2">
+            {(
+              [
+                ['today', 'Today'],
+                ['yesterday', 'Yesterday'],
+                ['7days', 'Last 7d'],
+                ['30days', 'Last 30d'],
+                ['thisMonth', 'This month'],
+                ['lastMonth', 'Last month'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => applyPreset(key)}
+                className="rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Inputs */}
+          <div className="p-3">
+            {mode === 'exact' ? (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Pick a date</label>
+                <input
+                  type="date"
+                  value={exactDate}
+                  onChange={(e) => {
+                    const next = e.target.value
+                    setExactDate(next)
+                    onChange(next ? { mode: 'exact', date: next } : undefined)
+                  }}
+                  className="h-9 w-full rounded-lg border border-input bg-card px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">From</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setFromDate(next)
+                      onChange(next || toDate ? { mode: 'range', from: next, to: toDate } : undefined)
+                    }}
+                    className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">To</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => {
+                      const next = e.target.value
+                      setToDate(next)
+                      onChange(fromDate || next ? { mode: 'range', from: fromDate, to: next } : undefined)
+                    }}
+                    className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-border bg-muted/30 px-3 py-2">
+            <button
+              type="button"
+              onClick={() => {
+                setExactDate('')
+                setFromDate('')
+                setToDate('')
+                onChange(undefined)
+              }}
+              disabled={!hasValue}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-40"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Done
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
 /** Under the button, or above it when the viewport has no room below; never off-screen sideways. */
-function popoverPos(button: HTMLElement): PopoverPos {
+function popoverPos(button: HTMLElement, minWidth = 260): PopoverPos {
   const r = button.getBoundingClientRect()
   const vw = window.innerWidth
   const vh = window.innerHeight
-  const width = Math.min(Math.max(r.width, 260), vw - 16)
+  const width = Math.min(Math.max(r.width, minWidth), vw - 16)
   const left = Math.max(8, Math.min(r.left, vw - width - 8))
-  const NEEDED = 340
+  const NEEDED = 360
   return vh - r.bottom < NEEDED && r.top > vh - r.bottom
     ? { left, width, bottom: vh - r.top + 6 }
     : { left, width, top: r.bottom + 6 }
@@ -437,6 +780,7 @@ export default function DataView<T>({
   searchText,
   searchPlaceholder = 'Search…',
   facets = [],
+  dateFilters = [],
   renderCard,
   onRowClick,
   defaultSort,
@@ -447,6 +791,7 @@ export default function DataView<T>({
   emptyMessage = 'No records match your filters.',
   toolbarExtra,
   onVisibleRows,
+  onFacetValues,
   compact = false,
   initialTerm = '',
 }: {
@@ -456,6 +801,7 @@ export default function DataView<T>({
   searchText?: (row: T) => Array<string | null | undefined>
   searchPlaceholder?: string
   facets?: DataFacet<T>[]
+  dateFilters?: DataDateFilter<T>[]
   renderCard?: (row: T) => React.ReactNode
   onRowClick?: (row: T) => void
   defaultSort?: { id: string; dir: SortDir }
@@ -476,6 +822,8 @@ export default function DataView<T>({
   toolbarExtra?: React.ReactNode | ((visibleRows: T[]) => React.ReactNode)
   /** Told the rows the viewer is looking at, in order, whenever they change. */
   onVisibleRows?: (rows: T[]) => void
+  /** The ticked facet values, whenever they change — e.g. to highlight a match in a cell. */
+  onFacetValues?: (values: Record<string, string[]>) => void
   /** Dashboard preview mode: no toolbar, no pagination, renders every row given. */
   compact?: boolean
   /** Pre-filled search, used to focus a record arrived at from a deep link. */
@@ -552,12 +900,17 @@ export default function DataView<T>({
     updateSession({ facets: pruned, page: 1 })
   }
 
+  const sessionDateFilters = session.dateFilters ?? {}
+
   const sortableColumns = useMemo(
     () => columns.filter((c) => c.sortable && c.sortValue),
     [columns]
   )
 
-  const activeFacetCount = Object.values(facetValues).filter((v) => v.length > 0).length
+  const activeDateFilterCount = Object.values(sessionDateFilters).filter(
+    (v) => (v.mode === 'exact' && Boolean(v.date)) || (v.mode === 'range' && Boolean(v.from || v.to))
+  ).length
+  const activeFacetCount = Object.values(facetValues).filter((v) => v.length > 0).length + activeDateFilterCount
 
   /* ── filter → search → sort ─────────────────────────────────────────── */
   const processed = useMemo(() => {
@@ -568,6 +921,32 @@ export default function DataView<T>({
     for (const facet of facets) {
       const values = facetValues[facet.id]
       if (values?.length) out = out.filter((row) => values.some((value) => facet.matches(row, value)))
+    }
+
+    if (dateFilters.length > 0 && sessionDateFilters) {
+      for (const df of dateFilters) {
+        const val = sessionDateFilters[df.id]
+        if (!val) continue
+        if (val.mode === 'exact') {
+          if (!val.date) continue
+          out = out.filter((row) => {
+            const raw = df.getDate(row, df.scopedBy ? facetValues[df.scopedBy] ?? [] : [])
+            if (raw == null) return false
+            const arr = Array.isArray(raw) ? raw : [raw]
+            const strs = arr.map(extractDateStr).filter((d): d is string => Boolean(d))
+            return strs.includes(val.date!)
+          })
+        } else if (val.mode === 'range') {
+          if (!val.from && !val.to) continue
+          out = out.filter((row) => {
+            const raw = df.getDate(row, df.scopedBy ? facetValues[df.scopedBy] ?? [] : [])
+            if (raw == null) return false
+            const arr = Array.isArray(raw) ? raw : [raw]
+            const strs = arr.map(extractDateStr).filter((d): d is string => Boolean(d))
+            return strs.some((d) => (!val.from || d >= val.from) && (!val.to || d <= val.to))
+          })
+        }
+      }
     }
 
     const q = term.trim().toLowerCase()
@@ -595,7 +974,7 @@ export default function DataView<T>({
     }
 
     return out
-  }, [rows, facets, facetValues, term, searchText, sort, columns])
+  }, [rows, facets, facetValues, dateFilters, sessionDateFilters, term, searchText, sort, columns])
 
   /*
     Tell the caller what is on screen — but only when it actually changed.
@@ -621,6 +1000,12 @@ export default function DataView<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- callers pass a fresh closure each render
   }, [processed, rows])
 
+  const facetKey = JSON.stringify(facetValues)
+  useEffect(() => {
+    onFacetValues?.(facetValues)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on content; callers pass a fresh closure each render
+  }, [facetKey])
+
   const total = processed.length
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
   const safePage = Math.min(page, pageCount)
@@ -634,10 +1019,15 @@ export default function DataView<T>({
         : { id, dir: 'asc' }
     )
 
-  const clearAll = () => updateSession({ term: '', facets: {}, page: 1 })
+  const clearAll = () => updateSession({ term: '', facets: {}, dateFilters: {}, page: 1 })
 
   const hasToolbar =
-    !compact && (Boolean(searchText) || facets.length > 0 || Boolean(renderCard) || Boolean(toolbarExtra))
+    !compact &&
+    (Boolean(searchText) ||
+      facets.length > 0 ||
+      dateFilters.length > 0 ||
+      Boolean(renderCard) ||
+      Boolean(toolbarExtra))
 
   return (
     <div className="space-y-3">
@@ -676,7 +1066,7 @@ export default function DataView<T>({
               </div>
             )}
 
-            {facets.length > 0 && (
+            {(facets.length > 0 || dateFilters.length > 0) && (
               <button
                 type="button"
                 onClick={() => setShowFilters((v) => !v)}
@@ -694,7 +1084,7 @@ export default function DataView<T>({
             )}
           </div>
 
-          {/* Facets: always shown from lg, collapsed behind the Filters button below it */}
+          {/* Facets & Date filters: always shown from lg, collapsed behind the Filters button below it */}
           <ScrollRow
             className={`${showFilters ? 'block' : 'hidden'} order-2 w-full lg:block @xl:order-3 @5xl:order-2 @5xl:w-auto @5xl:flex-1`}
           >
@@ -704,6 +1094,27 @@ export default function DataView<T>({
                   facet={facet}
                   selected={facetValues[facet.id] ?? []}
                   onChange={(next) => setFacetValues({ ...facetValues, [facet.id]: next })}
+                />
+              ))}
+
+              {dateFilters.map((df) => (
+                <DateFilterPicker
+                  key={df.id}
+                  filter={df}
+                  value={sessionDateFilters[df.id]}
+                  onChange={(next) => {
+                    const updated = { ...sessionDateFilters }
+                    if (
+                      !next ||
+                      (next.mode === 'exact' && !next.date) ||
+                      (next.mode === 'range' && !next.from && !next.to)
+                    ) {
+                      delete updated[df.id]
+                    } else {
+                      updated[df.id] = next
+                    }
+                    updateSession({ dateFilters: updated, page: 1 })
+                  }}
                 />
               ))}
 

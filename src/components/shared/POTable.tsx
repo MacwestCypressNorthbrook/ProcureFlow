@@ -1,12 +1,21 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
+import { approvalDates, approverNames, lastApproval } from '@/lib/approval-trail'
 import StatusBadge from '@/components/shared/StatusBadge'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { PO_STATUS_CONFIG, formatCurrency, formatDate, formatQuantity } from '@/lib/utils'
 import { ChevronRight, FileText, AlertTriangle } from 'lucide-react'
 import type { PurchaseOrder } from '@/lib/types'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
+
+/** Everyone in the requisition's chain; POs without one fall back to their approver. */
+function approversOf(p: PurchaseOrder): string[] {
+  const names = approverNames(p.approvals_list)
+  return names.length ? names : p.approver_name ? [p.approver_name] : []
+}
 
 export default function POTable({
   pos,
@@ -23,6 +32,9 @@ export default function POTable({
   compact?: boolean
 }) {
   const router = useRouter()
+  const hasApprovals = pos.some((p) => 'approvals_list' in p || 'approver_name' in p)
+  // Approvers ticked in the filter, so their sign-offs stand out in the trail.
+  const [approverFocus, setApproverFocus] = useState<string[]>([])
 
   const columns: DataColumn<PurchaseOrder>[] = [
     {
@@ -79,6 +91,27 @@ export default function POTable({
         </span>
       ),
     },
+    // Only lists that load approvals get the column; elsewhere it would be blank.
+    ...(hasApprovals
+      ? [
+          {
+            id: 'approval',
+            label: 'Approval',
+            hideBelow: 'lg',
+            sortable: true,
+            sortValue: (p) => lastApproval(p.approvals_list)?.at ?? p.approved_at ?? null,
+            cell: (p) =>
+              p.approvals_list?.length ? (
+                <ApprovalTrailCell list={p.approvals_list} highlight={approverFocus} />
+              ) : (
+                <div className="whitespace-nowrap">
+                  <p className="text-xs font-medium text-foreground">{p.approver_name || '—'}</p>
+                  {p.approved_at && <p className="text-[11px] text-muted-foreground">{formatDate(p.approved_at)}</p>}
+                </div>
+              ),
+          } satisfies DataColumn<PurchaseOrder>,
+        ]
+      : []),
     {
       id: 'status',
       label: 'Status',
@@ -107,6 +140,7 @@ export default function POTable({
 
   const statuses = Array.from(new Set(pos.map((p) => p.status))).sort()
   const types = Array.from(new Set(pos.map((p) => requisitionType(p.request_description))))
+  const approvers = [...new Set(pos.flatMap(approversOf))].sort((a, b) => a.localeCompare(b))
   const facets: DataFacet<PurchaseOrder>[] = [
     {
       id: 'status',
@@ -124,6 +158,16 @@ export default function POTable({
         } satisfies DataFacet<PurchaseOrder>,
       ]
       : []),
+    ...(approvers.length > 0
+      ? [
+        {
+          id: 'approver',
+          label: 'Approver',
+          options: approvers.map((a) => ({ value: a, label: a })),
+          matches: (p, value) => approversOf(p).includes(value),
+        } satisfies DataFacet<PurchaseOrder>,
+      ]
+      : []),
   ]
 
   return (
@@ -132,12 +176,32 @@ export default function POTable({
       getRowId={(p) => p.id}
       columns={columns}
       facets={facets}
+      dateFilters={
+        hasApprovals
+          ? [
+              {
+                id: 'approval_date',
+                label: 'Approval Date',
+                // With approvers ticked, only their own sign-offs count.
+                scopedBy: 'approver',
+                getDate: (p, approvers) =>
+                  p.approvals_list?.length
+                    ? approvalDates(p.approvals_list, approvers)
+                    : approvers.length === 0 || (p.approver_name && approvers.includes(p.approver_name))
+                      ? p.approved_at || null
+                      : null,
+              },
+            ]
+          : []
+      }
+      onFacetValues={hasApprovals ? (v) => setApproverFocus(v.approver ?? []) : undefined}
       searchPlaceholder="Search purchase orders…"
       searchText={(p) => [
         p.purpose,
         p.po_number,
         p.description,
         p.vendor_name,
+        ...approversOf(p),
         p.file_name,
         REQUISITION_TYPE_CONFIG[requisitionType(p.request_description)].label,
       ]}

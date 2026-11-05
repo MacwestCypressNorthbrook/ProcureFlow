@@ -1,6 +1,7 @@
 import { requirePageRole } from '@/lib/auth-guard'
 import { can } from '@/lib/roles'
 import { query } from '@/lib/db'
+import { approvalsListSql } from '@/lib/approval-trail'
 import { getRequestWindowSettings } from '@/lib/settings'
 import { getNotificationSettings } from '@/lib/notification-settings'
 import AdminClient, { type AuditEntry, type AdminRequestRow } from '@/components/admin/AdminClient'
@@ -196,7 +197,12 @@ export default async function AdminPage() {
               po.vendor_name AS po_vendor_name,
               po.total_amount AS po_amount,
               pos.po_count,
-              pos.po_numbers
+              pos.po_numbers,
+              appr.last_approver_name,
+              appr.last_approved_at,
+              appr.last_approver_stage,
+              appr.approver_names,
+              appr.approvals_list
        FROM public.requests r
        LEFT JOIN public.projects pr ON pr.id = r.project_id
        LEFT JOIN public.users u ON u.id = r.created_by
@@ -213,6 +219,27 @@ export default async function AdminPage() {
          FROM public.purchase_orders
          WHERE request_id = r.id
        ) pos ON true
+       LEFT JOIN LATERAL (
+         SELECT (SELECT COALESCE(usr.name, usr.email)
+                   FROM public.request_approvals a1
+                   LEFT JOIN public.users usr ON usr.id = a1.performed_by
+                  WHERE a1.request_id = r.id AND a1.action IN ('approved', 'po_created', 'completed')
+                  ORDER BY a1.created_at DESC LIMIT 1) AS last_approver_name,
+                (SELECT a2.created_at
+                   FROM public.request_approvals a2
+                  WHERE a2.request_id = r.id AND a2.action IN ('approved', 'po_created', 'completed')
+                  ORDER BY a2.created_at DESC LIMIT 1) AS last_approved_at,
+                (SELECT a3.stage
+                   FROM public.request_approvals a3
+                  WHERE a3.request_id = r.id AND a3.action IN ('approved', 'po_created', 'completed')
+                  ORDER BY a3.created_at DESC LIMIT 1) AS last_approver_stage,
+                (SELECT string_agg(DISTINCT COALESCE(usr4.name, usr4.email), ', ')
+                   FROM public.request_approvals a4
+                   LEFT JOIN public.users usr4 ON usr4.id = a4.performed_by
+                  WHERE a4.request_id = r.id AND a4.action IN ('approved', 'po_created', 'completed')
+                    AND COALESCE(usr4.name, usr4.email) IS NOT NULL) AS approver_names,
+                ${approvalsListSql('r.id')} AS approvals_list
+       ) appr ON true
        ORDER BY r.created_at DESC
        LIMIT 1000`
     ),
@@ -230,6 +257,8 @@ export default async function AdminPage() {
               pr.code AS project_code,
               COALESCE(eu.name, r.guest_name) AS engineer_name,
               cb.name AS raised_by_name,
+              COALESCE(ap.name, ap.email, ra_u.name, ra_u.email) AS approver_name,
+              COALESCE(po.approved_at, po.sam_approved_at, ra.created_at) AS approved_at,
               (SELECT COALESCE(SUM(pp.amount), 0) FROM public.po_payments pp WHERE pp.po_id = po.id) AS paid_amount,
               (SELECT COUNT(*)::int FROM public.po_attachments pa WHERE pa.po_id = po.id) AS document_count,
               doc.id AS document_id,
@@ -240,12 +269,24 @@ export default async function AdminPage() {
                 WHERE ri.request_id = po.request_id) AS requisition_suppliers,
               sl.line_count AS supplier_line_count,
               sl.items AS supplier_items,
-              sl.value AS supplier_requisitioned
+              sl.value AS supplier_requisitioned,
+              -- The requisition's sign-offs, so the PO tab can filter by any
+              -- approver in the chain and show who approved it, and when.
+              ${approvalsListSql('po.request_id', 'po.id')} AS approvals_list
          FROM public.purchase_orders po
          LEFT JOIN public.requests r ON r.id = po.request_id
          LEFT JOIN public.projects pr ON pr.id = r.project_id
          LEFT JOIN public.users eu ON eu.id = r.created_by
          LEFT JOIN public.users cb ON cb.id = po.created_by
+         LEFT JOIN public.users ap ON ap.id = COALESCE(po.approved_by, po.sam_approved_by)
+         LEFT JOIN LATERAL (
+              SELECT a.created_at, a.performed_by
+                FROM public.request_approvals a
+               WHERE a.po_id = po.id AND a.action = 'approved'
+               ORDER BY a.created_at DESC
+               LIMIT 1
+         ) ra ON true
+         LEFT JOIN public.users ra_u ON ra_u.id = ra.performed_by
          LEFT JOIN LATERAL (
               SELECT pa.id, pa.file_name FROM public.po_attachments pa
                WHERE pa.po_id = po.id ORDER BY pa.created_at DESC LIMIT 1
@@ -264,14 +305,66 @@ export default async function AdminPage() {
     ),
     maySeeAudit
       ? query<AuditEntry>(
-      `SELECT a.*,
-              json_build_object('id', po.id, 'purpose', po.purpose, 'status', po.status) as po,
-              json_build_object('id', u.id, 'name', u.name, 'email', u.email) as performer
-       FROM public.po_audit_trail a
-       LEFT JOIN public.purchase_orders po ON po.id = a.po_id
-       LEFT JOIN public.users u ON u.id = a.performed_by
-       ORDER BY a.created_at DESC
-       LIMIT 100`
+      // Two trails feed this log. `request_approvals` holds every requisition
+      // decision (submit, each stage's approval, send-back, edit, cancel…);
+      // `po_audit_trail` holds PO events, most of which the requisition routes
+      // also write to `request_approvals`. A PO row is dropped when the same
+      // person recorded the matching requisition action within a minute, so one
+      // decision appears once; PO-only events such as payments still show.
+      `SELECT * FROM (
+         SELECT ra.id,
+                CASE
+                  WHEN ra.action = 'po_created' THEN 'created'
+                  WHEN ra.action = 'edited' AND ra.po_id IS NULL THEN 'requisition_edited'
+                  ELSE ra.action
+                END AS action,
+                ra.comment AS notes,
+                ra.created_at,
+                ra.stage,
+                json_build_object('id', r.id, 'purpose', r.purpose) AS request,
+                CASE WHEN po.id IS NULL THEN NULL
+                     ELSE json_build_object('id', po.id, 'purpose', po.purpose, 'status', po.status) END AS po,
+                CASE WHEN u.id IS NULL THEN NULL
+                     ELSE json_build_object('id', u.id, 'name', u.name, 'email', u.email) END AS performer
+           FROM public.request_approvals ra
+           JOIN public.requests r ON r.id = ra.request_id
+           LEFT JOIN public.purchase_orders po ON po.id = ra.po_id
+           LEFT JOIN public.users u ON u.id = ra.performed_by
+         UNION ALL
+         SELECT a.id,
+                a.action,
+                a.notes,
+                a.created_at,
+                NULL AS stage,
+                CASE WHEN r.id IS NULL THEN NULL
+                     ELSE json_build_object('id', r.id, 'purpose', r.purpose) END AS request,
+                CASE WHEN po.id IS NULL THEN NULL
+                     ELSE json_build_object('id', po.id, 'purpose', po.purpose, 'status', po.status) END AS po,
+                CASE WHEN u.id IS NULL THEN NULL
+                     ELSE json_build_object('id', u.id, 'name', u.name, 'email', u.email) END AS performer
+           FROM public.po_audit_trail a
+           LEFT JOIN public.purchase_orders po ON po.id = a.po_id
+           LEFT JOIN public.requests r ON r.id = po.request_id
+           LEFT JOIN public.users u ON u.id = a.performed_by
+          WHERE NOT EXISTS (
+                  SELECT 1 FROM public.request_approvals ra
+                   WHERE ra.request_id = po.request_id
+                     AND (ra.po_id IS NULL OR ra.po_id = a.po_id)
+                     AND ra.performed_by IS NOT DISTINCT FROM a.performed_by
+                     AND ra.created_at BETWEEN a.created_at - interval '1 minute' AND a.created_at + interval '1 minute'
+                     AND ra.action = ANY(CASE a.action
+                           WHEN 'created' THEN ARRAY['po_created']
+                           WHEN 'approved' THEN ARRAY['approved', 'completed']
+                           WHEN 'resubmitted' THEN ARRAY['resubmitted', 'edited']
+                           ELSE ARRAY[a.action]
+                         END)
+                )
+       ) t
+       -- The dashboard charts span eight months; load all of that window rather
+       -- than a row count, which a busy fortnight would otherwise truncate.
+       WHERE t.created_at >= now() - interval '8 months'
+       ORDER BY t.created_at DESC
+       LIMIT 10000`
         )
       : Promise.resolve([]),
     maySeePreferences ? getRequestWindowSettings() : Promise.resolve({ blockedDays: [] }),

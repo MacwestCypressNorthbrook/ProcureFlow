@@ -1,4 +1,5 @@
 import { query } from '@/lib/db'
+import { approvalsListSql } from '@/lib/approval-trail'
 import RequestTable from '@/components/shared/RequestTable'
 import { monthSplit } from '@/components/shared/stat-presets'
 import { SectionHeader, StatGrid, EmptyState } from '@/components/shared/ui-kit'
@@ -39,7 +40,8 @@ export default async function AllRequisitionsView({
               pr.name AS project_name,
               (po.id IS NOT NULL) AS has_po,
               po.po_number,
-              po.status AS po_status
+              po.status AS po_status,
+              ${approvalsListSql('r.id')} AS approvals_list
          FROM public.requests r
          LEFT JOIN public.projects pr ON pr.id = r.project_id
          LEFT JOIN LATERAL (

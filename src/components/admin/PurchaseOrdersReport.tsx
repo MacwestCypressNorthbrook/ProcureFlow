@@ -11,6 +11,8 @@ import { downloadPdf, exportFilename, type ExportColumn } from '@/lib/export'
 import { toCsv, downloadCsv } from '@/lib/csv'
 import { downloadDocumentBundle, MAX_BUNDLE_FILES } from '@/lib/bundle-documents'
 import { vendorKey, type AdminInvoice, type AdminPurchaseOrder } from './report-types'
+import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
+import { approvalDates, approverNames } from '@/lib/approval-trail'
 import ReportExportMenu, { type ReportExportOption } from './ReportExportMenu'
 import {
   AttentionStrip,
@@ -261,6 +263,14 @@ export default function PurchaseOrdersReport({
   }, [visible])
 
   /* ── Table ──────────────────────────────────────────────────────────── */
+  // Approvers ticked in the filter, so their sign-offs stand out in the trail.
+  const [approverFocus, setApproverFocus] = useState<string[]>([])
+  /** Everyone in the chain; older POs without one fall back to their approver. */
+  const approversOf = (r: PoRow): string[] => {
+    const names = approverNames(r.approvals_list)
+    return names.length ? names : r.approver_name ? [r.approver_name] : []
+  }
+
   // Memoized: DataView re-filters and re-sorts whenever these change identity.
   const columns: DataColumn<PoRow>[] = useMemo(() => [
     {
@@ -345,6 +355,23 @@ export default function PurchaseOrdersReport({
         ),
     },
     {
+      id: 'approval',
+      label: 'Approval',
+      sortable: true,
+      sortValue: (r) => r.approved_at || null,
+      cell: (r) =>
+        r.approvals_list?.length ? (
+          <ApprovalTrailCell list={r.approvals_list} highlight={approverFocus} />
+        ) : (
+          <div className="whitespace-nowrap">
+            <p className="text-xs font-medium text-foreground">{r.approver_name || '—'}</p>
+            {r.approved_at && (
+              <p className="text-[11px] text-muted-foreground">{dateOnly(r.approved_at)}</p>
+            )}
+          </div>
+        ),
+    },
+    {
       id: 'status',
       label: 'Status',
       sortable: true,
@@ -368,7 +395,7 @@ export default function PurchaseOrdersReport({
         </div>
       ),
     },
-  ], [])
+  ], [approverFocus])
 
 
   const facet = useCallback(
@@ -392,6 +419,14 @@ export default function PurchaseOrdersReport({
   const facets: DataFacet<PoRow>[] = useMemo(() => [
     facet('project', 'Project', (r) => r.project),
     facet('engineer', 'Engineer', (r) => r.engineer),
+    {
+      id: 'approver',
+      label: 'Approver',
+      options: [...new Set(rows.flatMap(approversOf))]
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+      matches: (r: PoRow, value: string) => approversOf(r).includes(value),
+    },
     facet('supplier', 'Supplier', (r) => r.vendor),
     facet('status', 'Status', (r) => r.status, (v) => PO_STATUS_CONFIG[v]?.label ?? v),
     facet('department', 'Department', (r) => r.department || 'None'),
@@ -400,7 +435,7 @@ export default function PurchaseOrdersReport({
     facet('split', 'Requisition', (r) => (num(r.sibling_count) > 1 ? 'multi' : 'single'), (v) =>
       v === 'multi' ? 'Split across several POs' : 'Single PO'
     ),
-  ], [facet])
+  ], [facet, rows])
 
 
   /* ── Exports ────────────────────────────────────────────────────────── */
@@ -458,6 +493,8 @@ export default function PurchaseOrdersReport({
     { header: 'PO raised', value: (r) => r.created_at, format: 'date', width: 14 },
     { header: 'Days to PO', value: (r) => r.daysToPo, format: 'int', width: 10 },
     { header: 'Raised by', value: (r) => r.raised_by_name, width: 20 },
+    { header: 'Approver', value: (r) => r.approver_name || '', width: 22 },
+    { header: 'Approved date', value: (r) => r.approved_at, format: 'date', width: 14 },
     { header: 'PO document', value: (r) => r.document_name ?? r.file_name ?? 'Missing', width: 30 },
     { header: 'Notes', value: (r) => r.notes, width: 36 },
   ]
@@ -749,10 +786,35 @@ export default function PurchaseOrdersReport({
           getRowId={(r) => r.id}
           columns={columns}
           facets={facets}
+          dateFilters={[
+            {
+              id: 'approval_date',
+              label: 'Approval Date',
+              scopedBy: 'approver',
+              getDate: (r, approvers) =>
+                r.approvals_list?.length
+                  ? approvalDates(r.approvals_list, approvers)
+                  : approvers.length === 0 || (r.approver_name && approvers.includes(r.approver_name))
+                    ? r.approved_at || null
+                    : null,
+            },
+          ]}
+          onFacetValues={(v) => setApproverFocus(v.approver ?? [])}
           onVisibleRows={setVisible}
           onRowClick={(r) => r.request_id && router.push(`/admin/requests/${r.request_id}`)}
           searchPlaceholder="Search PO number, supplier, project, engineer…"
-          searchText={(r) => [r.id, r.po_number, r.vendor, r.project, r.engineer, r.request_purpose, r.supplier_items, r.department]}
+          searchText={(r) => [
+            r.id,
+            r.po_number,
+            r.vendor,
+            r.approver_name,
+            ...approverNames(r.approvals_list),
+            r.project,
+            r.engineer,
+            r.request_purpose,
+            r.supplier_items,
+            r.department,
+          ]}
           initialTerm={focusId}
           defaultSort={{ id: 'created_at', dir: 'desc' }}
           storageKey="admin-po-report"

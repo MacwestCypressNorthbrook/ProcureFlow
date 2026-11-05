@@ -1,3 +1,5 @@
+import type { ApprovalStep } from '@/lib/approval-trail'
+
 export type UserRole =
   | 'engineer'
   | 'supply_chain'
@@ -99,6 +101,9 @@ export interface PurchaseOrder {
   status: POStatus | string
   approved_by?: string | null
   approved_at?: string | null
+  approver_name?: string | null
+  /** The requisition's sign-offs, oldest first — set by lists that filter by approver. */
+  approvals_list?: ApprovalStep[] | null
   sam_approved_by?: string | null
   sam_approved_at?: string | null
   sam_rejection_reason?: string | null

@@ -26,6 +26,8 @@ import AuditDashboard from './AuditDashboard'
 import AdminOverviewDashboard from './AdminOverviewDashboard'
 import { TableTray } from '@/components/shared/dashboard/kit'
 import type { AdminPurchaseOrder, AdminInvoice } from './report-types'
+import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
+import { approvalDates, approverNames, type ApprovalStep } from '@/lib/approval-trail'
 import type { ExportColumn } from '@/lib/export'
 import { currentStage, STAGE_LABEL } from '@/lib/workflow'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
@@ -78,6 +80,11 @@ export type AdminRequestRow = Request & {
   /** Every purchase order on it; a multi-supplier requisition has one per vendor. */
   po_count?: number | null
   po_numbers?: string | null
+  last_approver_name?: string | null
+  last_approved_at?: string | null
+  last_approver_stage?: string | null
+  approver_names?: string | null
+  approvals_list?: ApprovalStep[] | null
 }
 type AdminRequest = AdminRequestRow
 
@@ -186,6 +193,13 @@ const ACTION_COLORS: Record<string, string> = {
   rejected: 'bg-red-500/10 text-red-600 dark:text-red-400',
   sent_back: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
   paid: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+  part_paid: 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+  completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+  submitted: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  resubmitted: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+  marked_urgent: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
+  cancelled: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  voided: 'bg-red-500/10 text-red-600 dark:text-red-400',
   // legacy spellings
   approved_by_sam: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   rejected_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',
@@ -200,9 +214,15 @@ export interface AuditEntry {
   action: string
   notes: string | null
   created_at: string
+  /** Approval stage the action was taken at; null for PO-only events. */
+  stage: string | null
+  request: { id: string; purpose: string } | null
   po: { id: string; purpose: string; status: string } | null
   performer: { id: string; name: string | null; email: string } | null
 }
+
+/** What the entry is about: the PO when there is one, else its requisition. */
+const auditSubject = (e: AuditEntry) => e.po?.purpose ?? e.request?.purpose ?? ''
 
 interface Col {
   label: string
@@ -316,6 +336,8 @@ export default function AdminClient({
   // What each table's search and filters leave — the dashboards above it chart exactly these.
   const [visibleRequests, setVisibleRequests] = useState<AdminRequest[]>(requests)
   const [visibleAudit, setVisibleAudit] = useState<AuditEntry[]>(auditTrail)
+  // Approvers ticked in the Requisitions filter, so their sign-offs stand out.
+  const [approverFocus, setApproverFocus] = useState<string[]>([])
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false)
 
   /** Surface the outcome of an admin action, then re-fetch server data. */
@@ -390,6 +412,8 @@ export default function AdminClient({
     { header: 'Department', value: (r) => r.department ?? '' },
     { header: 'Current stage', value: (r) => stageLabelOf(stageKeyOf(r)) },
     { header: 'Days at stage', value: (r) => daysAtStage(r) ?? '', align: 'right' },
+    { header: 'Approver', value: (r) => r.last_approver_name ?? r.approver_names ?? '' },
+    { header: 'Approved date', value: (r) => csvDate(r.last_approved_at ?? null) },
     { header: 'Status', value: (r) => REQUEST_STATUS_CONFIG[r.status]?.label ?? r.status },
     { header: 'PO numbers', value: (r) => r.po_numbers ?? r.po_number ?? '' },
     { header: 'Raised', value: (r) => csvDate(r.created_at) },
@@ -419,7 +443,8 @@ export default function AdminClient({
 
   const auditCsv: CsvColumn<AuditEntry>[] = [
     { header: 'Action', value: (e) => AUDIT_ACTION_LABELS[e.action] ?? e.action },
-    { header: 'Purchase order', value: (e) => e.po?.purpose ?? '' },
+    { header: 'Requisition / PO', value: auditSubject },
+    { header: 'Stage', value: (e) => (e.stage ? STAGE_LABEL(e.stage) : '') },
     { header: 'Performed by', value: (e) => e.performer?.name ?? e.performer?.email ?? '' },
     { header: 'Notes', value: (e) => e.notes ?? '' },
     { header: 'Time', value: (e) => csvDate(e.created_at) },
@@ -522,6 +547,44 @@ export default function AdminClient({
       },
     },
     {
+      id: 'approval',
+      label: 'Approval',
+      sortable: true,
+      sortValue: (r) => r.last_approved_at || null,
+      cell: (r) => {
+        if (r.approvals_list?.length) return <ApprovalTrailCell list={r.approvals_list} highlight={approverFocus} />
+        if (!r.last_approver_name && !r.last_approved_at) {
+          return <span className="text-xs text-muted-foreground">Pending</span>
+        }
+        const otherCount =
+          r.approvals_list && r.approvals_list.length > 1 ? r.approvals_list.length - 1 : 0
+        return (
+          <div className="flex flex-col items-start gap-0.5">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-foreground">{r.last_approver_name || 'Approved'}</span>
+              {otherCount > 0 && (
+                <span
+                  className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.2 text-[10px] font-semibold text-muted-foreground"
+                  title={r.approver_names || undefined}
+                >
+                  +{otherCount}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+              {r.last_approver_stage && (
+                <span className="font-medium text-primary/80">{STAGE_LABEL(r.last_approver_stage)}</span>
+              )}
+              {r.last_approver_stage && r.last_approved_at && <span>·</span>}
+              {r.last_approved_at && (
+                <span>{shortDate(r.last_approved_at)}</span>
+              )}
+            </div>
+          </div>
+        )
+      },
+    },
+    {
       id: 'status',
       label: 'Status',
       hideBelow: 'lg',
@@ -547,6 +610,23 @@ export default function AdminClient({
         .sort((a, b) => a.localeCompare(b))
         .map((name) => ({ value: name, label: name })),
       matches: (r, value) => engineerOf(r) === value,
+    },
+    {
+      id: 'approver',
+      label: 'Approver',
+      options: [...new Set(
+        requests.flatMap((r) =>
+          r.approvals_list?.length ? approverNames(r.approvals_list) : r.last_approver_name ? [r.last_approver_name] : []
+        )
+      )]
+        .sort((a, b) => a.localeCompare(b))
+        .map((name) => ({ value: name, label: name })),
+      matches: (r, value) => {
+        if (r.approvals_list && r.approvals_list.length > 0) {
+          return r.approvals_list.some((a) => a.name === value)
+        }
+        return r.last_approver_name === value
+      },
     },
     {
       id: 'stage',
@@ -590,11 +670,16 @@ export default function AdminClient({
     },
     {
       id: 'po',
-      label: 'Purchase Order',
+      label: 'Requisition / PO',
       hideBelow: 'sm',
       sortable: true,
-      sortValue: (e) => e.po?.purpose ?? '',
-      cell: (e) => <span className="font-medium text-foreground">{e.po?.purpose ?? '—'}</span>,
+      sortValue: auditSubject,
+      cell: (e) => (
+        <span className="block">
+          <span className="font-medium text-foreground">{auditSubject(e) || '—'}</span>
+          {e.stage && <span className="block text-[11px] text-muted-foreground">{STAGE_LABEL(e.stage)}</span>}
+        </span>
+      ),
     },
     {
       id: 'by',
@@ -729,9 +814,35 @@ export default function AdminClient({
                 getRowId={(r) => r.id}
                 columns={[...requestCols, attachColumn]}
                 facets={requestFacets}
+                dateFilters={[
+                  {
+                    id: 'approval_date',
+                    label: 'Approval Date',
+                    scopedBy: 'approver',
+                    getDate: (r, approvers) => {
+                      if (r.approvals_list && r.approvals_list.length > 0) {
+                        return approvalDates(r.approvals_list, approvers)
+                      }
+                      return approvers.length === 0 || (r.last_approver_name && approvers.includes(r.last_approver_name))
+                        ? r.last_approved_at || null
+                        : null
+                    },
+                  },
+                ]}
+                onFacetValues={(v) => setApproverFocus(v.approver ?? [])}
                 onRowClick={(r) => router.push(`/admin/requests/${r.id}`)}
                 searchPlaceholder="Search requisitions…"
-                searchText={(r) => [r.id, r.purpose, engineerOf(r), r.guest_email, r.department, r.project_name, r.po_numbers]}
+                searchText={(r) => [
+                  r.id,
+                  r.purpose,
+                  engineerOf(r),
+                  r.last_approver_name,
+                  r.approver_names,
+                  r.guest_email,
+                  r.department,
+                  r.project_name,
+                  r.po_numbers,
+                ]}
                 initialTerm={focusId}
                 defaultSort={{ id: 'created_at', dir: 'desc' }}
                 storageKey="admin-requests"
@@ -786,7 +897,7 @@ export default function AdminClient({
                 columns={auditCols}
                 facets={auditFacets}
                 searchPlaceholder="Search the audit trail…"
-                searchText={(e) => [e.action, e.notes, e.po?.purpose, e.performer?.name, e.performer?.email]}
+                searchText={(e) => [e.action, ACTION_LABELS[e.action], e.notes, e.po?.purpose, e.request?.purpose, e.stage && STAGE_LABEL(e.stage), e.performer?.name, e.performer?.email]}
                 defaultSort={{ id: 'created_at', dir: 'desc' }}
                 toolbarExtra={(visible) => (
                   <ExportButton rows={visible} columns={auditCsv} section="audit-trail" />

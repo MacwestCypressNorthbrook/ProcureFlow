@@ -92,6 +92,12 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   paid: 'Payment completed',
   cancelled: 'Cancelled',
   voided: 'Voided',
+  // requisition actions (request_approvals), shown in the admin audit log
+  submitted: 'Requisition submitted',
+  requisition_edited: 'Requisition edited',
+  items_removed: 'Items removed',
+  marked_urgent: 'Marked urgent',
+  completed: 'Authorized and closed',
   // legacy
   approved_by_sam: 'Approved',
   rejected_by_sam: 'Rejected',
@@ -103,7 +109,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
 
 export type AuditTone = 'positive' | 'negative' | 'neutral'
 
-const POSITIVE_ACTIONS = new Set(['approved', 'paid', 'part_paid', 'approved_by_sam', 'payment_completed'])
+const POSITIVE_ACTIONS = new Set(['approved', 'completed', 'paid', 'part_paid', 'approved_by_sam', 'payment_completed'])
 const NEGATIVE_ACTIONS = new Set(['rejected', 'sent_back', 'rejected_by_sam', 'sent_back_by_sam', 'cancelled', 'voided'])
 
 export function auditTone(action: string): AuditTone {
