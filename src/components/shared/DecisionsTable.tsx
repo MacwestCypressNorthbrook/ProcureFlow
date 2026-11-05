@@ -5,10 +5,22 @@ import DataView, { type DataColumn, type DataFacet } from '@/components/shared/D
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 import ExportMenu from '@/components/shared/ExportMenu'
 import type { ExportColumn } from '@/lib/export'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
 import { Check, RotateCcw, ShoppingBag, Banknote, Trash2, XCircle, Zap } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { StageDecision } from '@/lib/review'
+import { currentStage, STAGES } from '@/lib/workflow'
+
+/**
+ * Where the requisition is now — "With Cost Control", "Sent back to Supply
+ * Chain", "Completed" — so a reviewer can follow what happened after them.
+ */
+function whereNow(d: StageDecision): string {
+  const stage = currentStage(d.request_status, d.sent_back_to)
+  if (stage && d.request_status === 'sent_back') return `Sent back to ${STAGES[stage].label}`
+  if (stage) return `With ${STAGES[stage].label}`
+  return REQUEST_STATUS_CONFIG[d.request_status]?.label ?? d.request_status
+}
 
 const ACTION: Record<string, { label: string; className: string; icon: React.ReactNode }> = {
   approved: {
@@ -122,6 +134,7 @@ export default function DecisionsTable({
     { header: 'Project site', value: (d) => d.project_name ?? '' },
     { header: 'Requested by', value: (d) => d.requester_name ?? '' },
     { header: 'Decided by', value: (d) => d.actor_name ?? '' },
+    { header: 'Where it is now', value: whereNow },
     { header: 'PO number', value: (d) => d.po_number ?? '' },
     { header: 'Urgent', value: (d) => (d.is_urgent ? 'Yes' : 'No') },
     { header: 'Comment', value: (d) => d.comment ?? '' },
@@ -188,6 +201,14 @@ export default function DecisionsTable({
         ),
     },
     {
+      id: 'now',
+      label: 'Now',
+      hideBelow: 'lg',
+      sortable: true,
+      sortValue: whereNow,
+      cell: (d) => <span className="whitespace-nowrap text-xs text-muted-foreground">{whereNow(d)}</span>,
+    },
+    {
       id: 'po',
       label: 'PO',
       hideBelow: 'xl',
@@ -238,6 +259,14 @@ export default function DecisionsTable({
         label: ACTION[a]?.label ?? a,
       })),
       matches: (d, value) => d.action === value,
+    },
+    {
+      id: 'now',
+      label: 'Now',
+      options: Array.from(new Set(rows.map(whereNow)))
+        .sort((a, b) => a.localeCompare(b))
+        .map((v) => ({ value: v, label: v })),
+      matches: (d, value) => whereNow(d) === value,
     },
     ...(types.length > 1
       ? [

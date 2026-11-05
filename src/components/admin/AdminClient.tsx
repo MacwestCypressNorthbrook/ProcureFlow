@@ -27,7 +27,7 @@ import AdminOverviewDashboard from './AdminOverviewDashboard'
 import { TableTray } from '@/components/shared/dashboard/kit'
 import type { AdminPurchaseOrder, AdminInvoice } from './report-types'
 import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
-import { approvalDates, approverNames, type ApprovalStep } from '@/lib/approval-trail'
+import { APPROVAL_STAGES, approvalDates, approvalTrailText, approverNames, stageApproval, type ApprovalStep } from '@/lib/approval-trail'
 import type { ExportColumn } from '@/lib/export'
 import { currentStage, STAGE_LABEL } from '@/lib/workflow'
 import { csvNumber, formatDate as csvDate, type CsvColumn } from '@/lib/csv'
@@ -412,8 +412,13 @@ export default function AdminClient({
     { header: 'Department', value: (r) => r.department ?? '' },
     { header: 'Current stage', value: (r) => stageLabelOf(stageKeyOf(r)) },
     { header: 'Days at stage', value: (r) => daysAtStage(r) ?? '', align: 'right' },
-    { header: 'Approver', value: (r) => r.last_approver_name ?? r.approver_names ?? '' },
-    { header: 'Approved date', value: (r) => csvDate(r.last_approved_at ?? null) },
+    // One pair per stage, so a spreadsheet can sort or filter by who approved
+    // at each step and when; the trail column keeps re-approvals after a send-back.
+    ...APPROVAL_STAGES.flatMap((stage): ExportColumn<AdminRequest>[] => [
+      { header: `${STAGE_LABEL(stage)} approved by`, value: (r) => stageApproval(r.approvals_list, stage)?.name ?? '' },
+      { header: `${STAGE_LABEL(stage)} approved on`, value: (r) => csvDate(stageApproval(r.approvals_list, stage)?.at ?? null) },
+    ]),
+    { header: 'Approval trail', value: (r) => approvalTrailText(r.approvals_list, STAGE_LABEL) },
     { header: 'Status', value: (r) => REQUEST_STATUS_CONFIG[r.status]?.label ?? r.status },
     { header: 'PO numbers', value: (r) => r.po_numbers ?? r.po_number ?? '' },
     { header: 'Raised', value: (r) => csvDate(r.created_at) },

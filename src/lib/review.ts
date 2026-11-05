@@ -351,6 +351,9 @@ export interface StageDecision {
   po_number: string | null
   po_status: string | null
   is_urgent: boolean | null
+  /** Where the requisition is now, so a reviewer can follow what they decided. */
+  request_status: string
+  sent_back_to: string | null
 }
 
 /**
@@ -363,6 +366,9 @@ export interface StageDecision {
  * Any stage can be passed, so the same view works for Project Lead, Supply
  * Chain and Finance.
  */
+/** Actions that are history rather than a stage's decision. */
+const DECISION_EXCLUDED = `('submitted', 'edited')`
+
 export async function getStageDecisions(
   stage: Stage,
   { limit = 200, actorId }: { limit?: number; actorId?: string } = {}
@@ -379,6 +385,8 @@ export async function getStageDecisions(
               r.description,
               r.total_amount,
               r.is_urgent,
+              r.status AS request_status,
+              r.sent_back_to,
               p.name AS project_name,
               ru.name AS requester_name,
               po.po_number,
@@ -391,7 +399,7 @@ export async function getStageDecisions(
          LEFT JOIN public.purchase_orders po ON po.id = a.po_id
         WHERE a.stage = $1
           -- Raising and editing a requisition are history, not a stage's decision.
-          AND a.action NOT IN ('submitted', 'edited')
+          AND a.action NOT IN ${DECISION_EXCLUDED}
           AND ($2::uuid IS NULL OR a.performed_by = $2)
         ORDER BY a.created_at DESC
         LIMIT $3`,
@@ -400,6 +408,27 @@ export async function getStageDecisions(
   } catch (err) {
     console.error('Failed to load stage decisions from Neon:', err)
     return []
+  }
+}
+
+/**
+ * How many decisions a stage has recorded — for tab badges, which need the
+ * number, not 500 rows fetched to count them (and capped at 500 besides).
+ */
+export async function getStageDecisionCount(stage: Stage, actorId?: string): Promise<number> {
+  try {
+    const row = await queryOne<{ count: number }>(
+      `SELECT COUNT(*)::int AS count
+         FROM public.request_approvals a
+        WHERE a.stage = $1
+          AND a.action NOT IN ${DECISION_EXCLUDED}
+          AND ($2::uuid IS NULL OR a.performed_by = $2)`,
+      [stage, actorId ?? null]
+    )
+    return row?.count ?? 0
+  } catch (err) {
+    console.error('Failed to count stage decisions in Neon:', err)
+    return 0
   }
 }
 

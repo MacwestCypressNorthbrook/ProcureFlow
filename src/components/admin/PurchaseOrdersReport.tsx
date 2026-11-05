@@ -12,7 +12,8 @@ import { toCsv, downloadCsv } from '@/lib/csv'
 import { downloadDocumentBundle, MAX_BUNDLE_FILES } from '@/lib/bundle-documents'
 import { vendorKey, type AdminInvoice, type AdminPurchaseOrder } from './report-types'
 import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
-import { approvalDates, approverNames } from '@/lib/approval-trail'
+import { APPROVAL_STAGES, approvalDates, approvalTrailText, approverNames, stageApproval } from '@/lib/approval-trail'
+import { STAGE_LABEL } from '@/lib/workflow'
 import ReportExportMenu, { type ReportExportOption } from './ReportExportMenu'
 import {
   AttentionStrip,
@@ -493,8 +494,12 @@ export default function PurchaseOrdersReport({
     { header: 'PO raised', value: (r) => r.created_at, format: 'date', width: 14 },
     { header: 'Days to PO', value: (r) => r.daysToPo, format: 'int', width: 10 },
     { header: 'Raised by', value: (r) => r.raised_by_name, width: 20 },
-    { header: 'Approver', value: (r) => r.approver_name || '', width: 22 },
-    { header: 'Approved date', value: (r) => r.approved_at, format: 'date', width: 14 },
+    // One pair per stage of the requisition's chain, then the full trail.
+    ...APPROVAL_STAGES.flatMap((stage) => [
+      { header: `${STAGE_LABEL(stage)} approved by`, value: (r: PoRow) => stageApproval(r.approvals_list, stage)?.name ?? '', width: 20 },
+      { header: `${STAGE_LABEL(stage)} approved on`, value: (r: PoRow) => stageApproval(r.approvals_list, stage)?.at ?? null, format: 'date' as const, width: 14 },
+    ]),
+    { header: 'Approval trail', value: (r) => approvalTrailText(r.approvals_list, STAGE_LABEL), width: 60 },
     { header: 'PO document', value: (r) => r.document_name ?? r.file_name ?? 'Missing', width: 30 },
     { header: 'Notes', value: (r) => r.notes, width: 36 },
   ]

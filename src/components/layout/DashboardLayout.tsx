@@ -100,6 +100,7 @@ const ROUTE_TITLES: Record<string, { title: string; subtitle?: string }> = {
   '/sam': { title: 'Project Lead Review', subtitle: 'First review of every requisition' },
   '/sam/requests': { title: 'Requisitions to Review', subtitle: 'Awaiting your approval' },
   '/sam/reviewed': { title: 'Reviewed', subtitle: 'Everything you have decided on' },
+  '/sam/all': { title: 'All Requisitions', subtitle: 'Everything across the sites, with its approval trail' },
   '/mintah': { title: 'Supply Chain', subtitle: 'Specifications, quantities and suppliers' },
   '/mintah/queue': { title: 'Requisitions to Review', subtitle: 'Awaiting your approval' },
   '/mintah/requests': { title: 'All Requisitions', subtitle: 'Everything raised across the sites' },
@@ -190,11 +191,12 @@ const roleNavSections: Record<string, { label: string; items: { href: string; la
       // raised by the Administrator, and the Project Lead has no action on one
       // — `po:approve` is Cost Control's and `po:pay` is Finance's. Their real
       // question, "what happened to the requisitions I approved", is answered
-      // by Reviewed, which is requisition-centric, filterable and exportable.
+      // by Reviewed (which shows where each one is now) and All Requisitions.
       // A PO deep-linked from a notification still opens at /sam/:id.
       items: [
         { href: '/sam/requests', label: 'Awaiting Review', icon: <ClipboardCheck size={18} /> },
         { href: '/sam/reviewed', label: 'Reviewed', icon: <ClipboardList size={18} /> },
+        { href: '/sam/all', label: 'All Requisitions', icon: <FileText size={18} /> },
       ],
     },
   ],

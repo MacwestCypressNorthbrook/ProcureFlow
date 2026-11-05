@@ -80,3 +80,23 @@ export const lastApproval = (list: ApprovalStep[] | null | undefined): ApprovalS
   const steps = approvalSteps(list)
   return steps.length ? steps[steps.length - 1] : null
 }
+
+/** The approval stages in chain order, as export columns list them. */
+export const APPROVAL_STAGES = ['lead', 'supply_chain', 'cost_control', 'admin'] as const
+
+/** A stage's latest sign-off — after a send-back, the one that let it through. */
+export const stageApproval = (list: ApprovalStep[] | null | undefined, stage: string): ApprovalStep | null =>
+  approvalSteps(list).filter((s) => s.stage === stage).pop() ?? null
+
+/**
+ * The whole chain as one line for a spreadsheet cell, oldest first:
+ * "Project Lead: Ama Mensah, 03 Oct 2026 → Supply Chain: …".
+ */
+export function approvalTrailText(list: ApprovalStep[] | null | undefined, stageLabel: (stage: string) => string): string {
+  return approvalSteps(list)
+    .map((s) => {
+      const day = new Date(s.at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+      return `${stageLabel(s.stage)}: ${s.name ?? 'Unknown'}, ${day}`
+    })
+    .join(' → ')
+}

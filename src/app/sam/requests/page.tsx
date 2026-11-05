@@ -2,7 +2,7 @@ import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
-import { getStageInbox, getStageDecisions } from '@/lib/review'
+import { getStageInbox, getStageDecisionCount } from '@/lib/review'
 import StageTabs from '@/components/shared/StageTabs'
 import { ClipboardCheck } from 'lucide-react'
 
@@ -10,9 +10,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeadQueuePage() {
   await requirePageRole('project_lead')
-  const [rows, decisions] = await Promise.all([
+  const [rows, decisionCount] = await Promise.all([
     getStageInbox('lead'),
-    getStageDecisions('lead', { limit: 500 }),
+    getStageDecisionCount('lead'),
   ])
 
   return (
@@ -21,7 +21,7 @@ export default async function LeadQueuePage() {
         <StageTabs
           tabs={[
             { label: 'Awaiting review', href: '/sam/requests', count: rows.length, active: true },
-            { label: 'Reviewed', href: '/sam/reviewed', count: decisions.length },
+            { label: 'Reviewed', href: '/sam/reviewed', count: decisionCount },
           ]}
         />
         <StatGrid

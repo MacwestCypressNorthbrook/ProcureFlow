@@ -2,7 +2,7 @@ import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
-import { getStageInbox, getStageDecisions } from '@/lib/review'
+import { getStageInbox, getStageDecisionCount } from '@/lib/review'
 import StageTabs from '@/components/shared/StageTabs'
 import { ShoppingBag } from 'lucide-react'
 
@@ -17,9 +17,9 @@ export const dynamic = 'force-dynamic'
  */
 export default async function AdminPOQueuePage() {
   await requirePageRole('administrator', 'super_user')
-  const [rows, decisions] = await Promise.all([
+  const [rows, decisionCount] = await Promise.all([
     getStageInbox('admin'),
-    getStageDecisions('admin', { limit: 500 }),
+    getStageDecisionCount('admin'),
   ])
 
   return (
@@ -28,7 +28,7 @@ export default async function AdminPOQueuePage() {
         <StageTabs
           tabs={[
             { label: 'Awaiting review', href: '/admin/requests', count: rows.length, active: true },
-            { label: 'Reviewed', href: '/admin/reviewed', count: decisions.length },
+            { label: 'Reviewed', href: '/admin/reviewed', count: decisionCount },
           ]}
         />
         <StatGrid

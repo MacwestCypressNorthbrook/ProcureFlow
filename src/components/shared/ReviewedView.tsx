@@ -39,8 +39,10 @@ export default async function ReviewedView({
   mineOnly?: boolean
 }) {
   const label = STAGES[stage].label
+  // The whole record, not the latest 500: this page is the stage's history, and
+  // its tiles (approved, sent back, value) count from these rows.
   const [decisions, pending] = await Promise.all([
-    getStageDecisions(stage, { limit: 500, actorId: mineOnly ? user.id : undefined }),
+    getStageDecisions(stage, { limit: 10000, actorId: mineOnly ? user.id : undefined }),
     queueHref && reviewedHref ? getStageInbox(stage) : Promise.resolve([]),
   ])
 
