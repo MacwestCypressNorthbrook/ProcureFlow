@@ -292,7 +292,7 @@ export async function PUT(
           id,
         ],
       ],
-      editedStatement(id, existing, guard.user.id, editSummary),
+      editedStatement(id, existing, guard.user, editSummary),
     ])
 
     // The header UPDATE is the second-to-last statement.
@@ -338,7 +338,7 @@ export async function PUT(
         id,
       ],
     ],
-    editedStatement(id, existing, guard.user.id, editSummary),
+    editedStatement(id, existing, guard.user, editSummary),
   ])
 
   return NextResponse.json({ data: results[0]?.[0] ?? null, success: true })
@@ -347,15 +347,22 @@ export async function PUT(
 /**
  * The `edited` entry for a requisition's history, as a [sql, params] pair for
  * `transaction()`. Filed under the stage holding the requisition when it was
- * edited, so the history shows where in the chain the change happened.
+ * edited when a reviewer made the change, or under `requester` when the
+ * requester did, so the label reflects who acted.
  */
 function editedStatement(
   requestId: string,
   existing: DbRequest,
-  userId: string,
+  user: { id: string; role: string },
   summary: string
 ): [string, unknown[]] {
-  const stage = currentStage(existing.status, existing.sent_back_to) ?? 'requester'
+  // The label names who acted, not where the requisition sat: a requester
+  // editing their own request must not read as the Project Lead.
+  const actsAsReviewer = isElevated(user.role) || normalizeRole(user.role) === 'project_lead'
+  const stage = actsAsReviewer
+    ? currentStage(existing.status, existing.sent_back_to) ?? 'requester'
+    : 'requester'
+  const userId = user.id
   return [
     `INSERT INTO public.request_approvals (request_id, stage, action, performed_by, comment)
      VALUES ($1, $2, 'edited', $3, $4)`,
