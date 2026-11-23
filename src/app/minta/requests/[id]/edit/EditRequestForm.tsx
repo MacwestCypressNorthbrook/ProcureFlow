@@ -276,9 +276,16 @@ export default function EditRequestForm({
       return
     }
 
-    const noAmount = payloadLines.find((l) => isLumpSum(l) && !(Number(l.unitPrice) > 0))
+    // A sub-contractor's amount may be zero (agreed later, or covered elsewhere); an expense may not.
+    const noAmount = payloadLines.find((l) =>
+      l.category === 'labour' && l.isSubcontractor ? Number(l.unitPrice) < 0 : isLumpSum(l) && !(Number(l.unitPrice) > 0)
+    )
     if (noAmount) {
-      setError(`"${noAmount.description || 'Expense'}" requires an amount greater than zero.`)
+      setError(
+        noAmount.category === 'labour' && noAmount.isSubcontractor
+          ? `"${noAmount.description || 'Sub-contractor'}" cannot have a negative amount.`
+          : `"${noAmount.description || 'Expense'}" requires an amount greater than zero.`
+      )
       return
     }
 

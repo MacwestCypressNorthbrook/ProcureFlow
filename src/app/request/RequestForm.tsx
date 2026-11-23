@@ -270,9 +270,16 @@ export default function RequestForm({
       setError('Every material and labour line needs a quantity greater than zero.')
       return
     }
-    const noAmount = payloadLines.find((l) => isLumpSum(l) && !(Number(l.unitPrice) > 0))
+    // A sub-contractor's amount may be zero (agreed later, or covered elsewhere); an expense may not.
+    const noAmount = payloadLines.find((l) =>
+      l.category === 'labour' && l.isSubcontractor ? Number(l.unitPrice) < 0 : isLumpSum(l) && !(Number(l.unitPrice) > 0)
+    )
     if (noAmount) {
-      setError('Every expense and sub-contractor line needs an amount greater than zero.')
+      setError(
+        noAmount.isSubcontractor
+          ? 'A sub-contractor amount cannot be negative.'
+          : 'Every expense line needs an amount greater than zero.'
+      )
       return
     }
 
