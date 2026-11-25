@@ -1,7 +1,7 @@
 'use client'
 
 import { lineNeedsSupplier, supplierRequiredMessage } from '@/lib/supplier-rule'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import FormErrorBanner from '@/components/shared/FormErrorBanner'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -9,6 +9,7 @@ import SupplierPicker, { type SupplierOption } from '@/components/shared/Supplie
 import { uploadDocument } from '@/lib/upload-client'
 import type { Project } from '@/lib/types'
 import {
+  AlertTriangle,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -76,11 +77,25 @@ const lineTotal = (l: Line) =>
 
 /* ── Small field primitives, sized for thumbs ───────────────────────────── */
 
-function Label({ children, required }: { children: React.ReactNode; required?: boolean }) {
+function Label({
+  children,
+  required,
+  htmlFor,
+  id,
+}: {
+  children: React.ReactNode
+  required?: boolean
+  htmlFor?: string
+  id?: string
+}) {
   return (
-    <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <label htmlFor={htmlFor} id={id} className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
       {children}
-      {required && <span className="ml-0.5 text-destructive">*</span>}
+      {required && (
+        <span aria-hidden="true" className="ml-0.5 text-destructive">
+          *
+        </span>
+      )}
     </label>
   )
 }
@@ -138,12 +153,17 @@ export default function RequestForm({
   dashboardPath?: string
 }) {
   const router = useRouter()
+  const fid = useId()
+  const lineFieldId = (i: number, field: string) => `${fid}-line-${i}-${field}`
 
   const [suppliers, setSuppliers] = useState<SupplierOption[]>(initialSuppliers)
   const [projectId, setProjectId] = useState(projects.length === 1 ? projects[0].id : '')
   const [department, setDepartment] = useState(requester.department || 'Operations')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [lines, setLines] = useState<Line[]>([blankLine()])
+  // The first line renders on the server too, so its id must be deterministic
+  // (nextId mixes a module counter and Date.now(), which differ server vs client).
+  // Lines added later are created only in the browser and can use nextId.
+  const [lines, setLines] = useState<Line[]>(() => [{ ...blankLine(), id: 'line-initial' }])
   const [collapsedLines, setCollapsedLines] = useState<Set<string>>(new Set())
   const [notes, setNotes] = useState('')
   const [files, setFiles] = useState<File[]>([])
@@ -167,7 +187,10 @@ export default function RequestForm({
     setSubmittingState(value)
   }
   const [uploading, setUploading] = useState<{ index: number; total: number; percent: number } | null>(null)
-  const [submitted, setSubmitted] = useState<{ total: number; lines: number } | null>(null)
+  const [submitted, setSubmitted] = useState<{ total: number; lines: number; requestId: string | null } | null>(null)
+  /** Files that did not attach after the requisition saved, so they can be retried. */
+  const [failedUploads, setFailedUploads] = useState<File[]>([])
+  const [retrying, setRetrying] = useState(false)
   const [error, setError] = useState('')
   // The line a supplier error is about, so it can be taken to and outlined.
   const [errorLineId, setErrorLineId] = useState<string | null>(null)
@@ -245,6 +268,61 @@ export default function RequestForm({
 
   const registerSupplier = (s: SupplierOption) =>
     setSuppliers((list) => (list.some((x) => x.id === s.id) ? list : [...list, s].sort((a, b) => a.name.localeCompare(b.name))))
+
+  /**
+   * Uploads one file and records it against the requisition. Throws if either
+   * the transfer or the attachment record fails, so the caller can keep it for a retry.
+   */
+  const uploadAttachment = async (
+    requestId: string,
+    file: File,
+    onProgress?: (percent: number) => void
+  ) => {
+    // Straight to storage where possible, so a weak connection retries
+    // one file instead of losing the whole batch.
+    const uploaded = await uploadDocument(file, { scope: `request-docs/${requestId}`, onProgress })
+
+    const isInvoice = invoiceKeys.has(fileKey(file))
+    let res: Response
+    if (uploaded.viaServer) {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('is_invoice', isInvoice ? 'true' : 'false')
+      res = await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
+    } else {
+      res = await fetch(`/api/requests/${requestId}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          file_name: uploaded.fileName,
+          file_url: uploaded.key,
+          file_size: uploaded.fileSize,
+          file_type: uploaded.contentType,
+          is_invoice: isInvoice,
+        }),
+      })
+    }
+    if (!res.ok) throw new Error(`Attachment could not be recorded (${res.status})`)
+  }
+
+  const retryFailedUploads = async () => {
+    const requestId = submitted?.requestId
+    if (!requestId || retrying || failedUploads.length === 0) return
+    setRetrying(true)
+    const stillFailed: File[] = []
+    for (const file of failedUploads) {
+      try {
+        await uploadAttachment(requestId, file)
+        // Drop each file from the warning as soon as it lands.
+        setFailedUploads((list) => list.filter((f) => f !== file))
+      } catch (uploadErr) {
+        console.error('Attachment retry failed:', uploadErr)
+        stillFailed.push(file)
+      }
+    }
+    setFailedUploads(stillFailed)
+    setRetrying(false)
+  }
 
   const addFiles = (incoming: FileList | null) => {
     if (incoming) setFiles((f) => [...f, ...Array.from(incoming)])
@@ -364,47 +442,30 @@ export default function RequestForm({
       }
 
       // Attachments upload after the requisition exists; a failure here must
-      // not discard a requisition that already saved.
-      if (files.length > 0 && payload.data?.id) {
-        const requestId = payload.data.id
-        for (const [index, file] of files.entries()) {
-          setUploading({ index, total: files.length, percent: 0 })
-          try {
-            // Straight to storage where possible, so a weak connection retries
-            // one file instead of losing the whole batch.
-            const uploaded = await uploadDocument(file, {
-              scope: `request-docs/${requestId}`,
-              onProgress: (percent: number) =>
-                setUploading({ index, total: files.length, percent }),
-            })
-
-            const isInvoice = invoiceKeys.has(fileKey(file))
-            if (uploaded.viaServer) {
-              const form = new FormData()
-              form.append('file', file)
-              form.append('is_invoice', isInvoice ? 'true' : 'false')
-              await fetch(`/api/requests/${requestId}/attachments`, { method: 'POST', body: form })
-            } else {
-              await fetch(`/api/requests/${requestId}/attachments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  file_name: uploaded.fileName,
-                  file_url: uploaded.key,
-                  file_size: uploaded.fileSize,
-                  file_type: uploaded.contentType,
-                  is_invoice: isInvoice,
-                }),
-              })
+      // not discard a requisition that already saved, but it must be reported.
+      const requestId: string | null = payload.data?.id ?? null
+      const failed: File[] = []
+      if (files.length > 0) {
+        if (!requestId) {
+          failed.push(...files)
+        } else {
+          for (const [index, file] of files.entries()) {
+            setUploading({ index, total: files.length, percent: 0 })
+            try {
+              await uploadAttachment(requestId, file, (percent: number) =>
+                setUploading({ index, total: files.length, percent })
+              )
+            } catch (uploadErr) {
+              console.error('Attachment upload failed:', uploadErr)
+              failed.push(file)
             }
-          } catch (uploadErr) {
-            console.error('Attachment upload failed:', uploadErr)
           }
+          setUploading(null)
         }
-        setUploading(null)
       }
 
-      setSubmitted({ total: grandTotal, lines: payloadLines.length })
+      setFailedUploads(failed)
+      setSubmitted({ total: grandTotal, lines: payloadLines.length, requestId })
     } catch {
       setError('Network error — the requisition was not submitted.')
     } finally {
@@ -433,10 +494,47 @@ export default function RequestForm({
           {files.length > 0 && (
             <div className="flex justify-between gap-4">
               <dt className="text-sm text-muted-foreground">Attachments</dt>
-              <dd className="text-sm font-semibold text-foreground">{files.length}</dd>
+              <dd className="text-sm font-semibold text-foreground">
+                {files.length - failedUploads.length}
+                {failedUploads.length > 0 ? ` of ${files.length}` : ''}
+              </dd>
             </div>
           )}
         </dl>
+        {failedUploads.length > 0 && (
+          <div
+            role="alert"
+            className="mt-5 rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-left"
+          >
+            <p className="flex items-start gap-2 text-sm font-semibold text-destructive">
+              <AlertTriangle size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+              The requisition was submitted, but {failedUploads.length === 1 ? 'this file was' : 'these files were'} not
+              attached:
+            </p>
+            <ul className="mt-2 space-y-1 pl-6 text-sm text-foreground">
+              {failedUploads.map((f, i) => (
+                <li key={`${fileKey(f)}-${i}`} className="list-disc break-all">
+                  {f.name}
+                </li>
+              ))}
+            </ul>
+            {submitted.requestId ? (
+              <button
+                type="button"
+                onClick={retryFailedUploads}
+                disabled={retrying}
+                className="mt-3 inline-flex h-11 items-center gap-2 rounded-lg border border-input bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+              >
+                {retrying && <Loader2 size={16} aria-hidden="true" className="animate-spin" />}
+                {retrying ? 'Retrying…' : 'Retry upload'}
+              </button>
+            ) : (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Open the requisition from your dashboard to add them.
+              </p>
+            )}
+          </div>
+        )}
         <div className="mt-7 flex flex-col gap-3 sm:flex-row">
           <button
             type="button"
@@ -445,6 +543,8 @@ export default function RequestForm({
               setLines([blankLine()])
               setNotes('')
               setFiles([])
+              setFailedUploads([])
+              setInvoiceKeys(new Set())
               setError('')
             }}
             className="h-12 flex-1 rounded-lg border border-input bg-card text-base font-medium text-foreground transition-colors hover:bg-muted"
@@ -493,9 +593,11 @@ export default function RequestForm({
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="sm:col-span-2">
-              <Label required={projects.length > 0}>Project site</Label>
+              <Label required={projects.length > 0} htmlFor={`${fid}-project`}>Project site</Label>
               {projects.length > 0 ? (
                 <select
+                  id={`${fid}-project`}
+                  aria-required="true"
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
                   className={`${inputClass} appearance-none`}
@@ -519,8 +621,9 @@ export default function RequestForm({
             </div>
 
             <div>
-              <Label>Department</Label>
+              <Label htmlFor={`${fid}-department`}>Department</Label>
               <select
+                id={`${fid}-department`}
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 className={`${inputClass} appearance-none`}
@@ -532,8 +635,8 @@ export default function RequestForm({
             </div>
 
             <div>
-              <Label>Date</Label>
-              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
+              <Label htmlFor={`${fid}-date`}>Date</Label>
+              <input id={`${fid}-date`} type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputClass} />
             </div>
           </div>
         </section>
@@ -624,7 +727,7 @@ export default function RequestForm({
                       )}
 
                       <div>
-                        <Label required>
+                        <Label required htmlFor={lineFieldId(i, 'description')}>
                           {line.category === 'other'
                             ? 'Expense description'
                             : line.category === 'labour'
@@ -634,6 +737,8 @@ export default function RequestForm({
                               : 'Material description'}
                         </Label>
                         <textarea
+                          id={lineFieldId(i, 'description')}
+                          aria-required="true"
                           value={line.description}
                           onChange={(e) => updateLine(line.id, { description: e.target.value })}
                           placeholder={
@@ -653,8 +758,10 @@ export default function RequestForm({
                       {!isLumpSum(line) && (
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label required>Quantity</Label>
+                            <Label required htmlFor={lineFieldId(i, 'quantity')}>Quantity</Label>
                             <input
+                              id={lineFieldId(i, 'quantity')}
+                              aria-required="true"
                               type="number"
                               inputMode="decimal"
                               min="0"
@@ -665,8 +772,9 @@ export default function RequestForm({
                             />
                           </div>
                           <div>
-                            <Label>Unit</Label>
+                            <Label htmlFor={lineFieldId(i, 'unit')}>Unit</Label>
                             <select
+                              id={lineFieldId(i, 'unit')}
                               value={line.unit}
                               onChange={(e) => updateLine(line.id, { unit: e.target.value })}
                               className={`${inputClass} appearance-none`}
@@ -681,10 +789,12 @@ export default function RequestForm({
                       )}
 
                       <div>
-                        <Label required={isLumpSum(line)}>
+                        <Label required={line.category === 'other'} htmlFor={lineFieldId(i, 'price')}>
                           {isLumpSum(line) ? 'Amount (GHS)' : 'Unit price (GHS)'}
                         </Label>
                         <input
+                          id={lineFieldId(i, 'price')}
+                          aria-required={line.category === 'other'}
                           type="number"
                           inputMode="decimal"
                           min="0"
@@ -698,8 +808,9 @@ export default function RequestForm({
 
                       {line.isSubcontractor && (
                         <div>
-                          <Label>Scope / supporting detail (optional)</Label>
+                          <Label htmlFor={lineFieldId(i, 'scope')}>Scope / supporting detail (optional)</Label>
                           <textarea
+                            id={lineFieldId(i, 'scope')}
                             value={line.subcontractorNote}
                             onChange={(e) => updateLine(line.id, { subcontractorNote: e.target.value })}
                             placeholder="What the sub-contractor delivered, and anything the reviewers should know."
@@ -736,8 +847,9 @@ export default function RequestForm({
                       </div>
 
                       <div>
-                        <Label>Remarks</Label>
+                        <Label htmlFor={lineFieldId(i, 'remarks')}>Remarks</Label>
                         <input
+                          id={lineFieldId(i, 'remarks')}
                           value={line.remarks}
                           onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
                           placeholder="Optional note"
@@ -821,6 +933,8 @@ export default function RequestForm({
                         <input
                           value={line.description}
                           onChange={(e) => updateLine(line.id, { description: e.target.value })}
+                          aria-label={`Line ${i + 1} description`}
+                          aria-required="true"
                           placeholder={
                             line.category === 'other'
                               ? 'e.g. Site permit fees — district assembly'
@@ -836,6 +950,7 @@ export default function RequestForm({
                           value={line.remarks}
                           onChange={(e) => updateLine(line.id, { remarks: e.target.value })}
                           placeholder="Remarks (optional)"
+                          aria-label={`Line ${i + 1} remarks`}
                           className="mt-1.5 h-9 w-full rounded-lg border border-transparent bg-transparent px-3 text-xs text-muted-foreground placeholder:text-muted-foreground/70 hover:border-input focus:border-input focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </td>
@@ -851,6 +966,8 @@ export default function RequestForm({
                             step="any"
                             value={line.quantity}
                             onChange={(e) => updateLine(line.id, { quantity: e.target.value })}
+                            aria-label={`Line ${i + 1} quantity`}
+                            aria-required="true"
                             className="h-10 w-full min-w-0 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           />
                         )}
@@ -860,6 +977,7 @@ export default function RequestForm({
                           <select
                             value={line.unit}
                             onChange={(e) => updateLine(line.id, { unit: e.target.value })}
+                            aria-label={`Line ${i + 1} unit`}
                             className="h-10 w-full appearance-none rounded-lg border border-input bg-card px-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                           >
                             {UNITS.map((u) => (
@@ -876,6 +994,8 @@ export default function RequestForm({
                           placeholder="0.00"
                           value={line.unitPrice}
                           onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
+                          aria-label={isLumpSum(line) ? `Line ${i + 1} amount` : `Line ${i + 1} unit price`}
+                          aria-required={line.category === 'other'}
                           className="h-10 w-full rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                       </td>
@@ -927,8 +1047,9 @@ export default function RequestForm({
         <section className="surface rounded-xl p-4 sm:p-5">
           <div className="grid gap-5 xl:grid-cols-2">
             <div>
-              <Label>Justification / notes</Label>
+              <Label htmlFor={`${fid}-notes`}>Justification / notes</Label>
               <textarea
+                id={`${fid}-notes`}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 rows={4}
@@ -998,8 +1119,9 @@ export default function RequestForm({
           </div>
 
           <div className="mt-5 border-t border-border pt-5">
-            <Label>Send status updates to</Label>
+            <Label htmlFor={`${fid}-notify-email`}>Send status updates to</Label>
             <input
+              id={`${fid}-notify-email`}
               type="email"
               value={notifyEmail}
               onChange={(e) => setNotifyEmail(e.target.value)}

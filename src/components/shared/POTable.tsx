@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
 import { approvalDates, approverNames, lastApproval } from '@/lib/approval-trail'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -31,7 +30,6 @@ export default function POTable({
   /** Dashboard preview: plain table, no toolbar or pagination. */
   compact?: boolean
 }) {
-  const router = useRouter()
   const hasApprovals = pos.some((p) => 'approvals_list' in p || 'approver_name' in p)
   // Approvers ticked in the filter, so their sign-offs stand out in the trail.
   const [approverFocus, setApproverFocus] = useState<string[]>([])
@@ -208,7 +206,7 @@ export default function POTable({
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       compact={compact}
-      onRowClick={(p) => router.push(`${hrefBase}/${p.id}`)}
+      rowHref={(p) => `${hrefBase}/${p.id}`}
       emptyTitle="No purchase orders yet"
       emptyMessage="Purchase orders will appear here once requisitions are converted."
       renderCard={(p) => (

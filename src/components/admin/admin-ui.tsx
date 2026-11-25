@@ -1,12 +1,16 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Children, cloneElement, isValidElement, useId } from 'react'
+import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
 import { X } from 'lucide-react'
+import { Dialog, DialogClose, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from '@/components/ui/dialog'
+import { cn } from '@/lib/utils'
 
 /* Shared building blocks for the admin management panels. Kept local to the
    admin area so its forms stay consistent without touching the app-wide kit. */
 
-/** Centred modal on desktop, bottom sheet on phones. */
+/** Centred modal on desktop, bottom sheet on phones. Built on the app Dialog
+ *  primitive, which traps and restores focus, closes on Escape and locks scroll. */
 export function AdminModal({
   open,
   onClose,
@@ -24,85 +28,100 @@ export function AdminModal({
   footer?: React.ReactNode
   wide?: boolean
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    const { overflow } = document.body.style
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        className={`relative flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-border bg-card shadow-2xl sm:max-h-[86vh] sm:rounded-2xl ${
-          wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'
-        }`}
-      >
-        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold text-foreground">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose()
+      }}
+    >
+      <DialogPortal>
+        <DialogOverlay className="z-[60] bg-black/50 supports-backdrop-filter:backdrop-blur-sm" />
+        <DialogPrimitive.Popup
+          className={cn(
+            'fixed right-0 bottom-0 left-0 z-[60] flex max-h-[92vh] w-full flex-col rounded-t-2xl border border-border bg-card shadow-2xl outline-none duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 sm:right-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:max-h-[86vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl',
+            wide ? 'sm:max-w-2xl' : 'sm:max-w-lg'
+          )}
+        >
+          <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
+            <div className="min-w-0">
+              <DialogTitle className="text-base leading-normal font-semibold text-foreground">{title}</DialogTitle>
+              {description && (
+                <DialogDescription className="mt-0.5 text-sm text-muted-foreground">{description}</DialogDescription>
+              )}
+            </div>
+            <DialogClose
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Close"
+            >
+              <X size={18} aria-hidden />
+            </DialogClose>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">{children}</div>
 
-        {footer && (
-          <div className="flex flex-col-reverse gap-2 border-t border-border px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:pb-4">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
+          {footer && (
+            <div className="flex flex-col-reverse gap-2 border-t border-border px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:pb-4">
+              {footer}
+            </div>
+          )}
+        </DialogPrimitive.Popup>
+      </DialogPortal>
+    </Dialog>
   )
 }
 
 export const adminInputClass =
   'h-11 w-full rounded-lg border border-input bg-card px-3.5 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:h-10 sm:text-sm'
 
+const LABELLABLE = new Set(['input', 'select', 'textarea'])
+
+/**
+ * Label + control. When the only child is an input/select/textarea it is
+ * given an id (its own, or a generated one) and the label points at it, so
+ * every field is programmatically labelled without each panel minting ids.
+ * Anything else (e.g. a checkbox group) gets a plain caption instead.
+ */
 export function AdminField({
   label,
   required,
   hint,
+  htmlFor,
   children,
 }: {
   label: string
   required?: boolean
   hint?: string
+  htmlFor?: string
   children: React.ReactNode
 }) {
+  const autoId = useId()
+  let controlId = htmlFor
+  let content = children
+  const only = Children.count(children) === 1 ? Children.toArray(children)[0] : null
+  if (!controlId && isValidElement<{ id?: string }>(only) && typeof only.type === 'string' && LABELLABLE.has(only.type)) {
+    controlId = only.props.id ?? autoId
+    content = cloneElement(only, { id: controlId })
+  }
+
+  const captionClass = 'mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground'
+  const caption = (
+    <>
+      {label}
+      {required && <span className="ml-0.5 text-destructive">*</span>}
+    </>
+  )
+
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
-      </label>
-      {children}
+      {controlId ? (
+        <label htmlFor={controlId} className={captionClass}>
+          {caption}
+        </label>
+      ) : (
+        <p className={captionClass}>{caption}</p>
+      )}
+      {content}
       {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   )
@@ -135,7 +154,7 @@ export function AdminButton({
 export function AdminError({ message }: { message: string | null }) {
   if (!message) return null
   return (
-    <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+    <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
       {message}
     </p>
   )

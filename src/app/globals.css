@@ -359,15 +359,22 @@ svg path[stroke-width] {
   }
 }
 
+/* Reduced motion: stop movement, but never reset transform/opacity globally —
+   positioned popups (Base UI menus, selects, tooltips) rely on inline transforms,
+   and opacity-0 is used for genuinely hidden UI. */
 @media (prefers-reduced-motion: reduce) {
-  *,
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
   .animate-fade-in, .animate-slide-up, .animate-slide-in-right,
   .animate-scale-in, .animate-float, .animate-float-slow,
   .animate-pulse-soft, .animate-shimmer, .stagger > *, .scroll-reveal {
     animation: none !important;
     opacity: 1 !important;
     transform: none !important;
-    transition: none !important;
   }
 }
 

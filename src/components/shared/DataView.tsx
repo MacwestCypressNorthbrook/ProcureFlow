@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   ArrowDown,
   ArrowUp,
@@ -37,7 +39,21 @@ export interface DataColumn<T> {
   sortValue?: (row: T) => string | number | null | undefined
   cell: (row: T) => React.ReactNode
   headClassName?: string
+  /**
+   * The cell that carries the row's link when DataView is given `rowHref`.
+   * Defaults to the first column. Its cell must not render its own links or
+   * buttons, since the whole cell is wrapped in an anchor.
+   */
+  primary?: boolean
 }
+
+/** Elements that handle their own clicks — a row click on them is not a row click. */
+const INTERACTIVE =
+  'a, button, input, select, textarea, label, summary, [role="button"], [role="checkbox"], [role="link"], [role="menuitem"]'
+
+/** Visible keyboard focus for the row/card links. */
+const ROW_LINK_FOCUS =
+  'outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
 
 export interface DataFacet<T> {
   id: string
@@ -783,6 +799,7 @@ export default function DataView<T>({
   dateFilters = [],
   renderCard,
   onRowClick,
+  rowHref,
   defaultSort,
   defaultView = 'table',
   storageKey,
@@ -804,6 +821,14 @@ export default function DataView<T>({
   dateFilters?: DataDateFilter<T>[]
   renderCard?: (row: T) => React.ReactNode
   onRowClick?: (row: T) => void
+  /**
+   * Where a row opens. Given this, the primary cell (and each grid card) is a
+   * real link — reachable by keyboard and screen readers, openable in a new
+   * tab — and a click anywhere else on the row navigates there too. Cards are
+   * wrapped whole in the link, so `renderCard` must not render links or buttons.
+   * `onRowClick`, if also given, replaces the navigation for plain row clicks.
+   */
+  rowHref?: (row: T) => string | null | undefined
   defaultSort?: { id: string; dir: SortDir }
   defaultView?: ViewMode
   /**
@@ -830,6 +855,26 @@ export default function DataView<T>({
   initialTerm?: string
 }) {
   const [showFilters, setShowFilters] = useState(false)
+  const router = useRouter()
+  const linkColumnId = (columns.find((c) => c.primary) ?? columns[0])?.id
+
+  // Mouse users can click anywhere on a row; keyboard and screen-reader users
+  // get the real link in the primary cell. Clicks on nested controls (the
+  // link itself, checkboxes, action buttons) are left to those controls.
+  const rowClick = (row: T, href: string | null | undefined) => {
+    if (!href && !onRowClick) return undefined
+    return (e: React.MouseEvent<HTMLElement>) => {
+      const hit = (e.target as Element).closest(INTERACTIVE)
+      if (hit && e.currentTarget.contains(hit)) return
+      if (href && (e.metaKey || e.ctrlKey)) {
+        window.open(href, '_blank', 'noopener')
+      } else if (onRowClick) {
+        onRowClick(row)
+      } else if (href) {
+        router.push(href)
+      }
+    }
+  }
 
   const prefKey = `prefs:${storageKey ?? ''}`
   const prefsRaw = useSyncExternalStore(
@@ -1255,15 +1300,21 @@ export default function DataView<T>({
         </div>
       ) : view === 'grid' && renderCard ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {pageRows.map((row) => (
-            <div
-              key={getRowId(row)}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={onRowClick ? 'cursor-pointer' : undefined}
-            >
-              {renderCard(row)}
-            </div>
-          ))}
+          {pageRows.map((row) => {
+            const href = rowHref?.(row)
+            const click = rowClick(row, href)
+            return (
+              <div key={getRowId(row)} onClick={click} className={click ? 'cursor-pointer' : undefined}>
+                {href ? (
+                  <Link href={href} className={`block h-full rounded-xl ${ROW_LINK_FOCUS}`}>
+                    {renderCard(row)}
+                  </Link>
+                ) : (
+                  renderCard(row)
+                )}
+              </div>
+            )
+          })}
         </div>
       ) : (
         <div className="surface overflow-hidden rounded-xl">
@@ -1307,26 +1358,36 @@ export default function DataView<T>({
                 </tr>
               </thead>
               <tbody>
-                {pageRows.map((row) => (
-                  <tr
-                    key={getRowId(row)}
-                    onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    className={`group border-b border-border last:border-0 transition-colors ${
-                      onRowClick ? 'cursor-pointer hover:bg-muted/40' : ''
-                    }`}
-                  >
-                    {columns.map((c) => (
-                      <td
-                        key={c.id}
-                        className={`border-r border-border/50 px-3 py-3 text-sm last:border-r-0 ${
-                          c.align === 'right' ? 'text-right' : ''
-                        } ${c.hideBelow ? HIDE[c.hideBelow] : ''}`}
-                      >
-                        {c.cell(row)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+                {pageRows.map((row) => {
+                  const href = rowHref?.(row)
+                  const click = rowClick(row, href)
+                  return (
+                    <tr
+                      key={getRowId(row)}
+                      onClick={click}
+                      className={`group border-b border-border last:border-0 transition-colors ${
+                        click ? 'cursor-pointer hover:bg-muted/40' : ''
+                      }`}
+                    >
+                      {columns.map((c) => (
+                        <td
+                          key={c.id}
+                          className={`border-r border-border/50 px-3 py-3 text-sm last:border-r-0 ${
+                            c.align === 'right' ? 'text-right' : ''
+                          } ${c.hideBelow ? HIDE[c.hideBelow] : ''}`}
+                        >
+                          {href && c.id === linkColumnId ? (
+                            <Link href={href} className={`group/row-link block rounded-md ${ROW_LINK_FOCUS}`}>
+                              {c.cell(row)}
+                            </Link>
+                          ) : (
+                            c.cell(row)
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

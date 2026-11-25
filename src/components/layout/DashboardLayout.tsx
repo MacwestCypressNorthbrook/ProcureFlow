@@ -825,6 +825,13 @@ export default function DashboardLayout({
         collapsed ? RAIL_PAD : OPEN_PAD
       )}
     >
+      {/* First in DOM order, so keyboard users can jump the whole sidebar. */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Skip to content
+      </a>
       <div aria-hidden className="hidden pointer-fine:md:block" />
 
       {/*
@@ -851,14 +858,6 @@ export default function DashboardLayout({
       </aside>
 
       <div className="flex min-h-screen min-w-0 flex-col">
-        {/* Keyboard users land here first and can jump the whole menu. */}
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-primary-foreground"
-        >
-          Skip to content
-        </a>
-
         <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md backdrop-saturate-150 sm:px-6">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             {/* 44×44, the HIG minimum — it was 36 and sat under the thumb's
@@ -911,7 +910,8 @@ export default function DashboardLayout({
         */}
         <main
           id="main"
-          className="flex-1 overflow-y-auto pb-[calc(var(--pf-tabbar-h)+env(safe-area-inset-bottom,0px))] pointer-fine:md:pb-0"
+          tabIndex={-1}
+          className="flex-1 overflow-y-auto outline-none pb-[calc(var(--pf-tabbar-h)+env(safe-area-inset-bottom,0px))] pointer-fine:md:pb-0"
         >
           {children}
         </main>

@@ -589,6 +589,7 @@ export default function UsersPanel({
                     value={projectQuery}
                     onChange={(e) => setProjectQuery(e.target.value)}
                     placeholder="Filter sites…"
+                    aria-label="Filter sites"
                     className={adminInputClass}
                   />
                 )}

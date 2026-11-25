@@ -205,20 +205,26 @@ export function Panel({
   )
 }
 
+/** Pass `htmlFor` when the child is a form control, so the label names it. */
 export function Field({
   label,
+  htmlFor,
   children,
   className,
 }: {
   label: string
+  htmlFor?: string
   children: React.ReactNode
   className?: string
 }) {
+  const labelClass = 'mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground'
   return (
     <div className={className}>
-      <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </p>
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className={labelClass}>{label}</label>
+      ) : (
+        <p className={labelClass}>{label}</p>
+      )}
       {children}
     </div>
   )

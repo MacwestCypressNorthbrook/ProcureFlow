@@ -169,7 +169,7 @@ export default function Header() {
         <div className="flex items-center gap-1 md:hidden">
           <ThemeToggle />
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors press-active">
+            <SheetTrigger aria-label="Open menu" className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors press-active">
               <Menu size="20" />
             </SheetTrigger>
             <SheetContent side="right" className="w-[300px] border-l border-border bg-card p-0">

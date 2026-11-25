@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { AlertTriangle, FileArchive, FileSpreadsheet, FileText, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -180,7 +179,6 @@ export default function PurchaseOrdersReport({
   exportedBy: string | null
   focusId?: string
 }) {
-  const router = useRouter()
   const rows = useMemo(() => deriveRows(pos, invoices), [pos, invoices])
   const [visible, setVisible] = useState<PoRow[]>(rows)
 
@@ -806,7 +804,7 @@ export default function PurchaseOrdersReport({
           ]}
           onFacetValues={(v) => setApproverFocus(v.approver ?? [])}
           onVisibleRows={setVisible}
-          onRowClick={(r) => r.request_id && router.push(`/admin/requests/${r.request_id}`)}
+          rowHref={(r) => (r.request_id ? `/admin/requests/${r.request_id}` : null)}
           searchPlaceholder="Search PO number, supplier, project, engineer…"
           searchText={(r) => [
             r.id,

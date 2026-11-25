@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 import ExportMenu from '@/components/shared/ExportMenu'
@@ -119,7 +118,6 @@ export default function DecisionsTable({
   exportSection?: string
   exportedBy?: string | null
 }) {
-  const router = useRouter()
 
   /**
    * The export mirrors the table, plus the columns a spreadsheet needs but a
@@ -309,7 +307,7 @@ export default function DecisionsTable({
           }}
         />
       )}
-      onRowClick={(d) => router.push(`${hrefBase}/${d.request_id}`)}
+      rowHref={(d) => `${hrefBase}/${d.request_id}`}
       emptyTitle="Nothing reviewed yet"
       emptyMessage="Approvals and send-backs you make will be listed here."
       renderCard={(d) => (

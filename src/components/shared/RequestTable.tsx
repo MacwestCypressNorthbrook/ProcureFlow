@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ApprovalTrailCell } from '@/components/shared/ApprovalTrail'
 import { approvalDates, approverNames, lastApproval, type ApprovalStep } from '@/lib/approval-trail'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -66,7 +65,6 @@ export default function RequestTable({
   /** Dashboard preview: plain table, no toolbar or pagination. */
   compact?: boolean
 }) {
-  const router = useRouter()
   const hasApprovals = requests.some((r) => 'approvals_list' in r)
   // Approvers ticked in the filter, so their sign-offs stand out in the trail.
   const [approverFocus, setApproverFocus] = useState<string[]>([])
@@ -283,7 +281,7 @@ export default function RequestTable({
       defaultSort={{ id: 'created_at', dir: 'desc' }}
       storageKey={storageKey}
       compact={compact}
-      onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}
+      rowHref={(r) => `${hrefBase}/${r.id}`}
       emptyTitle="No requests yet"
       emptyMessage="Requisitions will appear here once they are raised."
       renderCard={(r) => {

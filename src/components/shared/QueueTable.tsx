@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import BatchApproveDialog from '@/components/shared/BatchApproveDialog'
 import DataView, { type DataColumn } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
@@ -10,7 +9,6 @@ import { Paperclip, ShoppingBag, Truck } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { QueueRow } from '@/lib/review'
 import { writeQueueOrder } from '@/lib/queue-order'
-import Link from 'next/link'
 import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '@/components/shared/requisition-type'
 
 /**
@@ -40,7 +38,6 @@ export default function QueueTable({
    */
   batch?: { eligibleStatus: string; nextStageLabel: string }
 }) {
-  const router = useRouter()
   const [picked, setPicked] = useState<string[]>([])
 
   const eligible = (r: QueueRow) => Boolean(batch) && r.status === batch!.eligibleStatus && !r.is_urgent
@@ -76,21 +73,18 @@ export default function QueueTable({
     {
       id: 'purpose',
       label: 'Requisition',
+      // DataView wraps this cell in the row's real link (see rowHref below), so
+      // it can be opened in a new tab and reached by keyboard.
+      primary: true,
       sortable: true,
       sortValue: (r) => r.purpose,
       cell: (r) => (
         <div className="min-w-0 max-w-[200px] sm:max-w-[260px] xl:max-w-[340px]">
-          {/* A real anchor, not just the row's click handler — so the
-              requisition can be opened in a new tab and reached by keyboard. */}
           <div className="flex items-center gap-1.5">
             {r.is_urgent && <UrgentBadge size="sm" />}
-            <Link
-              href={`${hrefBase}/${r.id}`}
-              className="block truncate text-sm font-medium text-foreground outline-none hover:underline focus-visible:underline"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <span className="block truncate text-sm font-medium text-foreground group-hover/row-link:underline group-focus-visible/row-link:underline">
               {r.purpose}
-            </Link>
+            </span>
           </div>
           <p className="truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
@@ -300,7 +294,7 @@ export default function QueueTable({
             }
           : undefined
       }
-      onRowClick={(r) => router.push(`${hrefBase}/${r.id}`)}
+      rowHref={(r) => `${hrefBase}/${r.id}`}
       emptyTitle="Nothing waiting"
       emptyMessage="Requisitions arrive here when the stage before yours approves them."
       renderCard={(r) => (

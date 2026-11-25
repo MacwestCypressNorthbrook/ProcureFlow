@@ -29,10 +29,16 @@ const trail = [
   { who: 'Finance', what: 'paid & closed', tone: 'bg-emerald-400' },
 ]
 
+// Only same-origin paths: '/x' is fine, '//host', '/\\host' and absolute URLs are not.
+function safeRedirect(value: string | null): string | null {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return null
+  return value
+}
+
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirect = searchParams.get('redirect')
+  const redirect = safeRedirect(searchParams.get('redirect'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPw, setShowPw] = useState(false)
@@ -144,7 +150,7 @@ function LoginForm() {
 
           <form onSubmit={handleLogin} className="mt-8 space-y-4">
             {error && (
-              <div className="animate-shake rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              <div role="alert" className="animate-shake rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {error}
               </div>
             )}

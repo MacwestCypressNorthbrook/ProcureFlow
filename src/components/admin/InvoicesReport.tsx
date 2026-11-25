@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { AlertTriangle, BadgeCheck, FileArchive, FileSpreadsheet, FileText, Table2 } from 'lucide-react'
 import DataView, { type DataColumn, type DataFacet } from '@/components/shared/DataView'
 import { cn } from '@/lib/utils'
@@ -96,7 +95,6 @@ export default function InvoicesReport({
   invoices: AdminInvoice[]
   exportedBy: string | null
 }) {
-  const router = useRouter()
   const rows = useMemo<InvoiceRow[]>(
     () =>
       invoices.map((inv) => {
@@ -660,7 +658,7 @@ export default function InvoicesReport({
         columns={columns}
         facets={facets}
         onVisibleRows={setVisible}
-        onRowClick={(r) => router.push(`/admin/requests/${r.request_id}`)}
+        rowHref={(r) => `/admin/requests/${r.request_id}`}
         searchPlaceholder="Search invoice number, document, supplier, project, PO…"
         searchText={(r) => [r.invoice_number, r.attachment_name, r.supplier, r.project, r.engineer, r.po_numbers, r.request_purpose]}
         defaultSort={{ id: 'date', dir: 'desc' }}

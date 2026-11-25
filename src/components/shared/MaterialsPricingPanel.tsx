@@ -244,6 +244,7 @@ export default function MaterialsPricingPanel({
                         placeholder="0.00"
                         value={row?.unitPrice ?? ''}
                         onChange={(e) => updateRow(item.id, { unitPrice: e.target.value })}
+                        aria-label={`Unit price of ${item.description}`}
                         className="h-10 w-full rounded-lg border border-input bg-card px-2.5 text-sm tabular-nums text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                     ) : (
@@ -308,6 +309,7 @@ export default function MaterialsPricingPanel({
                     step="0.01"
                     placeholder="0.00"
                     value={discount}
+                    aria-label="Discount"
                     onChange={(e) => {
                       setDirty(true)
                       setSaved(false)
