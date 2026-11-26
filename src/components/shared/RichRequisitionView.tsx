@@ -154,15 +154,18 @@ export default function RichRequisitionView({
             <TableHeader>
               <TableRow className="border-border hover:bg-transparent">
                 <TableHead className="h-9 w-10 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">#</TableHead>
-                <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item Description</TableHead>
+                {/* The description is what the row is about — it gets the room. Remarks
+                    wrap inside a capped width instead of stretching the table, which
+                    used to squeeze this column to a few words per line. */}
+                <TableHead className="h-9 min-w-64 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Item Description</TableHead>
                 <TableHead className="h-9 w-16 px-3 text-center text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Qty</TableHead>
                 <TableHead className="h-9 w-24 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Unit Price</TableHead>
                 <TableHead className="h-9 w-28 px-3 text-right text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Amount</TableHead>
                 {showSupplier && (
-                  <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Supplier</TableHead>
+                  <TableHead className="h-9 min-w-32 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Supplier</TableHead>
                 )}
                 {showRemarks && (
-                  <TableHead className="h-9 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remarks</TableHead>
+                  <TableHead className="h-9 min-w-48 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Remarks</TableHead>
                 )}
               </TableRow>
             </TableHeader>
@@ -170,14 +173,14 @@ export default function RichRequisitionView({
               {rows.map((item, index) => (
                 <TableRow key={index} className="border-border hover:bg-muted/30">
                   <TableCell className="px-3 py-2.5 text-center text-xs text-muted-foreground">{index + 1}</TableCell>
-                  <TableCell className="whitespace-normal break-words px-3 py-2.5 text-sm font-medium text-foreground">
+                  <TableCell className="min-w-64 whitespace-normal break-words px-3 py-2.5 text-sm font-medium text-foreground">
                     {item.category === 'labour' && (
-                      <span className="mr-1.5 rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                      <span className="mr-1.5 inline-block whitespace-nowrap rounded-full bg-blue-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
                         {item.isSubcontractor ? 'Sub-contractor' : 'Labour'}
                       </span>
                     )}
                     {item.category === 'other' && (
-                      <span className="mr-1.5 rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
+                      <span className="mr-1.5 inline-block whitespace-nowrap rounded-full bg-teal-500/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400">
                         Expense
                       </span>
                     )}
@@ -189,10 +192,10 @@ export default function RichRequisitionView({
                   <TableCell className="px-3 py-2.5 text-right text-xs tabular-nums">{item.unitPrice ? formatGHS(item.unitPrice) : '—'}</TableCell>
                   <TableCell className="px-3 py-2.5 text-right text-xs font-semibold tabular-nums">{item.amount ? formatGHS(item.amount) : '—'}</TableCell>
                   {showSupplier && (
-                    <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">{item.supplierName || '—'}</TableCell>
+                    <TableCell className="min-w-32 whitespace-normal break-words px-3 py-2.5 text-xs text-muted-foreground">{item.supplierName || '—'}</TableCell>
                   )}
                   {showRemarks && (
-                    <TableCell className="px-3 py-2.5 text-xs text-muted-foreground">{item.remarks || '—'}</TableCell>
+                    <TableCell className="min-w-48 max-w-80 whitespace-normal break-words px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">{item.remarks || '—'}</TableCell>
                   )}
                 </TableRow>
               ))}
