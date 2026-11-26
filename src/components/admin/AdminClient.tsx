@@ -200,6 +200,7 @@ const ACTION_COLORS: Record<string, string> = {
   marked_urgent: 'bg-orange-500/10 text-orange-600 dark:text-orange-400',
   cancelled: 'bg-red-500/10 text-red-600 dark:text-red-400',
   voided: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  recalled: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
   // legacy spellings
   approved_by_sam: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
   rejected_by_sam: 'bg-red-500/10 text-red-600 dark:text-red-400',

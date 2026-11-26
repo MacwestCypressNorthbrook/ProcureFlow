@@ -3,6 +3,10 @@ import { notFound } from 'next/navigation'
 import ApprovalPanel from '@/components/shared/ApprovalPanel'
 import CancelRequisitionDialog from '@/components/shared/CancelRequisitionDialog'
 import { cancelModeFor } from '@/lib/cancellation'
+import { checkRecall } from '@/lib/recall'
+import RecallRequisitionDialog from '@/components/shared/RecallRequisitionDialog'
+import PresenceBanner from '@/components/shared/PresenceBanner'
+import { getPresence } from '@/lib/presence'
 import RecordPaymentPanel from '@/components/shared/RecordPaymentPanel'
 import { getPaymentPosition, listPayments } from '@/lib/payments'
 import StageProgress from '@/components/shared/StageProgress'
@@ -192,6 +196,18 @@ export default async function StageReview({
 
   const isUrgent = request.is_urgent === true
   const cancelMode = cancelModeFor(user.role, request.status, isRequester)
+  // Offered to whoever approved it last, while the next stage has not acted.
+  // Requesters recall from their own page, so only review-stage recalls here.
+  const recall = await checkRecall(request.id, user)
+  const recallable = recall.ok && recall.candidate.fromStage !== 'requester' ? recall.candidate : null
+  // Who else at this stage has it open right now (advisory; see lib/presence.ts).
+  const presenceStage = stage && stage !== 'requester' ? stage : null
+  const othersHere = presenceStage
+    ? ((await getPresence([request.id], [presenceStage], user.id)).get(request.id) ?? []).map((p) => ({
+        name: p.name,
+        startedAt: p.started_at,
+      }))
+    : []
   // Only the Project Lead escalates, and only while the requisition is still
   // theirs — see `request:urgent` in lib/roles.ts.
   const canEscalate = stage === 'lead' && holdsStage && can(user.role, 'request:urgent')
@@ -234,6 +250,15 @@ export default async function StageReview({
             <div className="flex flex-wrap items-center gap-2">
               {isUrgent && <UrgentBadge />}
               <StatusBadge status={request.status} config={REQUEST_STATUS_CONFIG} />
+              {recallable && (
+                <RecallRequisitionDialog
+                  requestId={request.id}
+                  purpose={request.purpose}
+                  action={recallable.action}
+                  fromLabel={STAGES[recallable.fromStage].label}
+                  heldByLabel={STAGES[recallable.heldBy].label}
+                />
+              )}
               {cancelMode && (
                 <CancelRequisitionDialog
                   requestId={request.id}
@@ -245,6 +270,10 @@ export default async function StageReview({
             </div>
           }
         />
+
+        {presenceStage && (
+          <PresenceBanner requestId={request.id} initialOthers={othersHere} isHolder={holdsStage} />
+        )}
 
         {/* Escalation and position on the chain are both "where does this
             stand" — they belong on one line rather than as two stacked bands

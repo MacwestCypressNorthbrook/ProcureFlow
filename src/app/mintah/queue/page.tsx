@@ -2,6 +2,7 @@ import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
+import { withPresence } from '@/lib/presence'
 import { getStageInbox, getStageDecisionCount } from '@/lib/review'
 import StageTabs from '@/components/shared/StageTabs'
 import { Eye } from 'lucide-react'
@@ -9,9 +10,10 @@ import { Eye } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 export default async function SupplyChainQueuePage() {
-  await requirePageRole('supply_chain')
+  const user = await requirePageRole('supply_chain')
   const [rows, decisionCount] = await Promise.all([
-    getStageInbox('supply_chain'),
+    // Who else at this stage has each one open (advisory badge).
+    getStageInbox('supply_chain').then((rows) => withPresence(rows, ['supply_chain'], user.id)),
     getStageDecisionCount('supply_chain'),
   ])
 

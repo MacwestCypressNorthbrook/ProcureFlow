@@ -5,7 +5,7 @@ import BatchApproveDialog from '@/components/shared/BatchApproveDialog'
 import DataView, { type DataColumn } from '@/components/shared/DataView'
 import StatusBadge from '@/components/shared/StatusBadge'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
-import { Paperclip, ShoppingBag, Truck } from 'lucide-react'
+import { Paperclip, ShoppingBag, Truck, Users } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { QueueRow } from '@/lib/review'
 import { writeQueueOrder } from '@/lib/queue-order'
@@ -21,6 +21,17 @@ import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '
  */
 /** The batch endpoint's cap — one sitting's worth, not a bulk import. */
 const MAX_BATCH = 50
+
+/** "Someone else at this stage has it open" — advisory, from lib/presence.ts. */
+function OpenByBadge({ names }: { names: string[] }) {
+  const label = names.length === 1 ? names[0] : `${names[0]} +${names.length - 1}`
+  return (
+    <p className="mt-0.5 inline-flex max-w-full items-center gap-1 truncate text-[11px] font-medium text-amber-700 dark:text-amber-300">
+      <Users size={11} className="shrink-0" aria-hidden="true" />
+      <span className="truncate">Open by {label}</span>
+    </p>
+  )
+}
 
 export default function QueueTable({
   rows,
@@ -89,6 +100,7 @@ export default function QueueTable({
           <p className="truncate text-xs text-muted-foreground">
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
           </p>
+          {r.open_by && r.open_by.length > 0 && <OpenByBadge names={r.open_by} />}
         </div>
       ),
     },
@@ -310,6 +322,7 @@ export default function QueueTable({
             {r.requester_name ?? r.guest_name ?? 'Unknown'}
             {r.project_name ? ` · ${r.project_name}` : ''}
           </p>
+          {r.open_by && r.open_by.length > 0 && <OpenByBadge names={r.open_by} />}
           <div className="mt-1.5">
             <RequisitionTypeBadge type={requisitionType(r.description)} />
           </div>

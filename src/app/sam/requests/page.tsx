@@ -2,6 +2,7 @@ import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer, StatGrid } from '@/components/shared/ui-kit'
 import { requestSummaryStats } from '@/components/shared/stat-presets'
+import { withPresence } from '@/lib/presence'
 import { getStageInbox, getStageDecisionCount } from '@/lib/review'
 import StageTabs from '@/components/shared/StageTabs'
 import { STAGES, statusForStage } from '@/lib/workflow'
@@ -10,9 +11,10 @@ import { ClipboardCheck } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 
 export default async function LeadQueuePage() {
-  await requirePageRole('project_lead')
+  const user = await requirePageRole('project_lead')
   const [rows, decisionCount] = await Promise.all([
-    getStageInbox('lead'),
+    // Who else at this stage has each one open (advisory badge).
+    getStageInbox('lead').then((rows) => withPresence(rows, ['lead'], user.id)),
     getStageDecisionCount('lead'),
   ])
 

@@ -97,6 +97,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   requisition_edited: 'Requisition edited',
   items_removed: 'Items removed',
   marked_urgent: 'Marked urgent',
+  recalled: 'Approval recalled',
   completed: 'Authorized and closed',
   // legacy
   approved_by_sam: 'Approved',

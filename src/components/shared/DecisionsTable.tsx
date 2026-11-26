@@ -5,10 +5,18 @@ import { requisitionType, RequisitionTypeBadge, REQUISITION_TYPE_CONFIG } from '
 import ExportMenu from '@/components/shared/ExportMenu'
 import type { ExportColumn } from '@/lib/export'
 import { REQUEST_STATUS_CONFIG, formatCurrency, formatDate } from '@/lib/utils'
-import { Check, RotateCcw, ShoppingBag, Banknote, Trash2, XCircle, Zap } from 'lucide-react'
+import { Check, RotateCcw, ShoppingBag, Banknote, Trash2, Undo2, XCircle, Zap } from 'lucide-react'
 import { UrgentBadge } from '@/components/shared/UrgentBadge'
 import type { StageDecision } from '@/lib/review'
 import { currentStage, STAGES } from '@/lib/workflow'
+import RecallRequisitionDialog from '@/components/shared/RecallRequisitionDialog'
+
+/** What the Reviewed page needs to offer a recall on one decision. */
+export interface RecallInfo {
+  action: 'approved' | 'marked_urgent' | 'submitted' | 'resubmitted'
+  fromLabel: string
+  heldByLabel: string
+}
 
 /**
  * Where the requisition is now — "With Cost Control", "Sent back to Supply
@@ -77,6 +85,11 @@ const ACTION: Record<string, { label: string; className: string; icon: React.Rea
     className: 'bg-red-500/10 text-red-600 dark:text-red-400',
     icon: <XCircle size={12} />,
   },
+  recalled: {
+    label: 'Recalled',
+    className: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
+    icon: <Undo2 size={12} />,
+  },
 }
 
 function ActionPill({ action }: { action: string }) {
@@ -110,6 +123,7 @@ export default function DecisionsTable({
   stageLabel = 'Stage',
   exportSection = 'reviewed',
   exportedBy,
+  recallable,
 }: {
   rows: StageDecision[]
   hrefBase: string
@@ -117,6 +131,8 @@ export default function DecisionsTable({
   stageLabel?: string
   exportSection?: string
   exportedBy?: string | null
+  /** Decisions (by decision id) the viewer may still recall — see lib/recall.ts. */
+  recallable?: Record<string, RecallInfo>
 }) {
 
   /**
@@ -245,6 +261,30 @@ export default function DecisionsTable({
         </div>
       ),
     },
+    // Only when something on this page can be recalled — otherwise an empty
+    // column on every row. Table only: grid cards are whole links and cannot
+    // hold a button; the requisition's own page offers Recall too.
+    ...(recallable && Object.keys(recallable).length > 0
+      ? [
+          {
+            id: 'recall',
+            label: 'Recall',
+            cell: (d: StageDecision) => {
+              const r = recallable[d.id]
+              return r ? (
+                <RecallRequisitionDialog
+                  compact
+                  requestId={d.request_id}
+                  purpose={d.purpose}
+                  action={r.action}
+                  fromLabel={r.fromLabel}
+                  heldByLabel={r.heldByLabel}
+                />
+              ) : null
+            },
+          } satisfies DataColumn<StageDecision>,
+        ]
+      : []),
   ]
 
   const types = Array.from(new Set(rows.map((r) => requisitionType(r.description))))

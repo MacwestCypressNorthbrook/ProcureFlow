@@ -26,6 +26,8 @@ export interface QueueRow extends DbRequest {
   urgent_marked_at: string | null
   /** Who escalated it, resolved for display. */
   urgent_marked_by_name: string | null
+  /** Others at this stage who have it open now — set by `withPresence`, never by the queue SQL. */
+  open_by?: string[]
 }
 
 /**

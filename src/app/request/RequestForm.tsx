@@ -118,7 +118,7 @@ function CategoryToggle({
 }) {
   const base = compact
     ? 'inline-flex h-8 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs font-medium transition-colors'
-    : 'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors'
+    : 'inline-flex h-9 pointer-coarse:h-11 flex-1 items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors'
   const options: Array<{ id: LineCategory; label: string; Icon: typeof Package }> = [
     { id: 'material', label: 'Material', Icon: Package },
     { id: 'labour', label: 'Labour', Icon: Users },
@@ -564,24 +564,26 @@ export default function RequestForm({
 
   /* ── Form ─────────────────────────────────────────────────────────────── */
   return (
-    <form onSubmit={handleSubmit} className="pb-36 sm:pb-28">
+    <form onSubmit={handleSubmit} className="pb-28">
       <div className="w-full space-y-5 px-4 py-5 sm:px-6 sm:py-6 lg:px-8">
         <FormErrorBanner message={error} />
 
         {/* Requester — prefilled, read-only */}
-        <section className="surface rounded-xl p-4 sm:p-5">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              {(requester.name || requester.email).slice(0, 2).toUpperCase()}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold text-foreground">{requester.name || 'Unnamed user'}</p>
-              <p className="truncate text-sm text-muted-foreground">{requester.email}</p>
-            </div>
-            <span className="hidden shrink-0 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline">
-              Requester
-            </span>
-          </div>
+        {/* One line, not a card: it confirms who is raising the request without
+            pushing the form below the fold on a phone. The email is already in
+            "Send status updates to", so it only shows where there is room. */}
+        <section aria-label="Requester" className="flex items-center gap-2.5 px-1">
+          <span
+            aria-hidden="true"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary"
+          >
+            {(requester.name || requester.email).slice(0, 2).toUpperCase()}
+          </span>
+          <p className="min-w-0 truncate text-sm text-muted-foreground">
+            Requesting as{' '}
+            <span className="font-semibold text-foreground">{requester.name || 'Unnamed user'}</span>
+            <span className="hidden sm:inline"> · {requester.email}</span>
+          </p>
         </section>
 
         {/* Context */}
@@ -647,14 +649,14 @@ export default function RequestForm({
             <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <FileText size={16} className="text-muted-foreground" />
               Materials &amp; Labour
-              <span className="rounded-full bg-muted  py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
-                {filledLines}
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium tabular-nums text-muted-foreground">
+                {lines.length}
               </span>
             </h2>
             <button
               type="button"
               onClick={addLine}
-              className="inline-flex h-10 items-center gap-1.5 rounded-lg border border-input bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+              className="inline-flex h-10 pointer-coarse:h-11 items-center gap-1.5 rounded-lg border border-input bg-card px-3.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
             >
               <Plus size={15} /> Add
             </button>
@@ -675,7 +677,8 @@ export default function RequestForm({
                       type="button"
                       onClick={() => lines.length > 1 && toggleCollapsed(line.id)}
                       disabled={lines.length <= 1}
-                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      aria-expanded={lines.length > 1 ? !isCollapsed : undefined}
+                      className="flex min-h-9 min-w-0 flex-1 items-center gap-2 text-left pointer-coarse:min-h-11"
                     >
                       <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Item {i + 1}
@@ -698,7 +701,7 @@ export default function RequestForm({
                     <button
                       type="button"
                       onClick={() => removeLine(line.id)}
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                      className="flex h-9 w-9 pointer-coarse:h-11 pointer-coarse:w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`Remove item ${i + 1}`}
                     >
                       <Trash2 size={16} />
@@ -706,7 +709,10 @@ export default function RequestForm({
                   </div>
 
                   {!isCollapsed && (
-                    <div className="space-y-4">
+                    // Container query, not viewport: the card is narrow on a phone
+                    // but ~580px beside the sidebar at 1024, where one field per
+                    // row made each line ~720px tall.
+                    <div className="@container space-y-4">
                       <CategoryToggle value={line.category} onChange={(c) => setLineCategory(line.id, c)} />
 
                       {line.category === 'labour' && (
@@ -755,8 +761,9 @@ export default function RequestForm({
                         />
                       </div>
 
+                      <div className="grid grid-cols-2 gap-3 @lg:grid-cols-3">
                       {!isLumpSum(line) && (
-                        <div className="grid grid-cols-2 gap-3">
+                        <>
                           <div>
                             <Label required htmlFor={lineFieldId(i, 'quantity')}>Quantity</Label>
                             <input
@@ -784,11 +791,10 @@ export default function RequestForm({
                               ))}
                             </select>
                           </div>
-                        </div>
-
+                        </>
                       )}
 
-                      <div>
+                      <div className="col-span-2 @lg:col-span-1">
                         <Label required={line.category === 'other'} htmlFor={lineFieldId(i, 'price')}>
                           {isLumpSum(line) ? 'Amount (GHS)' : 'Unit price (GHS)'}
                         </Label>
@@ -804,6 +810,7 @@ export default function RequestForm({
                           onChange={(e) => updateLine(line.id, { unitPrice: e.target.value })}
                           className={inputClass}
                         />
+                      </div>
                       </div>
 
                       {line.isSubcontractor && (
@@ -823,6 +830,7 @@ export default function RequestForm({
                         </div>
                       )}
 
+                      <div className="grid gap-4 @lg:grid-cols-2">
                       <div>
                         <Label>
                           {line.category === 'other'
@@ -856,6 +864,7 @@ export default function RequestForm({
                           className={inputClass}
                         />
                       </div>
+                      </div>
 
                       <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3.5 py-3">
                         <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -879,13 +888,13 @@ export default function RequestForm({
                 <thead className="bg-muted/50">
                   <tr className="text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <th className="w-10 px-3 py-2.5 text-center">#</th>
-                    <th className="w-36 px-3 py-2.5">Type</th>
+                    <th className="w-28 px-3 py-2.5">Type</th>
                     <th className="px-3 py-2.5">Description</th>
                     <th className="w-24 px-3 py-2.5 2xl:w-28">Qty</th>
                     <th className="w-24 px-3 py-2.5">Unit</th>
                     <th className="w-28 px-3 py-2.5">Unit price / amount</th>
                     <th className="w-44 px-3 py-2.5">Supplier</th>
-                    <th className="w-32 px-3 py-2.5 text-right">Total</th>
+                    <th className="w-28 px-3 py-2.5 text-right">Total</th>
                     <th className="w-12 px-2 py-2.5" />
                   </tr>
                 </thead>
@@ -930,7 +939,11 @@ export default function RequestForm({
                         )}
                       </td>
                       <td className="px-2 py-2">
-                        <input
+                        {/* One row that grows with the text (field-sizing: content),
+                            so long descriptions wrap instead of being clipped in
+                            the narrow grid column. Older browsers keep one row and scroll. */}
+                        <textarea
+                          rows={1}
                           value={line.description}
                           onChange={(e) => updateLine(line.id, { description: e.target.value })}
                           aria-label={`Line ${i + 1} description`}
@@ -944,7 +957,7 @@ export default function RequestForm({
                                   : 'e.g. Mason & 2 labourers — foundation blockwork'
                                 : 'e.g. Iron rods 12mm, high tensile'
                           }
-                          className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                          className="block min-h-10 max-h-[7lh] w-full resize-none rounded-lg border border-input bg-card px-3 py-2 text-sm leading-5 text-foreground [field-sizing:content] placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                         />
                         <input
                           value={line.remarks}
@@ -1027,17 +1040,8 @@ export default function RequestForm({
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr className="border-t border-border bg-muted/50">
-                    <td colSpan={7} className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      Total cost
-                    </td>
-                    <td className="px-3 py-3 text-right text-base font-semibold tabular-nums text-foreground">
-                      {ghs(grandTotal)}
-                    </td>
-                    <td />
-                  </tr>
-                </tfoot>
+                {/* No total row here: the pinned action bar already shows the
+                    total cost, always in view — one place for that figure. */}
               </table>
             </div>
           </div>
@@ -1134,32 +1138,38 @@ export default function RequestForm({
       </div>
 
       {/*
-        Action bar, pinned for every screen size. `lg:left-[272px]` keeps it
-        clear of the dashboard sidebar rather than spanning under it.
+        Action bar, pinned for every screen size.
+        - Touch: sits on top of the mobile tab bar (`--pf-tabbar-h`) instead of
+          covering it, so navigation stays reachable from the form.
+        - Pointer ≥ md: starts at the sidebar column (`--pf-rail-w`, published
+          by DashboardLayout) so it follows the open/collapsed rail.
+        - One row at every width, so it costs ~70px of a phone screen, not ~110px.
       */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:px-6 lg:left-[272px] lg:px-8">
-        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-          <div className="flex items-baseline justify-between gap-3 sm:justify-start">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total cost</span>
-            <span className="text-xl font-semibold tabular-nums text-foreground">{ghs(grandTotal)}</span>
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              {filledLines} line{filledLines === 1 ? '' : 's'}
+      <div className="fixed inset-x-0 bottom-[calc(var(--pf-tabbar-h,0px)+env(safe-area-inset-bottom,0px))] z-40 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-6 pointer-fine:md:bottom-0 pointer-fine:md:left-[var(--pf-rail-w,0px)] pointer-fine:md:pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:px-8">
+        <div className="flex items-center justify-between gap-3 sm:gap-6">
+          {/* Label stacks over the amount until lg: beside the sidebar at md the
+              bar is only ~470px wide and the inline version wrapped into Cancel. */}
+          <div className="flex min-w-0 flex-col whitespace-nowrap lg:flex-row lg:items-baseline lg:gap-3">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">Total cost</span>
+            <span className="text-lg font-semibold tabular-nums text-foreground sm:text-xl">{ghs(grandTotal)}</span>
+            <span className="hidden text-xs text-muted-foreground lg:inline">
+              {filledLines} of {lines.length} line{lines.length === 1 ? '' : 's'} filled
               {files.length > 0 ? ` · ${files.length} attachment${files.length === 1 ? '' : 's'}` : ''}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 sm:shrink-0">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => router.push(dashboardPath)}
-              className="hidden h-11 rounded-lg px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex sm:items-center"
+              className="hidden h-11 whitespace-nowrap rounded-lg px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:inline-flex sm:items-center"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-primary text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60 sm:h-11 sm:w-auto sm:px-6 sm:text-sm"
+              className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-5 text-base font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-60 sm:h-11 sm:px-6 sm:text-sm"
             >
               {submitting ? <Loader2 size={18} className="animate-spin sm:h-4 sm:w-4" /> : <Send size={18} className="sm:h-4 sm:w-4" />}
               {submitting

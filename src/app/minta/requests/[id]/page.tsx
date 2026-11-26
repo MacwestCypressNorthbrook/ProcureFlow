@@ -11,12 +11,14 @@ import { FileText, Paperclip, Clock, Receipt } from 'lucide-react'
 import Link from 'next/link'
 import RequestActions from './RequestActions'
 import CancelRequisitionDialog from '@/components/shared/CancelRequisitionDialog'
+import RecallRequisitionDialog from '@/components/shared/RecallRequisitionDialog'
+import { checkRecall } from '@/lib/recall'
 import { cancelModeFor } from '@/lib/cancellation'
 import ApprovalPanel, { type ApprovalEntry } from '@/components/shared/ApprovalPanel'
 import StageProgress from '@/components/shared/StageProgress'
 import RequisitionTimeline from '@/components/shared/RequisitionTimeline'
 import RemindButton from '@/components/shared/RemindButton'
-import { currentStage } from '@/lib/workflow'
+import { currentStage, STAGES } from '@/lib/workflow'
 import PoDocumentActions from '@/components/shared/PoDocumentActions'
 import PurchaseOrdersPanel, { type PurchaseOrderDocument } from '@/components/shared/PurchaseOrdersPanel'
 import { UrgentBadge, UrgentBanner } from '@/components/shared/UrgentBadge'
@@ -134,6 +136,10 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
     isElevated(user?.role)
 
   const cancelMode = isOwner ? cancelModeFor(user?.role, status, true) : null
+  // The requester may take back their submission while the Project Lead has
+  // not acted on it — see lib/recall.ts.
+  const recall = user && isOwner ? await checkRecall(id, user) : null
+  const recallable = recall?.ok && recall.candidate.fromStage === 'requester' ? recall.candidate : null
 
   const payment = po ? await getPaymentPosition(po.id, Number(po.total_amount) || 0) : null
   const poPayments = po ? await listPayments(po.id) : []
@@ -173,6 +179,15 @@ export default async function RequestDetailPage({ params }: { params: Promise<{ 
               {isUrgent && <UrgentBadge />}
               <StatusBadge status={status} config={REQUEST_STATUS_CONFIG} />
               {isOwner && (canEdit || canDelete) && <RequestActions requestId={id} canEdit={canEdit} canDelete={canDelete} />}
+              {recallable && (
+                <RecallRequisitionDialog
+                  requestId={id}
+                  purpose={String(requestData.purpose || '')}
+                  action={recallable.action}
+                  fromLabel="you"
+                  heldByLabel={recallable.heldBy === 'lead' ? 'the Project Lead' : STAGES[recallable.heldBy].label}
+                />
+              )}
               {cancelMode && (
                 <CancelRequisitionDialog
                   requestId={id}

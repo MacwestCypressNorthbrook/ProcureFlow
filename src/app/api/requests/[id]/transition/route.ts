@@ -437,12 +437,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     /* ── Forward: hand to the next stage ────────────────────── */
-    await execute(
+    // Guarded on the status we read: if a recall, or a colleague at the same
+    // stage, moved it in the meantime, this approval must not overwrite that.
+    const moved = await query<{ id: string }>(
       `UPDATE public.requests
           SET status = $2, sent_back_to = NULL, return_to_stage = NULL, updated_at = now()
-        WHERE id = $1`,
-      [id, statusForStage(onward)]
+        WHERE id = $1 AND status = $3
+        RETURNING id`,
+      [id, statusForStage(onward), existing.status]
     )
+    if (moved.length === 0) {
+      return NextResponse.json(
+        { error: 'Someone else acted on this requisition a moment ago. Refresh to see where it stands.' },
+        { status: 409 }
+      )
+    }
 
     if (po && onward === 'admin') {
       await execute(

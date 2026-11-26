@@ -1,4 +1,5 @@
-import DecisionsTable from '@/components/shared/DecisionsTable'
+import DecisionsTable, { type RecallInfo } from '@/components/shared/DecisionsTable'
+import { checkRecallMany, RECALLABLE_ACTIONS } from '@/lib/recall'
 import StageTabs from '@/components/shared/StageTabs'
 import { PageContainer, PageHeader, StatGrid } from '@/components/shared/ui-kit'
 import { monthSplit, statMoney } from '@/components/shared/stat-presets'
@@ -45,6 +46,30 @@ export default async function ReviewedView({
     getStageDecisions(stage, { limit: 10000, actorId: mineOnly ? user.id : undefined }),
     queueHref && reviewedHref ? getStageInbox(stage) : Promise.resolve([]),
   ])
+
+  // Recall: only decisions that could still be recalled are checked — a
+  // recallable action on a requisition that is still open and not sent back —
+  // so a 10,000-row history costs one small query, not one per row.
+  const ENDED = new Set(['completed', 'rejected', 'cancelled', 'sent_back'])
+  const candidateIds = Array.from(
+    new Set(
+      decisions
+        .filter((d) => (RECALLABLE_ACTIONS as readonly string[]).includes(d.action) && !ENDED.has(d.request_status))
+        .map((d) => d.request_id)
+    )
+  )
+  const checks = await checkRecallMany(candidateIds, user)
+  const recallable: Record<string, RecallInfo> = {}
+  for (const check of checks.values()) {
+    if (!check.ok) continue
+    const c = check.candidate
+    // Keyed by the trail row, so the button sits on the decision being recalled.
+    recallable[c.approvalId] = {
+      action: c.action,
+      fromLabel: STAGES[c.fromStage].label,
+      heldByLabel: STAGES[c.heldBy].label,
+    }
+  }
 
   const approved = decisions.filter((d) => d.action === 'approved' || d.action === 'completed')
   const sentBack = decisions.filter((d) => d.action === 'sent_back')
@@ -121,6 +146,7 @@ export default async function ReviewedView({
         stageLabel={label}
         exportSection={`${stage}-reviewed`}
         exportedBy={user.name || user.email}
+        recallable={recallable}
       />
     </PageContainer>
   )

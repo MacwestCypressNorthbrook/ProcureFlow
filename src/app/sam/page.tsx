@@ -9,6 +9,7 @@ import {
 } from '@/components/shared/ui-kit'
 import { statMoney } from '@/components/shared/stat-presets'
 import { getStageDecisions, getStageInbox, getStageQueue } from '@/lib/review'
+import { withPresence } from '@/lib/presence'
 import { statusForStage } from '@/lib/workflow'
 import ReviewerHomeDashboard from '@/components/dashboards/ReviewerHomeDashboard'
 import { CheckCircle, ArrowRight } from 'lucide-react'
@@ -22,7 +23,8 @@ export default async function SamPage() {
   // The Project Lead is the first review in the chain; everything downstream is
   // shown only as context for what they have already cleared.
   const [waiting, downstream, decisions] = await Promise.all([
-    getStageInbox('lead'),
+    // Who else at this stage has each one open (advisory badge).
+    getStageInbox('lead').then((rows) => withPresence(rows, ['lead'], user.id)),
     getStageQueue([
       statusForStage('supply_chain'),
       statusForStage('admin'),

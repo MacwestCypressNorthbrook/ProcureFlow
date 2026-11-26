@@ -404,7 +404,7 @@ ALTER TABLE public.request_approvals ADD CONSTRAINT request_approvals_action_che
     action IN (
         'submitted', 'approved', 'sent_back', 'resubmitted', 'po_created',
         'marked_urgent', 'completed', 'paid', 'rejected', 'items_removed',
-        'edited'
+        'edited', 'cancelled', 'voided', 'recalled'
     )
 );
 
@@ -463,3 +463,18 @@ CREATE TRIGGER set_supplier_invoices_updated_at
     BEFORE UPDATE ON public.supplier_invoices
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ── Requisition presence ─────────────────────────────────────────────────────
+-- (mirrors db/migrations/023_request_presence.sql)
+-- Who has a requisition open at the stage that holds it. Advisory only; see
+-- src/lib/presence.ts. Written by user activity, never by a timer.
+CREATE TABLE IF NOT EXISTS public.request_presence (
+    request_id   UUID NOT NULL REFERENCES public.requests(id) ON DELETE CASCADE,
+    user_id      UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    stage        TEXT NOT NULL,
+    started_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (request_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_request_presence_last_seen
+    ON public.request_presence (last_seen_at);

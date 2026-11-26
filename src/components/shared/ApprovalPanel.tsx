@@ -29,6 +29,7 @@ import DocumentPreviewModal from '@/components/shared/DocumentPreviewModal'
 import { documentUrl } from '@/lib/files'
 import AttachPODrawer from '@/components/admin/AttachPODrawer'
 import UrgentEscalationDialog from '@/components/shared/UrgentEscalationDialog'
+import ConfirmDecisionDialog, { type DecisionKind } from '@/components/shared/ConfirmDecisionDialog'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { queueNeighbours } from '@/lib/queue-order'
@@ -83,6 +84,7 @@ const ACTION_LABEL: Record<string, string> = {
   edited: 'Edited',
   cancelled: 'Cancelled',
   voided: 'Voided',
+  recalled: 'Recalled',
 }
 
 const ACTION_TONE: Record<string, string> = {
@@ -97,6 +99,7 @@ const ACTION_TONE: Record<string, string> = {
   edited: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
   cancelled: 'bg-slate-500/10 text-slate-600 dark:text-slate-400',
   voided: 'bg-red-500/10 text-red-600 dark:text-red-400',
+  recalled: 'bg-sky-500/10 text-sky-700 dark:text-sky-300',
 }
 
 /**
@@ -228,6 +231,56 @@ export default function ApprovalPanel({
     }
   }
 
+  /**
+   * Approve and send back go through a confirmation first: each takes the
+   * requisition out of this reviewer's queue and notifies someone, and a
+   * mis-click on either used to be final. Resubmit stays one click — it only
+   * returns the reviewer's own corrections to whoever asked for them.
+   */
+  const [confirming, setConfirming] = useState<{ action: DecisionKind; target?: Stage } | null>(null)
+  const askToConfirm = (action: DecisionKind, target?: Stage) => {
+    setError(null)
+    setConfirming({ action, target })
+  }
+
+  const decisionCopy = (c: { action: DecisionKind; target?: Stage }) => {
+    const here = stage ? STAGES[stage]?.label ?? stage : 'this stage'
+    if (c.action === 'approve') {
+      if (stage === 'admin') {
+        return {
+          title: 'Authorize and complete this requisition?',
+          consequence:
+            'This closes the requisition, approves its purchase order and notifies everyone on it. After this, only a Void can reverse it.',
+          confirmLabel: 'Authorize & complete',
+          commentLabel: 'Closing note',
+          commentRequired: false,
+        }
+      }
+      const next = stage ? nextStage(stage) : null
+      const nextLabel = next ? STAGES[next]?.label ?? next : 'the next stage'
+      return {
+        title: `Approve and send to ${nextLabel}?`,
+        consequence: `It leaves your queue and goes to ${nextLabel}${
+          isUrgent ? ', who are notified immediately because it is marked urgent' : ''
+        }. The requester is told it cleared ${here}.`,
+        confirmLabel: `Approve to ${nextLabel}`,
+        commentLabel: `Note for ${nextLabel}`,
+        commentRequired: false,
+      }
+    }
+    const dest = c.target ?? (stage ? previousStage(stage) : null)
+    const destLabel = dest === 'requester' ? 'the requester' : dest ? STAGES[dest]?.label ?? dest : 'the previous stage'
+    return {
+      title: `Send back to ${dest === 'requester' ? 'the Requester' : destLabel}?`,
+      consequence: `It leaves your queue and returns to ${destLabel} with your reason. When they resubmit, it comes straight back to ${here}.`,
+      confirmLabel: `Send back`,
+      commentLabel: dest === 'requester' ? 'What the requester needs to change' : 'Reason',
+      // The server refuses a Supply Chain → Requester skip without one: it
+      // arrives with nobody in between to explain it.
+      commentRequired: c.target === 'requester' && stage === 'supply_chain',
+    }
+  }
+
   const act = async (action: 'approve' | 'send_back' | 'resubmit', target?: Stage) => {
     if (actLock.current) return
     actLock.current = true
@@ -248,6 +301,7 @@ export default function ApprovalPanel({
         return
       }
       setComment('')
+      setConfirming(null)
       const next = action !== 'resubmit' && queueBase ? queueNeighbours(queueBase, requestId)?.nextId : null
       startTransition(() => {
         if (next) router.push(`${queueBase}/${next}`)
@@ -550,7 +604,7 @@ export default function ApprovalPanel({
                   <div className="flex flex-col gap-2 sm:flex-row pt-1">
                     <button
                       type="button"
-                      onClick={() => act('approve')}
+                      onClick={() => askToConfirm('approve')}
                       disabled={locked}
                       className="inline-flex h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-emerald-600 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
                     >
@@ -559,7 +613,7 @@ export default function ApprovalPanel({
                     </button>
                     <button
                       type="button"
-                      onClick={() => act('send_back')}
+                      onClick={() => askToConfirm('send_back')}
                       disabled={locked}
                       className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
                     >
@@ -601,7 +655,7 @@ export default function ApprovalPanel({
                   <div className="pt-1">
                     <button
                       type="button"
-                      onClick={() => act('send_back')}
+                      onClick={() => askToConfirm('send_back')}
                       disabled={locked}
                       className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-input bg-card px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:opacity-60"
                     >
@@ -624,13 +678,8 @@ export default function ApprovalPanel({
               const returnToRequesterButton = canReturnToRequester ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (!comment.trim()) {
-                      setError('Say what the requester needs to change — it goes to them directly.')
-                      return
-                    }
-                    act('send_back', 'requester')
-                  }}
+                  // The dialog asks for (and requires) what the requester must change.
+                  onClick={() => askToConfirm('send_back', 'requester')}
                   disabled={locked}
                   title="Return it to the engineer who raised it. Their resubmission comes straight back to you."
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-orange-500/40 bg-orange-500/[0.06] px-5 text-sm font-medium text-orange-700 transition-colors hover:bg-orange-500/10 disabled:opacity-60 cursor-pointer dark:text-orange-300 @lg:w-auto"
@@ -739,7 +788,7 @@ export default function ApprovalPanel({
                               {!isRequester && prev && (
                                 <button
                                   type="button"
-                                  onClick={() => act('send_back')}
+                                  onClick={() => askToConfirm('send_back')}
                                   disabled={locked}
                                   className="inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer @lg:w-auto"
                                 >
@@ -753,7 +802,7 @@ export default function ApprovalPanel({
                             <>
                               <button
                                 type="button"
-                                onClick={() => act('approve')}
+                                onClick={() => askToConfirm('approve')}
                                 disabled={locked || allDocsDeclined}
                                 title={allDocsDeclined ? 'All vendor invoices are declined. Send back or accept a valid quote.' : undefined}
                                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer @lg:w-auto @lg:min-w-[220px]"
@@ -763,7 +812,7 @@ export default function ApprovalPanel({
                               </button>
                               <button
                                 type="button"
-                                onClick={() => act('send_back')}
+                                onClick={() => askToConfirm('send_back')}
                                 disabled={locked}
                                 className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-input bg-card px-5 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60 cursor-pointer @lg:w-auto"
                               >
@@ -892,6 +941,23 @@ export default function ApprovalPanel({
           router.refresh()
         }}
       />
+
+      {confirming && (
+        <ConfirmDecisionDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setConfirming(null)
+          }}
+          kind={confirming.action}
+          purpose={requestSummary?.purpose}
+          {...decisionCopy(confirming)}
+          comment={comment}
+          onCommentChange={setComment}
+          busy={locked}
+          error={error}
+          onConfirm={() => act(confirming.action, confirming.target)}
+        />
+      )}
     </div>
   )
 }

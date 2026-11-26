@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { requirePageRole } from '@/lib/auth-guard'
 import QueueTable from '@/components/shared/QueueTable'
 import { PageContainer } from '@/components/shared/ui-kit'
+import { withPresence } from '@/lib/presence'
 import { getStageInbox, getStageDecisions } from '@/lib/review'
 import ReviewerHomeDashboard from '@/components/dashboards/ReviewerHomeDashboard'
 
@@ -17,10 +18,11 @@ export const dynamic = 'force-dynamic'
  * implementations that could drift; the tab below now links to the one page.
  */
 export default async function CostControlPage() {
-  await requirePageRole('cost_control')
+  const user = await requirePageRole('cost_control')
 
   const [pending, decisions] = await Promise.all([
-    getStageInbox('cost_control'),
+    // Who else at this stage has each one open (advisory badge).
+    getStageInbox('cost_control').then((rows) => withPresence(rows, ['cost_control'], user.id)),
     getStageDecisions('cost_control', { limit: 500 }),
   ])
 

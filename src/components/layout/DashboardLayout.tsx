@@ -819,7 +819,14 @@ export default function DashboardLayout({
   return (
     <div
       // 56px of tab bar on touch; nothing to clear on a pointer device.
-      style={{ '--pf-tabbar-h': tabItems.length > 0 ? '56px' : '0px' } as React.CSSProperties}
+      // `--pf-rail-w` is the sidebar column width (matches RAIL_PAD / OPEN_PAD),
+      // so fixed page chrome can start where the content column starts.
+      style={
+        {
+          '--pf-tabbar-h': tabItems.length > 0 ? '56px' : '0px',
+          '--pf-rail-w': collapsed ? '112px' : '300px',
+        } as React.CSSProperties
+      }
       className={cn(
         'min-h-screen bg-background transition-[grid-template-columns] duration-300 pointer-fine:md:grid',
         collapsed ? RAIL_PAD : OPEN_PAD
